@@ -36,15 +36,18 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#elif defined(__MINGW32__)
+#elif defined(_WIN32)
+#define _WIN32_IE 0x0400
 #include <windows.h>
+#include <shlobj.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#elif defined(__CYGWIN__)
-#include <windows.h>
-#include <sys/types.h>
-#include <sys/stat.h>
+#if defined(__CYGWIN__)
 #include <sys/cygwin.h>
+#endif
+#elif defined(__OS2__)
+#define INCL_DOS
+#include <os2.h>
 #endif
 
 #include "talloc.h"
@@ -77,30 +80,29 @@ char *get_path(const char *filename){
 	{
 		int i,imax=0;
 		struct _stat statBuffer;
-		char exedir[MAX_PATH];
-		char config_path[MAX_PATH];
-		char *appdata = getenv("appdata");
-		if (appdata && strcmp(appdata, "")) {
-			strncpy(exedir, appdata, MAX_PATH);
-			exedir[MAX_PATH-1] = '\0';
+		char exedir[4096], config_path[4096], appdata[4096];
+		if (SHGetSpecialFolderPathA(NULL, appdata, CSIDL_APPDATA, 1)) {
+			strncpy(exedir, appdata, strlen(appdata));
 		} else {
-			GetModuleFileNameA(NULL, exedir, MAX_PATH);
+			GetModuleFileNameA(NULL, exedir, 4096);
 		}
-		for (i=0; i< strlen(exedir); i++)
+		int len = strlen(exedir);
+		for (i=0; i< len; i++)
 			if (exedir[i] =='\\')
 				exedir[i]='/';
-		
+
 		sprintf(config_path, "%s%s", exedir, config_dir);
 		int stat_res;
 		if ((stat_res = stat(config_path, &statBuffer)) < 0 ||
 				!(statBuffer.st_mode & S_IFDIR)) {
-			GetModuleFileNameA(NULL, exedir, MAX_PATH);
-			for (i=0; i< strlen(exedir); i++)
+			GetModuleFileNameA(NULL, exedir, 4096);
+			len = strlen(exedir);
+			for (i=0; i< len; i++)
 				if (exedir[i] =='\\')
 					{exedir[i]='/'; imax=i;}
 			exedir[imax]='\0';
 		}
-		
+
 		homedir = exedir;
 	}
 #elif defined(__OS2__)
