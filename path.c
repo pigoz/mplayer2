@@ -59,7 +59,7 @@
 char *get_path(const char *filename){
 	char *homedir;
 	char *buff;
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(__CYGWIN__)
 	static char *config_dir = "/mplayer";
 #else
 	static char *config_dir = "/.mplayer";
