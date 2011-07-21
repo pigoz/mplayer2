@@ -812,7 +812,7 @@ drivers/rage128_vid.o: drivers/radeon_vid.c drivers/radeon.h drivers/radeon_vid.
 
 install-drivers: $(DRIVER_OBJS)
 	-mkdir -p $(MODULES_DIR)
-	install -m 644 $(KERNEL_OBJS) $(MODULES_DIR)
+	$(INSTALL) -m 644 $(KERNEL_OBJS) $(MODULES_DIR)
 	depmod -a
 	-mknod /dev/mga_vid    c 178 0
 	-mknod /dev/tdfx_vid   c 178 0
