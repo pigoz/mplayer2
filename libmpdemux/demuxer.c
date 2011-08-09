@@ -503,6 +503,9 @@ static void allocate_parser(AVCodecContext **avctx, AVCodecParserContext **parse
     enum CodecID codec_id = CODEC_ID_NONE;
 
     switch (format) {
+    case MKTAG('M', 'P', '4', 'A'):
+        codec_id = CODEC_ID_AAC;
+        break;
     case MKTAG('M', 'P', '4', 'L'):
         codec_id = CODEC_ID_AAC_LATM;
         break;
