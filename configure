@@ -200,7 +200,6 @@ issystem() {
 }
 aix()       { issystem "AIX"; }
 amigaos()   { issystem "AmigaOS"; }
-beos()      { issystem "BEOS"; }
 bsdos()     { issystem "BSD/OS"; }
 cygwin()    { issystem "CYGWIN"; }
 darwin()    { issystem "Darwin"; }
@@ -1203,10 +1202,7 @@ if test -z "$_target" ; then
   # OS name
   system_name=$(uname -s 2>&1)
   case "$system_name" in
-  Linux|FreeBSD|NetBSD|OpenBSD|DragonFly|BSD/OS|Darwin|SunOS|QNX|GNU|BeOS|MorphOS|AIX|AmigaOS)
-    ;;
-  Haiku)
-    system_name=BeOS
+  Linux|FreeBSD|NetBSD|OpenBSD|DragonFly|BSD/OS|Darwin|SunOS|QNX|GNU|MorphOS|AIX|AmigaOS|Haiku)
     ;;
   IRIX*)
     system_name=IRIX
@@ -1234,7 +1230,7 @@ if test -z "$_target" ; then
 
   # host's CPU/instruction set
   case "$(uname -m 2>&1)" in
-      x86_64|amd64|i[3-9]86*|x86|x86pc|k5|k6|k6_2|k6_3|k6-2|k6-3|pentium*|athlon*|i586_i686|i586-i686|BePC) host_arch=i386 ;;
+      x86_64|amd64|i[3-9]86*|x86|x86pc|k5|k6|k6_2|k6_3|k6-2|k6-3|pentium*|athlon*|i586_i686|i586-i686) host_arch=i386 ;;
       ia64) host_arch=ia64 ;;
       macppc|ppc|Power*) host_arch=ppc ;;
       ppc64) host_arch=ppc64 ;;
@@ -2633,23 +2629,6 @@ fi
 ######################
 
 
-echocheck "-lposix"
-if cflag_check -lposix ; then
-  extra_ldflags="$extra_ldflags -lposix"
-  echores "yes"
-else
-  echores "no"
-fi
-
-echocheck "-lm"
-if cflag_check -lm ; then
-  extra_ldflags="$extra_ldflags -lm"
-  echores "yes"
-else
-  echores "no"
-fi
-
-
 echocheck "langinfo"
 if test "$_langinfo" = auto ; then
   _langinfo=no
@@ -2821,7 +2800,6 @@ echores "$_nanosleep"
 
 echocheck "socklib"
 # for Solaris (socket stuff is in -lsocket, gethostbyname and friends in -lnsl):
-# for BeOS (socket stuff is in -lsocket, gethostbyname and friends in -lbind):
 cat > $TMPC << EOF
 #include <netdb.h>
 #include <sys/socket.h>
@@ -3396,19 +3374,6 @@ else
 fi
 echores "$_vsscanf"
 
-
-echocheck "swab()"
-_swab=no
-define_statement_check "_XOPEN_SOURCE 600" "unistd.h" 'int a, b; swab(&a, &b, 0)' ||
-    statement_check "string.h" 'int a, b; swab(&a, &b, 0)' && _swab=yes
-if test "$_swab" = yes ; then
-  def_swab='#define HAVE_SWAB 1'
-  need_swab=no
-else
-  def_swab='#undef HAVE_SWAB'
-  need_swab=yes
-fi
-echores "$_swab"
 
 echocheck "POSIX select()"
 cat > $TMPC << EOF
@@ -4446,7 +4411,7 @@ EOF
     if cc_check $_inc_tmp $_ld_tmp >>"$TMPLOG" 2>&1 ; then
           _sdl=yes
     elif cc_check $_inc_tmp $_ld_tmp -lstdc++ >>"$TMPLOG" 2>&1 ; then
-          # HACK for BeOS/Haiku SDL
+          # HACK for Haiku SDL
           _ld_tmp="$_ld_tmp -lstdc++"
           _sdl=yes
      fi
@@ -5153,8 +5118,6 @@ if test "$_libdvdcss_internal" = yes ; then
     extra_ldflags="$extra_ldflags -framework IOKit -framework Carbon"
   elif cygwin ; then
     cflags_libdvdcss="-DSYS_CYGWIN -DWIN32"
-  elif beos ; then
-    cflags_libdvdcss="-DSYS_BEOS"
   elif os2 ; then
     cflags_libdvdcss="-DSYS_OS2"
   fi
@@ -6103,7 +6066,7 @@ echores "$_pvr"
 
 echocheck "ftp"
 if test "$_ftp" = "auto" ; then
-test "$networking" = "yes" && ! beos && _ftp=yes
+test "$networking" = "yes" && _ftp=yes
 fi
 if test "$_ftp" = yes ; then
   def_ftp='#define CONFIG_FTP 1'
@@ -6392,7 +6355,6 @@ NEED_MMAP         = $need_mmap
 NEED_SETENV       = $need_setenv
 NEED_SHMEM        = $need_shmem
 NEED_STRSEP       = $need_strsep
-NEED_SWAB         = $need_swab
 NEED_VSSCANF      = $need_vsscanf
 
 # features
@@ -6637,7 +6599,6 @@ $def_setenv
 $def_setmode
 $def_shm
 $def_strsep
-$def_swab
 $def_sysi86
 $def_sysi86_iv
 $def_termcap
