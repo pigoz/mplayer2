@@ -509,7 +509,8 @@ GENERAL OPTIONS
     useful on slow terminals or broken ones which do not properly handle
     carriage return (i.e. \\r).
 
---priority=<prio> (Windows and OS/2 only)
+--priority=<prio>
+    (Windows and OS/2 only.)
     Set process priority for MPlayer according to the predefined priorities
     available under Windows and OS/2.
 
@@ -542,7 +543,8 @@ GENERAL OPTIONS
 PLAYER OPTIONS
 ==============
 
---autoq=<quality> (use with ``--vf=[s]pp``)
+--autoq=<quality>
+    Used with ``--vf=[s]pp``.
     Dynamically changes the level of postprocessing depending on the available
     spare CPU time. The number you specify will be the maximum level used.
     Usually you can use some big number. You have to use ``--vf=[s]pp`` without
@@ -598,7 +600,8 @@ PLAYER OPTIONS
     ``--correct-pts`` the subtitle timing will typically be off by some frames.
     This option does not work correctly with some demuxers and codecs.
 
---crash-debug (DEBUG CODE)
+--crash-debug
+    DEBUG CODE.
     Automatically attaches gdb upon crash or **SIGTRAP**. Support must be
     compiled in by configuring with ``---enable-crash-debug``.
 
@@ -614,7 +617,7 @@ PLAYER OPTIONS
     entries later. See http://www.mplayerhq.hu/DOCS/HTML/en/edl.html for
     details.
 
---fixed-vo, --nofixed-vo
+--fixed-vo, --no-fixed-vo
     ``--fixed-vo`` enforces a fixed video system for multiple files (one
     (un)initialization for all files). Therefore only one window will be opened
     for all files. Now enabled by default, use ``--nofixed-vo`` to disable and
@@ -733,7 +736,8 @@ PLAYER OPTIONS
     particularly slow command then the player may be unresponsive while it
     processes all the queued commands.
 
---lircconf=<filename> (LIRC only)
+--lircconf=<filename>
+    (LIRC only)
     Specifies a configuration file for LIRC (default: ``~/.lircrc``).
 
 --list-properties
@@ -742,27 +746,33 @@ PLAYER OPTIONS
 --loop=<number>
     Loops movie playback <number> times. 0 means forever.
 
---menu (OSD menu only)
+--menu
+    (OSD menu only)
     Turn on OSD menu support.
 
---menu-cfg=<filename> (OSD menu only)
+--menu-cfg=<filename>
+    (OSD menu only)
     Use an alternative menu.conf.
 
---menu-chroot=<path> (OSD menu only)
+--menu-chroot=<path>
+    (OSD menu only)
     Chroot the file selection menu to a specific location.
 
     *EXAMPLE*: ``--menu-chroot=/home`` will restrict the file selection menu to
     ``/home`` and downward (i.e. no access to ``/`` will be possible, but
     ``/home/user_name`` will).
 
---menu-keepdir (OSD menu only)
+--menu-keepdir
+     (OSD menu only)
      File browser starts from the last known location instead of current
      directory.
 
---menu-root=<value> (OSD menu only)
+--menu-root=<value>
+    (OSD menu only)
     Specify the main menu.
 
---menu-startup (OSD menu only)
+--menu-startup
+    (OSD menu only)
     Display the main menu at MPlayer startup.
 
 --mouse-movements
@@ -816,7 +826,7 @@ PLAYER OPTIONS
     :sort:    Maintain a buffer of unused pts values and use the lowest value
               for the frame.
 
---rtc (RTC only)
+--rtc
     Turns on usage of the Linux RTC (realtime clock - ``/dev/rtc``) as timing
     mechanism. This wakes up the process every 1/1024 seconds to check the
     current time. Useless with modern Linux kernels configured for desktop use
@@ -872,9 +882,8 @@ PLAYER OPTIONS
     price of higher CPU consumption.
 
 --sstep=<sec>
-    Skip <sec> seconds after every frame. The normal framerate of the movie
-    is kept, so playback is accelerated. Since MPlayer can only seek to the
-    next keyframe this may be inexact.
+    Skip <sec> seconds after every frame. Since MPlayer will only seek to
+    the next keyframe unless you use ``--hr-seek`` this may be inexact.
 
 
 DEMUXER/STREAM OPTIONS
@@ -933,25 +942,28 @@ DEMUXER/STREAM OPTIONS
     Enables caching for the stream used by ``--audiofile``, using the specified
     amount of memory.
 
---reuse-socket (udp:// only)
+--reuse-socket
+    (udp:// only)
     Allows a socket to be reused by other processes as soon as it is closed.
 
---bandwidth=<Bytes> (network only)
+--bandwidth=<Bytes>
     Specify the maximum bandwidth for network streaming (for servers that are
     able to send content in different bitrates). Useful if you want to watch
     live streamed media behind a slow connection. With Real RTSP streaming, it
     is also used to set the maximum delivery bandwidth allowing faster cache
     filling and stream dumping.
 
---bluray-angle=<angle ID> (Blu-ray only)
+--bluray-angle=<angle ID>
     Some Blu-ray discs contain scenes that can be viewed from multiple angles.
     Here you can tell MPlayer which angles to use (default: 1).
 
---bluray-chapter=<chapter ID> (Blu-ray only)
+--bluray-chapter=<chapter ID>
+    (Blu-ray only)
     Tells MPlayer which Blu-ray chapter to start the current title from
     (default: 1).
 
---bluray-device=<path to disc> (Blu-ray only)
+--bluray-device=<path to disc>
+    (Blu-ray only)
     Specify the Blu-ray disc location. Must be a directory with Blu-ray
     structure.
 
@@ -980,7 +992,7 @@ DEMUXER/STREAM OPTIONS
     else than MPEG streams. Note that, due to cache latencies, captured data
     may begin and end somewhat delayed compared to what you see displayed.
 
---cdda=<option1:option2> (CDDA only)
+--cdda=<option1:option2>
     This option can be used to tune the CD Audio reading feature of MPlayer.
 
     Available options are:
@@ -1040,19 +1052,22 @@ DEMUXER/STREAM OPTIONS
     :6: full 5.1
     :8: full 7.1
 
---chapter=<chapter ID>[-<endchapter ID>] (``dvd://`` and ``dvdnav://`` only)
+--chapter=<chapter ID[-endchapter ID]>
     Specify which chapter to start playing at. Optionally specify which chapter
     to end playing at (default: 1).
 
---edition=<edition ID> (Matroska only)
+--edition=<edition ID>
+    (Matroska files only)
     Specify the edition (set of chapters) to use, where 0 is the first. If set
     to -1 (the default), MPlayer will choose the first edition declared as a
     default, or if there is no default, the first edition defined.
 
---cookies (network only)
-    Send cookies when making HTTP requests.
+--cookies, --no-cookies
+    (network only)
+    Support cookies when making HTTP requests. Disabled by default.
 
---cookies-file=<filename> (network only)
+--cookies-file=<filename>
+    (network only)
     Read HTTP cookies from <filename> (default: ``~/.mozilla/`` and
     ``~/.netscape/``) and skip reading from default locations. The file is
     assumed to be in Netscape format.
@@ -1089,7 +1104,7 @@ DEMUXER/STREAM OPTIONS
     If you give more than one of ``--dumpaudio``, ``--dumpvideo``, ``--dumpstream`` on
     the command line only the last one will work.
 
---dvbin=<options> (DVB only)
+--dvbin=<options>
     Pass the following parameters to the DVB input module, in order to override
     the default ones:
 
@@ -1102,12 +1117,12 @@ DEMUXER/STREAM OPTIONS
     :timeout=<1-30>:  Maximum number of seconds to wait when trying to tune a
                       frequency before giving up (default: 30).
 
---dvd-device=<path to device> (DVD only)
+--dvd-device=<path to device>
     Specify the DVD device or .iso filename (default: ``/dev/dvd``). You can
     also specify a directory that contains files previously copied directly
     from a DVD (with e.g. vobcopy).
 
---dvd-speed=<factor or speed in KB/s> (DVD only)
+--dvd-speed=<factor or speed in KB/s>
     Try to limit DVD speed (default: 0, no change). DVD base speed is about
     1350KB/s, so a 8x drive can read at speeds up to 10800KB/s. Slower speeds
     make the drive more quiet, for watching DVDs 2700KB/s should be quiet and
@@ -1117,7 +1132,7 @@ DEMUXER/STREAM OPTIONS
 
     *NOTE*: You need write access to the DVD device to change the speed.
 
---dvdangle=<angle ID> (DVD only)
+--dvdangle=<angle ID>
     Some DVD discs contain scenes that can be viewed from multiple angles.
     Here you can tell MPlayer which angles to use (default: 1).
 
@@ -1152,7 +1167,10 @@ DEMUXER/STREAM OPTIONS
 --frames=<number>
     Play/convert only first <number> frames, then quit.
 
---hr-mp3-seek (MP3 only)
+--hr-mp3-seek
+    Only affects the internal ``audio`` demuxer, which is not used by
+    default for mp3 files any more. The equivalent functionality is always
+    enabled with the now default libavformat demuxer for mp3.
     Hi-res MP3 seeking. Enabled when playing from an external MP3 file, as we
     need to seek to the very exact position to keep A/V sync. Can be slow
     especially when seeking backwards since it has to rewind to the beginning
@@ -1188,8 +1206,8 @@ DEMUXER/STREAM OPTIONS
 --noidx
     Do not use index present in the file even if one is present.
 
---ipv4-only-proxy (network only)
-    Skip the proxy for IPv6 addresses. It will still be used for IPv4
+--ipv4-only-proxy
+    Skip any HTTP proxy for IPv6 addresses. It will still be used for IPv4
     connections.
 
 --lavfdopts=<option1:option2:...>
@@ -1241,11 +1259,13 @@ DEMUXER/STREAM OPTIONS
     :fps=<value>:  output fps (default: 25)
     :type=<value>: input file type (available: jpeg, png, tga, sgi)
 
---ni (AVI only)
+--ni
+    (Internal AVI demuxer which is not used by default only)
     Force usage of non-interleaved AVI parser (fixes playback of some bad AVI
     files).
 
---nobps (AVI only)
+--nobps
+    (Internal AVI demuxer which is not used by default only)
     Do not use average byte/second value for A-V sync. Helps with some AVI
     files with broken header.
 
@@ -1271,7 +1291,7 @@ DEMUXER/STREAM OPTIONS
     the video codec used. This option is needed to play EVO or VDR files
     containing H.264 streams.
 
---pvr=<option1:option2:...> (PVR only)
+--pvr=<option1:option2:...>
     This option tunes various encoding properties of the PVR capture module. It
     has to be used with any hardware MPEG encoder based card supported by the
     V4L2 driver. The Hauppauge WinTV PVR-150/250/350/500 and all IVTV based
@@ -1327,7 +1347,7 @@ DEMUXER/STREAM OPTIONS
         :svcd:  Super Video CD compatible stream
         :dvd:   DVD compatible stream
 
---radio=<option1:option2:...> (radio only)
+--radio=<option1:option2:...>
     These options set various parameters of the radio capture module. For
     listening to radio with MPlayer use ``radio://<frequency>`` (if channels
     option is not given) or ``radio://<channel_number>`` (if channels option is
@@ -1422,7 +1442,7 @@ DEMUXER/STREAM OPTIONS
     - ``mplayer sample-720x576.yuv --demuxer=rawvideo --rawvideo w=720:h=576``
       Play a raw YUV sample.
 
---referrer=<string> (network only)
+--referrer=<string>
     Specify a referrer path or URL for HTTP requests.
 
 --rtsp-port
@@ -1437,13 +1457,15 @@ DEMUXER/STREAM OPTIONS
     use ``-v`` to see which IP address MPlayer tries to bind to and try to force
     it to one assigned to your computer instead.
 
---rtsp-stream-over-tcp (LIVE555 and NEMESI only)
+--rtsp-stream-over-tcp
+    (LIVE555 and NEMESI only)
     Used with ``rtsp://`` URLs to specify that the resulting incoming RTP and
     RTCP packets be streamed over TCP (using the same TCP connection as RTSP).
     This option may be useful if you have a broken internet connection that
     does not pass incoming UDP packets (see http://www.live555.com/mplayer/).
 
---rtsp-stream-over-http (LIVE555 only)
+--rtsp-stream-over-http
+    (LIVE555 only)
     Used with ``http://`` URLs to specify that the resulting incoming RTP and
     RTCP packets be streamed over HTTP.
 
@@ -1490,7 +1512,7 @@ DEMUXER/STREAM OPTIONS
     program (if present) you want to play. Can be used with ``--vid`` and
     ``--aid``.
 
---tv=<option1:option2:...> (TV/PVR only)
+--tv=<option1:option2:...>
     This option tunes various properties of the TV capture module. For watching
     TV with MPlayer, use ``tv://`` or ``tv://<channel_number>`` or even
     ``tv://<channel_name>`` (see option channels for channel_name below) as a
@@ -1700,7 +1722,7 @@ DEMUXER/STREAM OPTIONS
         (default: off). Some audio cards create audio chunks about 0.5s in
         size, resulting in choppy video when using immediatemode=0.
 
---tvscan=<option1:option2:...> (TV only)
+--tvscan=<option1:option2:...>
     Tune the TV channel scanner. MPlayer will also print value for "-tv
     channels=" option, including existing and just found channels.
 
@@ -1731,7 +1753,8 @@ DEMUXER/STREAM OPTIONS
     playing an MPEG-TS stream, MPlayer will use the first program (if present)
     with the chosen video stream.
 
---vivo=<suboption> (DEBUG CODE)
+--vivo=<suboption>
+    (DEBUG CODE)
     Force audio parameters for the VIVO demuxer (for debugging purposes).
 
 .. FIXME: Document this.
@@ -1867,36 +1890,37 @@ OSD/SUBTITLE OPTIONS
     :1:    narrow black outline
     :10:   bold black outline
 
---flip-hebrew (FriBiDi only)
+--flip-hebrew
     Turns on flipping subtitles using FriBiDi.
 
---noflip-hebrew-commas
+--no-flip-hebrew-commas
     Change FriBiDi's assumptions about the placements of commas in subtitles.
     Use this if commas in subtitles are shown at the start of a sentence
     instead of at the end.
 
---font=<path to font.desc file> or <path to font (FreeType)> or <font pattern (Fontconfig)>
-    Search for the OSD/SUB fonts in an alternative directory (default for
-    normal fonts: ``~/.mplayer/font/font.desc``, default for FreeType fonts:
-    ``~/.mplayer/subfont.ttf``).
-
-    *NOTE*: With FreeType, this option determines the path to the text font
-    file. With Fontconfig, this option determines the Fontconfig font pattern.
+--font=<font pattern/file>
+    Specify font to use for OSD and for subtitles that do not themselves
+    specify a particular font. See also ``--subfont``.
+    With fontconfig enabled the argument is a fontconfig pattern and the
+    default is ``sans``.
+    Without fontconfig the argument is a filename and the default is
+    ``~/.mplayer/subfont.ttf`` with freetype enabled,
+    ``~/.mplayer/font/font.desc`` without it.
 
     *EXAMPLE*:
 
-    - ``--font=~/.mplayer/arial-14/font.desc``
-    - ``--font=~/.mplayer/arialuni.ttf``
-    - ``--font='Bitstream Vera Sans'``
-    - ``--font='Bitstream Vera Sans:style=Bold'``
+    - ``--font=~/.mplayer/arial-14/font.desc``  (no fontconfig or freetype)
+    - ``--font=~/.mplayer/arialuni.ttf`` (no fontconfig)
+    - ``--font='Bitstream Vera Sans'`` (usual case with fontconfig)
+    - ``--font='Bitstream Vera Sans:style=Bold'`` (usual case with fontconfig)
 
---fontconfig, --nofontconfig (fontconfig only)
+--fontconfig, --no-fontconfig
     Enables the use of fontconfig managed fonts. Enabled by default.
 
 --forcedsubsonly
     Display only forced subtitles for the DVD subtitle stream selected by e.g. ``--slang``.
 
---fribidi-charset=<charset name> (FriBiDi only)
+--fribidi-charset=<charset name>
     Specifies the character set that will be passed to FriBiDi when decoding
     non-UTF-8 subtitles (default: ISO8859-8).
 
@@ -1994,10 +2018,10 @@ OSD/SUBTITLE OPTIONS
     subtitles are grayscale so this value is equivalent to the intensity of the
     color. 255 means white and 0 black.
 
---sub-demuxer=<[+]name> (``--subfile`` only) (BETA CODE)
-    Force subtitle demuxer type for ``--subfile``. Use a '+' before the name to
-    force it, this will skip some checks! Give the demuxer name as printed by
-    ``--sub-demuxer=help``.
+--sub-demuxer=<[+]name>
+    Force subtitle demuxer type for ``--subfile``. Using a '+' before the name
+    will force it, this will skip some checks!
+    Give the demuxer name as printed by ``--sub-demuxer=help``.
 
 --sub-fuzziness=<mode>
     Adjust matching fuzziness when searching for subtitles:
@@ -2024,7 +2048,7 @@ OSD/SUBTITLE OPTIONS
     hearing impaired encoded in the VOB userdata stream on most region 1 DVDs.
     CC subtitles have not been spotted on DVDs from other regions so far.
 
---subcp=<codepage> (iconv only)
+--subcp=<codepage>
     If your system supports ``iconv(3)``, you can use this option to specify
     the subtitle codepage.
 
@@ -2032,7 +2056,11 @@ OSD/SUBTITLE OPTIONS
     - ``--subcp=latin2``
     - ``--subcp=cp1250``
 
---subcp enca:<language>:<fallback codepage> (ENCA only)
+    If the player was compiled with ENCA support you can use special syntax
+    to use that.
+
+    ``--subcp=enca:<language>:<fallback codepage>``
+
     You can specify your language using a two letter language code to make ENCA
     detect the codepage automatically. If unsure, enter anything and watch
     mplayer ``-v`` output for available languages. Fallback codepage specifies
@@ -2064,14 +2092,15 @@ OSD/SUBTITLE OPTIONS
 --subdelay=<sec>
     Delays subtitles by <sec> seconds. Can be negative.
 
---subfile=<filename> (BETA CODE)
+--subfile=<filename>
+    (BETA CODE)
     Currently useless. Same as ``--audiofile``, but for subtitle streams (OggDS?).
 
---subfont=<path to font (FreeType), font pattern (Fontconfig)> (FreeType only)
+--subfont=<font to use>
     Sets the subtitle font (see ``--font``). If no ``--subfont`` is given,
-    ``--font`` is used.
+    ``--font`` is used for subtitles too.
 
---subfont-autoscale=<0-3> (FreeType only)
+--subfont-autoscale=<0-3>
     Sets the autoscale mode.
 
     *NOTE*: 0 means that text scale and OSD scale are font heights in points.
@@ -2083,22 +2112,22 @@ OSD/SUBTITLE OPTIONS
     :2: proportional to movie width
     :3: proportional to movie diagonal (default)
 
---subfont-blur=<0-8> (FreeType only)
+--subfont-blur=<0-8>
     Sets the font blur radius (default: 2).
 
---subfont-encoding=<value> (FreeType only)
+--subfont-encoding=<value>
     Sets the font encoding. When set to 'unicode', all the glyphs from the font
     file will be rendered and unicode will be used (default: unicode).
 
---subfont-osd-scale=<0-100> (FreeType only)
-    Sets the autoscale coefficient of the OSD elements (default: 6).
+--subfont-osd-scale=<0-100>
+    Sets the autoscale coefficient of the OSD elements (default: 4).
 
---subfont-outline=<0-8> (FreeType only)
+--subfont-outline=<0-8>
     Sets the font outline thickness (default: 2).
 
---subfont-text-scale=<0-100> (FreeType only)
+--subfont-text-scale=<0-100>
     Sets the subtitle text autoscale coefficient as percentage of the screen
-    size (default: 5).
+    size (default: 3.5).
 
 --subfps=<rate>
     Specify the framerate of the subtitle file (default: movie fps).
@@ -2106,9 +2135,10 @@ OSD/SUBTITLE OPTIONS
     *NOTE*: <rate> > movie fps speeds the subtitles up for frame-based subtitle
     files and slows them down for time-based ones.
 
---subpos=<0-100> (useful with ``--vf=expand``)
+--subpos=<0-100>
     Specify the position of subtitles on the screen. The value is the vertical
     position of the subtitle in % of the screen height.
+    Can be useful with ``--vf=expand``.
 
 --subwidth=<10-100>
     Specify the maximum width of subtitles on the screen. Useful for TV-out.
@@ -2126,10 +2156,11 @@ OSD/SUBTITLE OPTIONS
 --unicode
     Tells MPlayer to handle the subtitle file as unicode.
 
---unrarexec=<path to unrar executable> (not supported on MingW)
+--unrarexec=<path to unrar executable>
     Specify the path to the unrar executable so MPlayer can use it to access
     rar-compressed VOBsub files (default: not set, so the feature is off). The
     path must include the executable's filename, i.e. ``/usr/local/bin/unrar``.
+    Not supported on MingW.
 
 --utf8
     Tells MPlayer to handle the subtitle file as UTF-8.
@@ -2145,7 +2176,8 @@ OSD/SUBTITLE OPTIONS
 AUDIO OUTPUT OPTIONS
 ====================
 
---abs=<value> (``--ao=oss`` only) (OBSOLETE)
+--abs=<value>
+    (``--ao=oss`` only) (OBSOLETE)
     Override audio driver/card buffer size detection.
 
 --format=<format>
@@ -2167,7 +2199,8 @@ AUDIO OUTPUT OPTIONS
     Use a mixer device different from the default ``/dev/mixer``. For ALSA this
     is the mixer name.
 
---mixer-channel=<mixer line>[,mixer index] (``--ao=oss`` and ``--ao=alsa`` only)
+--mixer-channel=<mixer line[,mixer index]>
+    (``--ao=oss`` and ``--ao=alsa`` only)
     This option will tell MPlayer to use a different channel for controlling
     volume than the default PCM. Options for OSS include **vol, pcm, line**.
     For a complete list of options look for ``SOUND_DEVICE_NAMES`` in
@@ -2407,7 +2440,8 @@ VIDEO OUTPUT OPTIONS
     Adjust the contrast of the video signal (default: 0). Not supported by all
     video output drivers.
 
---display=<name> (X11 only)
+--display=<name>
+    (X11 only)
     Specify the hostname and display number of the X server you want to display
     on.
 
@@ -2420,13 +2454,15 @@ VIDEO OUTPUT OPTIONS
 
     *WARNING*: May cause OSD/SUB corruption!
 
---fbmode=<modename> (``--vo=fbdev`` only)
+--fbmode=<modename>
+    (``--vo=fbdev`` only)
     Change video mode to the one that is labeled as <modename> in
     ``/etc/fb.modes``.
 
     *NOTE*: VESA framebuffer does not support mode changing.
 
---fbmodeconfig=<filename> (``--vo=fbdev`` only)
+--fbmodeconfig=<filename>
+    (``--vo=fbdev`` only)
     Override framebuffer mode configuration file (default: ``/etc/fb.modes``).
 
 --force-window-position
@@ -2441,7 +2477,8 @@ VIDEO OUTPUT OPTIONS
     OBSOLETE, use the ``--fs`` option.
     Try this option if you still experience fullscreen problems.
 
---fstype=<type1,type2,...> (X11 only)
+--fstype=<type1,type2,...>
+    (X11 only)
     Specify a priority list of fullscreen modes to be used. You can negate the
     modes by prefixing them with '-'. If you experience problems like the
     fullscreen window being covered by other windows try using a different
@@ -2480,7 +2517,7 @@ VIDEO OUTPUT OPTIONS
     Adjust the gamma of the video signal (default: 0). Not supported by all
     video output drivers.
 
---geometry=x[%][:y[%]] or [WxH][+-x+-y]
+--geometry=<x[%][:y[%]]>, --geometry=<[WxH][+-x+-y]>
     Adjust where the output is on the screen initially. The x and y
     specifications are in pixels measured from the top-left of the screen to
     the top-left of the image being displayed, however if a percentage sign is
@@ -2571,7 +2608,8 @@ VIDEO OUTPUT OPTIONS
     *NOTE*: Values between -1 and 0 are allowed as well, but highly
     experimental and may crash or worse. Use at your own risk!
 
---panscanrange=<-19.0-99.0> (experimental)
+--panscanrange=<-19.0-99.0>
+    (experimental)
     Change the range of the pan-and-scan functionality (default: 1). Positive
     values mean multiples of the default range. Negative numbers mean you can
     zoom in up to a factor of ``--panscanrange=+1``. E.g. ``--panscanrange=-3``
@@ -2600,7 +2638,8 @@ VIDEO OUTPUT OPTIONS
     Specify the screen width for video output drivers which do not know the
     screen resolution like fbdev, x11 and TV-out.
 
---stop-xscreensaver (X11 only)
+--stop-xscreensaver
+    (X11 only)
     Turns off xscreensaver at startup and turns it on again on exit. If your
     screensaver supports neither the XSS nor XResetScreenSaver API please use
     ``--heartbeat-cmd`` instead.
@@ -2623,11 +2662,14 @@ VIDEO OUTPUT OPTIONS
 --vsync
     Enables VBI for the vesa, dfbmga and svga video output drivers.
 
---wid=<window ID> (X11, OpenGL and DirectX only)
+--wid=<window ID>
+    (X11, OpenGL and DirectX only)
     This tells MPlayer to attach to an existing window. Useful to embed MPlayer
-    in a browser (e.g. the plugger extension). This option fills the given
-    window completely, thus aspect scaling, panscan, etc are no longer handled
-    by MPlayer but must be managed by the application that created the window.
+    in a browser (e.g. the plugger extension). Earlier this option always
+    filled the given window completely, thus aspect scaling, panscan, etc were
+    no longer handled by MPlayer but had to be managed by the application that
+    created the window. Now aspect is maintained by default. If you don't
+    want that use ``--no-keepaspect``.
 
 --xineramascreen=<-2-...>
     In Xinerama configurations (i.e. a single desktop that spans across
@@ -3538,7 +3580,7 @@ DECODING/FILTERING OPTIONS
 --flip
     Flip image upside-down.
 
---lavdopts=<option1:option2:...> (DEBUG CODE)
+--lavdopts=<option1:option2:...>
     Specify libavcodec decoding parameters. Separate multiple options with a
     colon.
 
@@ -3687,12 +3729,6 @@ DECODING/FILTERING OPTIONS
     vstats
         Prints some statistics and stores them in ``./vstats_*.log``.
 
---noslices
-    Disable drawing video by 16-pixel height slices/bands, instead draws the
-    whole frame in a single run. May be faster or slower, depending on video
-    card and available cache. It has effect only with libmpeg2 and libavcodec
-    codecs.
-
 --nosound
     Do not play sound. Useful for benchmarking.
 
@@ -3711,6 +3747,13 @@ DECODING/FILTERING OPTIONS
 --pphelp
     Show a summary about the available postprocess filters and their usage.
     See also ``--vf=pp``.
+
+--slices, --no-slices
+    Drawing video by 16-pixel height slices/bands, instead draws the
+    whole frame in a single run. May be faster or slower, depending on video
+    card and available cache. It has effect only with libmpeg2 and libavcodec
+    codecs. Enabled by default if applicable; usually disabled when threading
+    is used.
 
 --ssf=<mode>
     Specifies software scaler parameters.
