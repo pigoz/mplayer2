@@ -345,8 +345,9 @@ button 3 and button 4
 USAGE
 =====
 
-Every *flag* option has a *noflag* counterpart, e.g. the opposite of the
-``--fs`` option is ``--nofs``.
+Every *flag* option has a *no-flag* counterpart, e.g. the opposite of the
+``--fs`` option is ``--no-fs``.
+``--fs=yes`` is same as ``--fs``, ``--fs=no`` is the same as ``--no-fs``.
 
 If an option is marked as *(XXX only)*, it will only work in combination with
 the *XXX* option or if *XXX* is compiled in.
@@ -463,7 +464,7 @@ GENERAL OPTIONS
 --msgcolor
     Enable colorful console output on terminals that support ANSI color.
 
---msglevel=<all=<level>:<module>=<level>:...>
+--msglevel=<module1=level1:module2=level2:...>
     Control verbosity directly for each module. The *all* module changes the
     verbosity of all the modules not explicitly specified on the command line.
 
@@ -543,6 +544,9 @@ GENERAL OPTIONS
 PLAYER OPTIONS
 ==============
 
+--ar, --no-ar
+      Enable/disable AppleIR remote support. Enabled by default.
+
 --autoq=<quality>
     Used with ``--vf=[s]pp``.
     Dynamically changes the level of postprocessing depending on the available
@@ -591,7 +595,17 @@ PLAYER OPTIONS
     Disables colorkeying. Only supported by the fbdev, svga, vesa, xmga, xover,
     xv (see ``--vo=xv:ck``) and directx video output drivers.
 
---correct-pts, --nocorrect-pts
+--consolecontrols, --no-consolecontrols
+    ``--no-consolecontrols`` prevents  the player from reading key events
+    from standard input.
+    Useful when reading data from standard input.
+    This is automatically enabled when - is
+    found on the command line. There are situations where you have to set it
+    manually, e.g. if you open ``/dev/stdin`` (or the equivalent on your
+    system), use stdin in a playlist or intend to read from stdin later on via
+    the loadfile or loadlist slave commands.
+
+--correct-pts, --no-correct-pts
     Switches MPlayer to a mode where timestamps for video frames are calculated
     differently and video filters which add new frames or modify timestamps of
     existing ones are supported. Now enabled automatically for most common file
@@ -620,7 +634,7 @@ PLAYER OPTIONS
 --fixed-vo, --no-fixed-vo
     ``--fixed-vo`` enforces a fixed video system for multiple files (one
     (un)initialization for all files). Therefore only one window will be opened
-    for all files. Now enabled by default, use ``--nofixed-vo`` to disable and
+    for all files. Now enabled by default, use ``--no-fixed-vo`` to disable and
     create a new window whenever the video stream changes. Some of the older
     drivers may not be *fixed-vo* compliant.
 
@@ -686,6 +700,15 @@ PLAYER OPTIONS
     Mostly useful in slave mode where MPlayer can be controlled through input
     commands (see also ``--slave``).
 
+--initial-audio-sync, --no-initial-audio-sync
+    When starting a video file or after events such as seeking MPlayer will by
+    default modify the audio stream to make it start from the same timestamp as
+    video, by either inserting silence at the start or cutting away the first
+    samples. Disabling this option makes the player
+    behave like older MPlayer versions did: video and audio are both started
+    immediately even if their start timestamps differ, and then video timing is
+    gradually adjusted if necessary to reach correct synchronization later.
+
 --input=<commands>
     This option can be used to configure certain parts of the input system.
     Paths are relative to ``~/.mplayer/``.
@@ -729,12 +752,18 @@ PLAYER OPTIONS
         *NOTE*: When the given file is a FIFO MPlayer opens both ends so you
         can do several `echo "seek 10" > mp_pipe` and the pipe will stay valid.
 
+--joystick, --no-joystick
+    Enable/disable joystick support. Enabled by default.
+
 --key-fifo-size=<2-65000>
     Specify the size of the FIFO that buffers key events (default: 7). If it is
     too small some events may be lost. The main disadvantage of setting it to a
     very large value is that if you hold down a key triggering some
     particularly slow command then the player may be unresponsive while it
     processes all the queued commands.
+
+--lirc, --no-lirc
+    Enable/disable LIRC support. Enabled by default.
 
 --lircconf=<filename>
     (LIRC only)
@@ -780,37 +809,12 @@ PLAYER OPTIONS
     driver. Necessary to select the buttons in DVD menus. Supported for
     X11-based VOs (x11, xv, etc) and the gl, gl2, direct3d and corevideo VOs.
 
---noar
-    Turns off AppleIR remote support.
+--mouseinput, --no-mouseinput
+    Enabled by default. Disable mouse button press/release input
+    (mozplayerxp's context menu relies on this option).
 
---noconsolecontrols
-    Prevent MPlayer from reading key events from standard input. Useful when
-    reading data from standard input. This is automatically enabled when - is
-    found on the command line. There are situations where you have to set it
-    manually, e.g. if you open ``/dev/stdin`` (or the equivalent on your
-    system), use stdin in a playlist or intend to read from stdin later on via
-    the loadfile or loadlist slave commands.
-
---noinitial-audio-sync
-    When starting a video file or after events such as seeking MPlayer will by
-    default modify the audio stream to make it start from the same timestamp as
-    video, by either inserting silence at the start or cutting away the first
-    samples. This option disables that functionality and makes the player
-    behave like older MPlayer versions did: video and audio are both started
-    immediately even if their start timestamps differ, and then video timing is
-    gradually adjusted if necessary to reach correct synchronization later.
-
---nojoystick
-    Turns off joystick support.
-
---nolirc
-    Turns off LIRC support.
-
---nomouseinput
-    Disable mouse button press/release input (mozplayerxp's context menu relies
-    on this option).
-
---noordered-chapters
+--ordered-chapters, --no-ordered-chapters
+    Enabled by default.
     Disable support for Matroska ordered chapters. MPlayer will not load or
     search for video segments from other files, and will also ignore any
     chapter order specified for the main file.
@@ -1154,6 +1158,13 @@ DEMUXER/STREAM OPTIONS
     :-endpos 0 1\:10\:00: Stop at 1 hour 10 minutes.
     :-ss 10 -endpos 56:   Stop at 1 minute 6 seconds.
 
+--extbased, --no-extbased
+    Enabled by default.
+    Disables extension-based demuxer selection. By default, when the file type
+    (demuxer) cannot be detected reliably (the file has no header or it is not
+    reliable enough), the filename extension is used to select the demuxer.
+    Always falls back on content-based demuxer selection.
+
 --forceidx
     Force index rebuilding. Useful for files with broken index (A/V desync,
     etc). This will enable seeking in files where seeking was not possible.
@@ -1268,12 +1279,6 @@ DEMUXER/STREAM OPTIONS
     (Internal AVI demuxer which is not used by default only)
     Do not use average byte/second value for A-V sync. Helps with some AVI
     files with broken header.
-
---noextbased
-    Disables extension-based demuxer selection. By default, when the file type
-    (demuxer) cannot be detected reliably (the file has no header or it is not
-    reliable enough), the filename extension is used to select the demuxer.
-    Always falls back on content-based demuxer selection.
 
 --passwd=<password>
     Used with some network protocols. Specify password for HTTP authentication.
@@ -1487,8 +1492,7 @@ DEMUXER/STREAM OPTIONS
     on this). If the sample frequency selected is different from that of the
     current media, the resample or lavcresample audio filter will be inserted
     into the audio filter layer to compensate for the difference. The type of
-    resampling can be controlled by the ``--af-adv`` option. The default is fast
-    resampling that may cause distortion.
+    resampling can be controlled by the ``--af-adv`` option.
 
 --ss=<time>
     Seek to given time position.
@@ -1843,6 +1847,11 @@ OSD/SUBTITLE OPTIONS
 
     Enabled by default.
 
+--autosub, --no-autosub
+    Load additional subtitle files matching the video filename.
+    Enabled by default.
+    See also ``--sub-fuzziness``.
+
 --dumpjacosub
     Convert the given subtitle (specified with the ``--sub`` option) to the
     time-based JACOsub subtitle format. Creates a ``dumpsub.js`` file in the
@@ -1928,9 +1937,6 @@ OSD/SUBTITLE OPTIONS
     Indicate the file that will be used to load palette and frame size for
     VOBsub subtitles.
 
---noautosub
-    Turns off automatic subtitle file loading.
-
 --osd-duration=<time>
     Set the duration of the OSD messages in ms (default: 1000).
 
@@ -1964,8 +1970,8 @@ OSD/SUBTITLE OPTIONS
 
 --nosub
     Disables any otherwise auto-selected internal subtitles (as e.g. the
-    Matroska/mkv demuxer supports). Use ``--noautosub`` to disable the loading of
-    external subtitle files.
+    Matroska/mkv demuxer supports).
+    Use ``--no-autosub`` to disable the loading of external subtitle files.
 
 --slang=<language code[,language code,...]>
     Specify a priority list of subtitle languages to use. Different container
@@ -2144,9 +2150,9 @@ OSD/SUBTITLE OPTIONS
     Specify the maximum width of subtitles on the screen. Useful for TV-out.
     The value is the width of the subtitle in % of the screen width.
 
---noterm-osd
-    Disable the display of OSD messages on the console when no video output is
-    available.
+--term-osd, --no-term-osd
+    Display OSD messages on the console when no video output is available.
+    Enabled by default.
 
 --term-osd-esc=<escape sequence>
     Specify the escape sequence to use before writing an OSD message on the
@@ -2194,6 +2200,14 @@ AUDIO OUTPUT OPTIONS
     have specified cache settings that require time for the initial cache fill,
     then the buffered audio may run out before playback of the new file can
     start.
+
+    *NOTE*: The audio device is opened using parameters chosen according
+    to the first file played and is then kept open for gapless playback.
+    This means that if the first file for example has a low samplerate then
+    the following files may get resampled to the same low samplerate,
+    resulting in reduced sound quality. If you play files with different
+    parameters, consider using options such as ``--srate`` and ``--format``
+    to explicitly select what the shared output format will be.
 
 --mixer=<device>
     Use a mixer device different from the default ``/dev/mixer``. For ALSA this
@@ -2428,9 +2442,9 @@ VIDEO OUTPUT OPTIONS
     Override the autodetected color depth. Only supported by the fbdev, dga,
     svga, vesa video output drivers.
 
---border
+--border, --no-border
     Play movie with window border and decorations. Since this is on by default,
-    use ``--noborder`` to disable the standard window decorations.
+    use ``--no-border`` to disable the standard window decorations.
 
 --brightness=<-100-100>
     Adjust the brightness of the video signal (default: 0). Not supported by
@@ -2448,6 +2462,10 @@ VIDEO OUTPUT OPTIONS
     *EXAMPLE*:
 
     ``--display=xtest.localdomain:0``
+
+--double, --no-double
+    Double buffering. The option to disable this exists mostly for debugging
+    purposes and should not normally be used.
 
 --dr
     Turns on direct rendering (not supported by all codecs and video outputs)
@@ -2541,10 +2559,24 @@ VIDEO OUTPUT OPTIONS
     :100%:       Places the window at the middle of the right edge of the screen.
     :100%\:100%: Places the window at the bottom right corner of the screen.
 
+--grabpointer, --no-grabpointer
+    ``-no-grabpointer`` tells the player to not grab the mouse pointer after
+    a video mode change (``--vm``).
+    Useful for multihead setups.
+
 --hue=<-100-100>
     Adjust the hue of the video signal (default: 0). You can get a colored
     negative of the image with this option. Not supported by all video output
     drivers.
+
+--keepaspect, --no-keepaspect
+    Keep window aspect ratio when resizing windows. Enabled by default.
+    By default MPlayer tries to keep the correct video aspect ratio by
+    instructing the window manager to maintain window aspect when resizing,
+    and by adding black bars if the window manager nevertheless allows window
+    shape to change.
+    This option disables window manager aspect hints and scales the video to
+    completely fill the window without regard for aspect ratio.
 
 --monitor-dotclock=<range[,range,...]>
     Used with ``--vo=fbdev`` and ``--vo=vesa`` only.
@@ -2576,24 +2608,6 @@ VIDEO OUTPUT OPTIONS
 
 --name
     Set the window class name for X11-based video output methods.
-
---nodouble
-    Disables double buffering, mostly for debugging purposes. Double buffering
-    fixes flicker by storing two frames in memory, and displaying one while
-    decoding another. It can affect OSD negatively, but often removes OSD
-    flickering.
-
---nograbpointer
-    Do not grab the mouse pointer after a video mode change (``--vm``). Useful for
-    multihead setups.
-
---nokeepaspect
-    Do not keep window aspect ratio when resizing windows. By default MPlayer
-    tries to keep the correct video aspect ratio by instructing the window
-    manager to maintain window aspect when resizing, and by adding black bars
-    if the window manager nevertheless allows window shape to change. This
-    option disables window manager aspect hints and scales the video to
-    completely fill the window without regard for aspect ratio.
 
 --ontop
     Makes the player window stay on top of other windows. Supported by video
@@ -2656,8 +2670,8 @@ VIDEO OUTPUT OPTIONS
 --vm
     Try to change to a different video mode. Supported by the dga, x11, xv, sdl
     and directx video output drivers. If used with the directx video output
-    driver the ``--screenw``, ``--screenh``, ``--bpp`` and ``--refreshrate`` options can be
-    used to set the new display mode.
+    driver the ``--screenw``, ``--screenh``, ``--bpp`` and ``--refreshrate``
+    options can be used to set the new display mode.
 
 --vsync
     Enables VBI for the vesa, dfbmga and svga video output drivers.
@@ -2851,7 +2865,7 @@ sdl (SDL only, buggy/outdated)
     Highly platform independent SDL (Simple Directmedia Layer) library video
     output driver. Since SDL uses its own X11 layer, MPlayer X11 options do not
     have any effect on SDL. Note that it has several minor bugs
-    (``--vm``/``--novm`` is mostly ignored, ``--fs`` behaves like ``--novm``
+    (``--vm``/``--no-vm`` is mostly ignored, ``--fs`` behaves like ``--no-vm``
     should, window is in top-left corner when returning from fullscreen,
     panscan is not supported, ...).
 
@@ -2971,7 +2985,7 @@ gl
     (no)force-pbo
         Always uses PBOs to transfer textures even if this involves an extra
         copy. Currently this gives a little extra speed with NVidia drivers and
-        a lot more speed with ATI drivers. May need ``--noslices`` and the
+        a lot more speed with ATI drivers. May need ``--no-slices`` and the
         ati-hack suboption to work correctly.
     (no)scaled-osd
         Changes the way the OSD behaves when the size of the window changes
@@ -3151,7 +3165,7 @@ gl
         whole image.
 
         *NOTE*: If YUV colorspace is used (see `yuv` suboption), special rules
-        apply: If the decoder uses slice rendering (see ``--noslices``), this
+        apply: If the decoder uses slice rendering (see ``--no-slices``), this
         setting has no effect, the size of the slices as provided by the
         decoder is used. If the decoder does not use slice rendering, the
         default is 16.
@@ -3621,7 +3635,7 @@ DECODING/FILTERING OPTIONS
         :8:      macroblock (MB) type
         :16:     per-block quantization parameter (QP)
         :32:     motion vector
-        :0x0040: motion vector visualization (use ``--noslices``)
+        :0x0040: motion vector visualization (use ``--no-slices``)
         :0x0080: macroblock (MB) skip
         :0x0100: startcode
         :0x0200: PTS
