@@ -269,8 +269,8 @@ STOP
 PREVIOUS and NEXT
     Seek backward/forward 1 minute.
 
-(The following keys are only valid if you compiled with TV or DVB input support
-and will take precedence over the keys defined above.)
+(The following keys are only valid if you compiled with TV or DVB input
+support and will take precedence over the keys defined above.)
 
 h and k
     Select previous/next channel.
@@ -346,14 +346,15 @@ USAGE
 =====
 
 Every *flag* option has a *no-flag* counterpart, e.g. the opposite of the
-``--fs`` option is ``--no-fs``.
-``--fs=yes`` is same as ``--fs``, ``--fs=no`` is the same as ``--no-fs``.
+``--fs`` option is ``--no-fs``. ``--fs=yes`` is same as ``--fs``, ``--fs=no``
+is the same as ``--no-fs``.
 
 If an option is marked as *(XXX only)*, it will only work in combination with
 the *XXX* option or if *XXX* is compiled in.
 
 | *NOTE*: The suboption parser (used for example for ``--ao=pcm`` suboptions)
-  supports a special kind of string-escaping intended for use with external GUIs.
+  supports a special kind of string-escaping intended for use with external
+  GUIs.
 | It has the following format:
 | %n%string\_of\_length\_n
 | *EXAMPLES*:
@@ -380,13 +381,13 @@ You can also write file-specific configuration files. If you wish to have a
 configuration file for a file called 'movie.avi', create a file named
 'movie.avi.conf' with the file-specific options in it and put it in
 ``~/.mplayer/``. You can also put the configuration file in the same directory
-as the file to be played, as long as you give the ``--use-filedir-conf`` option
-(either on the command line or in your global config file). If a file-specific
-configuration file is found in the same directory, no file-specific
-configuration is loaded from ``~/.mplayer``. In addition, the
+as the file to be played, as long as you give the ``--use-filedir-conf``
+option (either on the command line or in your global config file). If a
+file-specific configuration file is found in the same directory, no
+file-specific configuration is loaded from ``~/.mplayer``. In addition, the
 ``--use-filedir-conf`` option enables directory-specific configuration files.
-For this, MPlayer first tries to load a mplayer.conf from the same directory as
-the file played and then tries to load any file-specific configuration.
+For this, MPlayer first tries to load a mplayer.conf from the same directory
+as the file played and then tries to load any file-specific configuration.
 
 *EXAMPLE MPLAYER CONFIGURATION FILE:*
 
@@ -408,8 +409,8 @@ To ease working with different configurations profiles can be defined in the
 configuration files. A profile starts with its name between square brackets,
 e.g. *[my-profile]*. All following options will be part of the profile. A
 description (shown by ``--profile=help``) can be defined with the profile-desc
-option. To end the profile, start another one or use the profile name *default*
-to continue with normal options.
+option. To end the profile, start another one or use the profile name
+*default* to continue with normal options.
 
 *EXAMPLE MPLAYER PROFILE:*
 
@@ -442,8 +443,8 @@ GENERAL OPTIONS
     Specify a directory for binary codecs.
 
 --codecs-file=<filename>
-    Override the standard search path and use the specified file instead of the
-    builtin codecs.conf.
+    Override the standard search path and use the specified file instead of
+    the builtin codecs.conf.
 
 --include=<configuration-file>
     Specify configuration file to be parsed after the default ones.
@@ -470,10 +471,10 @@ GENERAL OPTIONS
 
     See ``--msglevel=help`` for a list of all modules.
 
-    *NOTE*: Some messages are printed before the command line is parsed and are
-    therefore not affected by ``--msglevel``. To control these messages you have
-    to use the ``MPLAYER_VERBOSE`` environment variable, see its description
-    below for details.
+    *NOTE*: Some messages are printed before the command line is parsed and
+    are therefore not affected by ``--msglevel``. To control these messages
+    you have to use the ``MPLAYER_VERBOSE`` environment variable; see its
+    description below for details.
 
     Available levels:
 
@@ -521,8 +522,8 @@ GENERAL OPTIONS
     *WARNING*: Using realtime priority can cause system lockup.
 
 --profile=<profile1,profile2,...>
-    Use the given profile(s), ``--profile=help`` displays a list of the defined
-    profiles.
+    Use the given profile(s), ``--profile=help`` displays a list of the
+    defined profiles.
 
 --really-quiet
     Display even less output and status messages than with ``--quiet``.
@@ -551,8 +552,8 @@ PLAYER OPTIONS
     Used with ``--vf=[s]pp``.
     Dynamically changes the level of postprocessing depending on the available
     spare CPU time. The number you specify will be the maximum level used.
-    Usually you can use some big number. You have to use ``--vf=[s]pp`` without
-    parameters in order for this to work.
+    Usually you can use some big number. You have to use ``--vf=[s]pp``
+    without parameters in order for this to work.
 
 --autosync=<factor>
     Gradually adjusts the A/V sync based on audio delay measurements.
@@ -564,8 +565,8 @@ PLAYER OPTIONS
     higher the value, the closer the timing will be to ``--nosound``. Try
     ``--autosync=30`` to smooth out problems with sound drivers which do not
     implement a perfect audio delay measurement. With this value, if large A/V
-    sync offsets occur, they will only take about 1 or 2 seconds to settle out.
-    This delay in reaction time to sudden A/V offsets should be the only
+    sync offsets occur, they will only take about 1 or 2 seconds to settle
+    out. This delay in reaction time to sudden A/V offsets should be the only
     side-effect of turning this option on, for all sound drivers.
 
 --benchmark
@@ -578,41 +579,40 @@ PLAYER OPTIONS
 
 --chapter-merge-threshold=<number>
     Threshold for merging almost consecutive ordered chapter parts in
-    milliseconds (default: 100). Some Matroska files with ordered chapters have
-    inaccurate chapter end timestamps, causing a small gap between the end of
-    one chapter and the start of the next one when they should match. If the
-    end of one playback part is less than the given threshold away from the
-    start of the next one then keep playing video normally over the chapter
-    change instead of doing a seek.
+    milliseconds (default: 100). Some Matroska files with ordered chapters
+    have inaccurate chapter end timestamps, causing a small gap between the
+    end of one chapter and the start of the next one when they should match.
+    If the end of one playback part is less than the given threshold away from
+    the start of the next one then keep playing video normally over the
+    chapter change instead of doing a seek.
 
 --colorkey=<number>
     Changes the colorkey to an RGB value of your choice. 0x000000 is black and
-    0xffffff is white. Only supported by the fbdev, svga, vesa, xmga, xover, xv
-    (see ``--vo=xv:ck``) and directx video output
-    drivers.
-
---nocolorkey
-    Disables colorkeying. Only supported by the fbdev, svga, vesa, xmga, xover,
+    0xffffff is white. Only supported by the fbdev, svga, vesa, xmga, xover,
     xv (see ``--vo=xv:ck``) and directx video output drivers.
 
+--nocolorkey
+    Disables colorkeying. Only supported by the fbdev, svga, vesa, xmga,
+    xover, xv (see ``--vo=xv:ck``) and directx video output drivers.
+
 --consolecontrols, --no-consolecontrols
-    ``--no-consolecontrols`` prevents  the player from reading key events
-    from standard input.
-    Useful when reading data from standard input.
-    This is automatically enabled when - is
-    found on the command line. There are situations where you have to set it
-    manually, e.g. if you open ``/dev/stdin`` (or the equivalent on your
-    system), use stdin in a playlist or intend to read from stdin later on via
-    the loadfile or loadlist slave commands.
+    ``--no-consolecontrols`` prevents the player from reading key events from
+    standard input. Useful when reading data from standard input. This is
+    automatically enabled when ``-`` is found on the command line. There are
+    situations where you have to set it manually, e.g. if you open
+    ``/dev/stdin`` (or the equivalent on your system), use stdin in a playlist
+    or intend to read from stdin later on via the loadfile or loadlist slave
+    commands.
 
 --correct-pts, --no-correct-pts
-    Switches MPlayer to a mode where timestamps for video frames are calculated
-    differently and video filters which add new frames or modify timestamps of
-    existing ones are supported. Now enabled automatically for most common file
-    formats. The more accurate timestamps can be visible for example when
-    playing subtitles timed to scene changes with the ``--ass`` option. Without
-    ``--correct-pts`` the subtitle timing will typically be off by some frames.
-    This option does not work correctly with some demuxers and codecs.
+    Switches MPlayer to a mode where timestamps for video frames are
+    calculated differently and video filters which add new frames or modify
+    timestamps of existing ones are supported. Now enabled automatically for
+    most common file formats. The more accurate timestamps can be visible for
+    example when playing subtitles timed to scene changes with the ``--ass``
+    option. Without ``--correct-pts`` the subtitle timing will typically be
+    off by some frames. This option does not work correctly with some demuxers
+    and codecs.
 
 --crash-debug
     DEBUG CODE.
@@ -627,16 +627,16 @@ PLAYER OPTIONS
 --edlout=<filename>
     Creates a new file and writes edit decision list (EDL) records to it.
     During playback, the user hits 'i' to mark the start or end of a skip
-    block. This provides a starting point from which the user can fine-tune EDL
-    entries later. See http://www.mplayerhq.hu/DOCS/HTML/en/edl.html for
+    block. This provides a starting point from which the user can fine-tune
+    EDL entries later. See http://www.mplayerhq.hu/DOCS/HTML/en/edl.html for
     details.
 
 --fixed-vo, --no-fixed-vo
     ``--fixed-vo`` enforces a fixed video system for multiple files (one
-    (un)initialization for all files). Therefore only one window will be opened
-    for all files. Now enabled by default, use ``--no-fixed-vo`` to disable and
-    create a new window whenever the video stream changes. Some of the older
-    drivers may not be *fixed-vo* compliant.
+    (un)initialization for all files). Therefore only one window will be
+    opened for all files. Now enabled by default, use ``--no-fixed-vo`` to
+    disable and create a new window whenever the video stream changes. Some of
+    the older drivers may not be *fixed-vo* compliant.
 
 --framedrop
     Skip displaying some frames to maintain A/V sync on slow systems. Video
@@ -681,8 +681,8 @@ PLAYER OPTIONS
 
     :off:      Never use precise seeks.
     :absolute: Use precise seeks if the seek is to an absolute position in the
-               file, such as a chapter seek, but not for relative seeks like the
-               default behavior of arrow keys (default).
+               file, such as a chapter seek, but not for relative seeks like
+               the default behavior of arrow keys (default).
     :always:   Use precise seeks whenever possible.
 
 --identify
@@ -690,10 +690,10 @@ PLAYER OPTIONS
     parseable format. Also prints more detailed information about subtitle and
     audio track languages and IDs. In some cases you can get more information
     by using ``--msglevel=identify=6``. For example, for a DVD or Blu-ray it
-    will list the chapters and time length of each title, as well as a disk ID.
-    Combine this with ``--frames=0`` to suppress all video output. The wrapper
-    script ``TOOLS/midentify.sh`` suppresses the other MPlayer output and
-    (hopefully) shellescapes the filenames.
+    will list the chapters and time length of each title, as well as a disk
+    ID. Combine this with ``--frames=0`` to suppress all video output. The
+    wrapper script ``TOOLS/midentify.sh`` suppresses the other MPlayer output
+    and (hopefully) shellescapes the filenames.
 
 --idle
     Makes MPlayer wait idly instead of quitting when there is no file to play.
@@ -702,12 +702,12 @@ PLAYER OPTIONS
 
 --initial-audio-sync, --no-initial-audio-sync
     When starting a video file or after events such as seeking MPlayer will by
-    default modify the audio stream to make it start from the same timestamp as
-    video, by either inserting silence at the start or cutting away the first
-    samples. Disabling this option makes the player
-    behave like older MPlayer versions did: video and audio are both started
-    immediately even if their start timestamps differ, and then video timing is
-    gradually adjusted if necessary to reach correct synchronization later.
+    default modify the audio stream to make it start from the same timestamp
+    as video, by either inserting silence at the start or cutting away the
+    first samples. Disabling this option makes the player behave like older
+    MPlayer versions did: video and audio are both started immediately even if
+    their start timestamps differ, and then video timing is gradually adjusted
+    if necessary to reach correct synchronization later.
 
 --input=<commands>
     This option can be used to configure certain parts of the input system.
@@ -750,15 +750,16 @@ PLAYER OPTIONS
         See also ``--slave``.
 
         *NOTE*: When the given file is a FIFO MPlayer opens both ends so you
-        can do several `echo "seek 10" > mp_pipe` and the pipe will stay valid.
+        can do several `echo "seek 10" > mp_pipe` and the pipe will stay
+        valid.
 
 --joystick, --no-joystick
     Enable/disable joystick support. Enabled by default.
 
 --key-fifo-size=<2-65000>
-    Specify the size of the FIFO that buffers key events (default: 7). If it is
-    too small some events may be lost. The main disadvantage of setting it to a
-    very large value is that if you hold down a key triggering some
+    Specify the size of the FIFO that buffers key events (default: 7). If it
+    is too small some events may be lost. The main disadvantage of setting it
+    to a very large value is that if you hold down a key triggering some
     particularly slow command then the player may be unresponsive while it
     processes all the queued commands.
 
@@ -787,8 +788,8 @@ PLAYER OPTIONS
     (OSD menu only)
     Chroot the file selection menu to a specific location.
 
-    *EXAMPLE*: ``--menu-chroot=/home`` will restrict the file selection menu to
-    ``/home`` and downward (i.e. no access to ``/`` will be possible, but
+    *EXAMPLE*: ``--menu-chroot=/home`` will restrict the file selection menu
+    to ``/home`` and downward (i.e. no access to ``/`` will be possible, but
     ``/home/user_name`` will).
 
 --menu-keepdir
@@ -834,8 +835,8 @@ PLAYER OPTIONS
     Turns on usage of the Linux RTC (realtime clock - ``/dev/rtc``) as timing
     mechanism. This wakes up the process every 1/1024 seconds to check the
     current time. Useless with modern Linux kernels configured for desktop use
-    as they already wake up the process with similar accuracy when using normal
-    timed sleep.
+    as they already wake up the process with similar accuracy when using
+    normal timed sleep.
 
 --playing-msg=<string>
     Print out a string before starting playback. The following expansions are
@@ -851,11 +852,11 @@ PLAYER OPTIONS
 
     *WARNING*: The way MPlayer parses and uses playlist files is not safe
     against maliciously constructed files. Such files may trigger harmful
-    actions. This has been the case for all MPlayer versions, but unfortunately
-    this fact was not well documented earlier, and some people have even
-    misguidedly recommended use of ``--playlist`` with untrusted sources. Do
-    NOT use ``--playlist`` with random internet sources or files you don't
-    trust!
+    actions. This has been the case for all MPlayer versions, but
+    unfortunately this fact was not well documented earlier, and some people
+    have even misguidedly recommended use of ``--playlist`` with untrusted
+    sources. Do NOT use ``--playlist`` with random internet sources or files
+    you don't trust!
 
     *NOTE*: This option is considered an entry so options found after it will
     apply only to the elements of this playlist.
@@ -871,8 +872,8 @@ PLAYER OPTIONS
 --slave
     Switches on slave mode, in which MPlayer works as a backend for other
     programs. Instead of intercepting keyboard events, MPlayer will read
-    commands separated by a newline (\n) from stdin. See also
-    ``--input``, suboption ``file``.
+    commands separated by a newline (\n) from stdin. See also ``--input``,
+    suboption ``file``.
 
     *NOTE*: See ``DOCS/tech/slave.txt`` for a description of slave commands.
     Also, this is not intended to disable other inputs, e.g. via the video
@@ -903,21 +904,21 @@ DEMUXER/STREAM OPTIONS
 
 --aid=<ID>
     Select audio channel (MPEG: 0-31, AVI/OGM: 1-99, ASF/RM: 0-127, VOB(AC-3):
-    128-159, VOB(LPCM): 160-191, MPEG-TS 17-8190). MPlayer prints the available
-    audio IDs when run in verbose (-v) mode. When playing an MPEG-TS stream,
-    MPlayer will use the first program (if present) with the chosen audio
-    stream. See also ``--alang``.
+    128-159, VOB(LPCM): 160-191, MPEG-TS 17-8190). MPlayer prints the
+    available audio IDs when run in verbose (-v) mode. When playing an MPEG-TS
+    stream, MPlayer will use the first program (if present) with the chosen
+    audio stream. See also ``--alang``.
 
 --ausid=<ID>
-    Select audio substream channel. Currently the valid range is 0x55..0x75 and
-    applies only to MPEG-TS when handled by the native demuxer (not by
+    Select audio substream channel. Currently the valid range is 0x55..0x75
+    and applies only to MPEG-TS when handled by the native demuxer (not by
     libavformat). The format type may not be correctly identified because of
     how this information (or lack thereof) is embedded in the stream, but it
     will demux correctly the audio streams when multiple substreams are
     present. MPlayer prints the available substream IDs when run with
-    ``--identify``.  See also ``--alang``.
+    ``--identify``. See also ``--alang``.
 
---alang=<language code[,language code,...]>
+--alang=<languagecode[,languagecode,...]>
     Specify a priority list of audio languages to use. Different container
     formats employ different language codes. DVDs use ISO 639-1 two letter
     language codes, Matroska, MPEG-TS and NUT use ISO 639-2 three letter
@@ -927,24 +928,23 @@ DEMUXER/STREAM OPTIONS
     *EXAMPLE*:
 
     ``mplayer dvd://1 --alang=hu,en``
-        Chooses the Hungarian language track on a DVD and falls back on English
-        if Hungarian is not available.
+        Chooses the Hungarian language track on a DVD and falls back on
+        English if Hungarian is not available.
     ``mplayer --alang=jpn example.mkv``
         Plays a Matroska file in Japanese.
 
 --audio-demuxer=<[+]name>
-    Force audio demuxer type when using ``--audiofile``.
-    Use a '+' before the name to
-    force it, this will skip some checks! Give the demuxer name as printed by
-    ``--audio-demuxer=help``. ``--audio-demuxer=audio`` forces MP3.
+    Force audio demuxer type when using ``--audiofile``. Use a '+' before the
+    name to force it, this will skip some checks! Give the demuxer name as
+    printed by ``--audio-demuxer=help``. ``--audio-demuxer=audio`` forces MP3.
 
 --audiofile=<filename>
     Play audio from an external file (WAV, MP3 or Ogg Vorbis) while viewing a
     movie.
 
 --audiofile-cache=<kBytes>
-    Enables caching for the stream used by ``--audiofile``, using the specified
-    amount of memory.
+    Enables caching for the stream used by ``--audiofile``, using the
+    specified amount of memory.
 
 --reuse-socket
     (udp:// only)
@@ -957,16 +957,16 @@ DEMUXER/STREAM OPTIONS
     is also used to set the maximum delivery bandwidth allowing faster cache
     filling and stream dumping.
 
---bluray-angle=<angle ID>
+--bluray-angle=<ID>
     Some Blu-ray discs contain scenes that can be viewed from multiple angles.
     Here you can tell MPlayer which angles to use (default: 1).
 
---bluray-chapter=<chapter ID>
+--bluray-chapter=<ID>
     (Blu-ray only)
     Tells MPlayer which Blu-ray chapter to start the current title from
     (default: 1).
 
---bluray-device=<path to disc>
+--bluray-device=<path>
     (Blu-ray only)
     Specify the Blu-ray disc location. Must be a directory with Blu-ray
     structure.
@@ -983,18 +983,20 @@ DEMUXER/STREAM OPTIONS
     the total.
 
 --cache-seek-min=<percentage>
-    If a seek is to be made to a position within <percentage> of the cache size
-    from the current position, MPlayer will wait for the cache to be filled to
-    this position rather than performing a stream seek (default: 50).
+    If a seek is to be made to a position within <percentage> of the cache
+    size from the current position, MPlayer will wait for the cache to be
+    filled to this position rather than performing a stream seek (default:
+    50).
 
 --capture
     Allows capturing the primary stream (not additional audio tracks or other
-    kind of streams) into the file specified by ``--dumpfile`` or by default. If
-    this option is given, capturing can be started and stopped by pressing the
-    key bound to this function (see section `INTERACTIVE CONTROL`_). Same as
-    for ``--dumpstream``, this will likely not produce usable results for anything
-    else than MPEG streams. Note that, due to cache latencies, captured data
-    may begin and end somewhat delayed compared to what you see displayed.
+    kind of streams) into the file specified by ``--dumpfile`` or by default.
+    If this option is given, capturing can be started and stopped by pressing
+    the key bound to this function (see section `INTERACTIVE CONTROL`_). Same
+    as for ``--dumpstream``, this will likely not produce usable results for
+    anything else than MPEG streams. Note that, due to cache latencies,
+    captured data may begin and end somewhat delayed compared to what you see
+    displayed.
 
 --cdda=<option1:option2>
     This option can be used to tune the CD Audio reading feature of MPlayer.
@@ -1022,9 +1024,9 @@ DEMUXER/STREAM OPTIONS
         Force minimum overlap search during verification to <value> sectors.
 
     toc-bias
-        Assume that the beginning offset of track 1 as reported in the TOC will
-        be addressed as LBA 0. Some Toshiba drives need this for getting track
-        boundaries correct.
+        Assume that the beginning offset of track 1 as reported in the TOC
+        will be addressed as LBA 0. Some Toshiba drives need this for getting
+        track boundaries correct.
 
     toc-offset=<value>
         Add <value> sectors to the values reported when addressing tracks. May
@@ -1033,7 +1035,7 @@ DEMUXER/STREAM OPTIONS
     (no)skip
         (Never) accept imperfect data reconstruction.
 
---cdrom-device=<path to device>
+--cdrom-device=<path>
     Specify the CD-ROM device (default: ``/dev/cdrom``).
 
 --channels=<number>
@@ -1056,11 +1058,11 @@ DEMUXER/STREAM OPTIONS
     :6: full 5.1
     :8: full 7.1
 
---chapter=<chapter ID[-endchapter ID]>
-    Specify which chapter to start playing at. Optionally specify which chapter
-    to end playing at (default: 1).
+--chapter=<start[-end]>
+    Specify which chapter to start playing at. Optionally specify which
+    chapter to end playing at (default: 1).
 
---edition=<edition ID>
+--edition=<ID>
     (Matroska files only)
     Specify the edition (set of chapters) to use, where 0 is the first. If set
     to -1 (the default), MPlayer will choose the first edition declared as a
@@ -1081,8 +1083,8 @@ DEMUXER/STREAM OPTIONS
     delay the audio, and positive values delay the video.
 
 --ignore-start
-    Ignore the specified starting time for streams in AVI files. This nullifies
-    stream delays.
+    Ignore the specified starting time for streams in AVI files. This
+    nullifies stream delays.
 
 --demuxer=<[+]name>
     Force demuxer type. Use a '+' before the name to force it, this will skip
@@ -1091,8 +1093,8 @@ DEMUXER/STREAM OPTIONS
 --dumpaudio
     Dumps raw compressed audio stream to ``./stream.dump`` (useful with
     MPEG/AC-3, in most other cases the resulting file will not be playable).
-    If you give more than one of ``--dumpaudio``, ``--dumpvideo``, ``--dumpstream`` on
-    the command line only the last one will work.
+    If you give more than one of ``--dumpaudio``, ``--dumpvideo``,
+    ``--dumpstream`` on the command line only the last one will work.
 
 --dumpfile=<filename>
     Specify which file MPlayer should dump to. Should be used together with
@@ -1105,38 +1107,38 @@ DEMUXER/STREAM OPTIONS
 
 --dumpvideo
     Dump raw compressed video stream to ``./stream.dump`` (not very usable).
-    If you give more than one of ``--dumpaudio``, ``--dumpvideo``, ``--dumpstream`` on
-    the command line only the last one will work.
+    If you give more than one of ``--dumpaudio``, ``--dumpvideo``,
+    ``--dumpstream`` on the command line only the last one will work.
 
 --dvbin=<options>
-    Pass the following parameters to the DVB input module, in order to override
-    the default ones:
+    Pass the following parameters to the DVB input module, in order to
+    override the default ones:
 
     :card=<1-4>:      Specifies using card number 1-4 (default: 1).
     :file=<filename>: Instructs MPlayer to read the channels list from
                       <filename>. Default is
-                      ``~/.mplayer/channels.conf.{sat,ter,cbl,atsc}`` (based on
-                      your card type) or ``~/.mplayer/channels.conf`` as a last
-                      resort.
+                      ``~/.mplayer/channels.conf.{sat,ter,cbl,atsc}`` (based
+                      on your card type) or ``~/.mplayer/channels.conf`` as a
+                      last resort.
     :timeout=<1-30>:  Maximum number of seconds to wait when trying to tune a
                       frequency before giving up (default: 30).
 
---dvd-device=<path to device>
+--dvd-device=<path>
     Specify the DVD device or .iso filename (default: ``/dev/dvd``). You can
     also specify a directory that contains files previously copied directly
     from a DVD (with e.g. vobcopy).
 
---dvd-speed=<factor or speed in KB/s>
-    Try to limit DVD speed (default: 0, no change). DVD base speed is about
-    1350KB/s, so a 8x drive can read at speeds up to 10800KB/s. Slower speeds
-    make the drive more quiet, for watching DVDs 2700KB/s should be quiet and
+--dvd-speed=<speed>
+    Try to limit DVD speed (default: 0, no change). DVD base speed is 1385
+    kB/s, so a 8x drive can read at speeds up to 11080 kB/s. Slower speeds
+    make the drive more quiet. For watching DVDs 2700 kB/s should be quiet and
     fast enough. MPlayer resets the speed to the drive default value on close.
-    Values less than 100 mean multiples of 1350KB/s, i.e. ``--dvd-speed=8``
-    selects 10800KB/s.
+    Values of at least 100 mean speed in kB/s. Values less than 100 mean
+    multiples of 1385 kB/s, i.e. ``--dvd-speed=8`` selects 11080 kB/s.
 
     *NOTE*: You need write access to the DVD device to change the speed.
 
---dvdangle=<angle ID>
+--dvdangle=<ID>
     Some DVD discs contain scenes that can be viewed from multiple angles.
     Here you can tell MPlayer which angles to use (default: 1).
 
@@ -1149,8 +1151,8 @@ DEMUXER/STREAM OPTIONS
 --endpos=<[[hh:]mm:]ss[.ms]>
     Stop at given time.
 
-    *NOTE*: When used in conjunction with ``--ss`` option, ``--endpos`` time will
-    shift forward by seconds specified with ``--ss``.
+    *NOTE*: When used in conjunction with ``--ss`` option, ``--endpos`` time
+    will shift forward by seconds specified with ``--ss``.
 
     *EXAMPLE*:
 
@@ -1172,20 +1174,20 @@ DEMUXER/STREAM OPTIONS
     *NOTE*: This option only works if the underlying media supports seeking
     (i.e. not with stdin, pipe, etc).
 
---fps=<float value>
+--fps=<float>
     Override video framerate. Useful if the original value is wrong or missing.
 
 --frames=<number>
     Play/convert only first <number> frames, then quit.
 
 --hr-mp3-seek
-    Only affects the internal ``audio`` demuxer, which is not used by
-    default for mp3 files any more. The equivalent functionality is always
-    enabled with the now default libavformat demuxer for mp3.
-    Hi-res MP3 seeking. Enabled when playing from an external MP3 file, as we
-    need to seek to the very exact position to keep A/V sync. Can be slow
-    especially when seeking backwards since it has to rewind to the beginning
-    to find an exact frame position.
+    Only affects the internal ``audio`` demuxer, which is not used by default
+    for mp3 files any more. The equivalent functionality is always enabled
+    with the now default libavformat demuxer for mp3. Hi-res MP3 seeking.
+    Enabled when playing from an external MP3 file, as we need to seek to the
+    very exact position to keep A/V sync. Can be slow especially when seeking
+    backwards since it has to rewind to the beginning to find an exact frame
+    position.
 
 --http-header-fields=<field1,field2>
     Set custom HTTP fields when accessing HTTP stream.
@@ -1205,11 +1207,10 @@ DEMUXER/STREAM OPTIONS
             | Connection: close
 
 --idx
-    Rebuilds index of files if no index was found, allowing seeking.
-    Useful with broken/incomplete downloads, or badly created files.
-    Now this is done automatically by the demuxers used for most video formats,
-    meaning that this switch has no effect in the typical case.
-    See also  ``--forceidx``.
+    Rebuilds index of files if no index was found, allowing seeking. Useful
+    with broken/incomplete downloads, or badly created files. Now this is done
+    automatically by the demuxers used for most video formats, meaning that
+    this switch has no effect in the typical case. See also ``--forceidx``.
 
     *NOTE*: This option only works if the underlying media supports seeking
     (i.e. not with stdin, pipe, etc).
@@ -1235,23 +1236,23 @@ DEMUXER/STREAM OPTIONS
         Pass AVOptions to libavformat demuxer.
 
         Note, a patch to make the *o=* unneeded and pass all unknown options
-        through the AVOption system is welcome.  A full list of AVOptions can be
-        found in the FFmpeg manual.  Note that some options may conflict with
-        MPlayer options.
+        through the AVOption system is welcome. A full list of AVOptions can
+        be found in the FFmpeg manual. Note that some options may conflict
+        with MPlayer options.
 
         *EXAMPLE*: ``o=fflags=+ignidx``
     probesize=<value>
-        Maximum amount of data to probe during the detection phase. In the case
-        of MPEG-TS this value identifies the maximum number of TS packets to
-        scan.
+        Maximum amount of data to probe during the detection phase. In the
+        case of MPEG-TS this value identifies the maximum number of TS packets
+        to scan.
     cryptokey=<hexstring>
         Encryption key the demuxer should use. This is the raw binary data of
         the key converted to a hexadecimal string.
 
---loadidx=<index file>
-    The file from which to read the video index data saved by ``--saveidx``. This
-    index will be used for seeking, overriding any index data contained in the
-    AVI itself. MPlayer will not prevent you from loading an index file
+--loadidx=<filename>
+    The file from which to read the video index data saved by ``--saveidx``.
+    This index will be used for seeking, overriding any index data contained
+    in the AVI itself. MPlayer will not prevent you from loading an index file
     generated from a different AVI, but this is sure to cause unfavorable
     results.
 
@@ -1290,19 +1291,19 @@ DEMUXER/STREAM OPTIONS
 --prefer-ipv6
     Use IPv6 on network connections. Falls back on IPv4 automatically.
 
---psprobe=<byte position>
+--psprobe=<bytecount>
     When playing an MPEG-PS or MPEG-PES streams, this option lets you specify
     how many bytes in the stream you want MPlayer to scan in order to identify
     the video codec used. This option is needed to play EVO or VDR files
     containing H.264 streams.
 
 --pvr=<option1:option2:...>
-    This option tunes various encoding properties of the PVR capture module. It
-    has to be used with any hardware MPEG encoder based card supported by the
-    V4L2 driver. The Hauppauge WinTV PVR-150/250/350/500 and all IVTV based
-    cards are known as PVR capture cards. Be aware that only Linux 2.6.18
-    kernel and above is able to handle MPEG stream through V4L2 layer. For
-    hardware capture of an MPEG stream and watching it with MPlayer, use
+    This option tunes various encoding properties of the PVR capture module.
+    It has to be used with any hardware MPEG encoder based card supported by
+    the V4L2 driver. The Hauppauge WinTV PVR-150/250/350/500 and all IVTV
+    based cards are known as PVR capture cards. Be aware that only Linux
+    2.6.18 kernel and above is able to handle MPEG stream through V4L2 layer.
+    For hardware capture of an MPEG stream and watching it with MPlayer, use
     ``pvr://`` as a movie URL.
 
     Available options are:
@@ -1316,8 +1317,8 @@ DEMUXER/STREAM OPTIONS
         :3: 2.21:1
 
     arate=<32000-48000>
-        Specify encoding audio rate (default: 48000 Hz, available: 32000, 44100
-        and 48000 Hz).
+        Specify encoding audio rate (default: 48000 Hz, available: 32000,
+        44100 and 48000 Hz).
 
     alayer=<1-3>
         Specify MPEG audio layer encoding (default: 2).
@@ -1355,8 +1356,8 @@ DEMUXER/STREAM OPTIONS
 --radio=<option1:option2:...>
     These options set various parameters of the radio capture module. For
     listening to radio with MPlayer use ``radio://<frequency>`` (if channels
-    option is not given) or ``radio://<channel_number>`` (if channels option is
-    given) as a movie URL. You can see allowed frequency range by running
+    option is not given) or ``radio://<channel_number>`` (if channels option
+    is given) as a movie URL. You can see allowed frequency range by running
     MPlayer with ``-v``. To start the grabbing subsystem, use
     ``radio://<frequency or channel>/capture``. If the capture keyword is not
     given you can listen to radio using the line-in cable only. Using capture
@@ -1384,10 +1385,10 @@ DEMUXER/STREAM OPTIONS
 
     channels=<frequency>-<name>,<frequency>-<name>,...
         Set channel list. Use _ for spaces in names (or play with quoting ;-).
-        The channel names will then be written using OSD and the slave commands
-        radio_step_channel and radio_set_channel will be usable for a remote
-        control (see LIRC). If given, number in movie URL will be treated as
-        channel position in channel list.
+        The channel names will then be written using OSD and the slave
+        commands radio_step_channel and radio_set_channel will be usable for a
+        remote control (see LIRC). If given, number in movie URL will be
+        treated as channel position in channel list.
 
         *EXAMPLE*: ``radio://1``, ``radio://104.4``, ``radio_set_channel 1``
 
@@ -1411,8 +1412,8 @@ DEMUXER/STREAM OPTIONS
 
 --rawaudio=<option1:option2:...>
     This option lets you play raw audio files. You have to use
-    ``--demuxer=rawaudio`` as well. It may also be used to play audio CDs which
-    are not 44kHz 16-bit stereo. For playing raw AC-3 streams use
+    ``--demuxer=rawaudio`` as well. It may also be used to play audio CDs
+    which are not 44kHz 16-bit stereo. For playing raw AC-3 streams use
     ``--rawaudio=format=0x2000 --demuxer=rawaudio``.
 
     Available options are:
@@ -1435,8 +1436,8 @@ DEMUXER/STREAM OPTIONS
     :h=<value>:                    image height in pixels
     :i420|yv12|yuy2|y8:            set colorspace
     :format=<value>:               colorspace (fourcc) in hex or string
-                                   constant. Use ``--rawvideo=format=help`` for a
-                                   list of possible strings.
+                                   constant. Use ``--rawvideo=format=help``
+                                   for a list of possible strings.
     :size=<value>:                 frame size in Bytes
 
     *EXAMPLE*:
@@ -1456,11 +1457,11 @@ DEMUXER/STREAM OPTIONS
     stream from the server to a specific client.
 
 --rtsp-destination
-    Used with ``rtsp://`` URLs to force the destination IP address to be bound.
-    This option may be useful with some RTSP server which do not send RTP
-    packets to the right interface. If the connection to the RTSP server fails,
-    use ``-v`` to see which IP address MPlayer tries to bind to and try to force
-    it to one assigned to your computer instead.
+    Used with ``rtsp://`` URLs to force the destination IP address to be
+    bound. This option may be useful with some RTSP server which do not send
+    RTP packets to the right interface. If the connection to the RTSP server
+    fails, use ``-v`` to see which IP address MPlayer tries to bind to and try
+    to force it to one assigned to your computer instead.
 
 --rtsp-stream-over-tcp
     (LIVE555 and NEMESI only)
@@ -1480,7 +1481,7 @@ DEMUXER/STREAM OPTIONS
 
     *NOTE*: This option is obsolete now that MPlayer has OpenDML support.
 
---sb=<byte position>
+--sb=<n>
     Seek to byte position. Useful for playback from CD-ROM images or VOB files
     with junk at the beginning. See also ``--ss``.
 
@@ -1488,11 +1489,11 @@ DEMUXER/STREAM OPTIONS
     Slow down or speed up playback by the factor given as parameter.
 
 --srate=<Hz>
-    Select the output sample rate to be used (of course sound cards have limits
-    on this). If the sample frequency selected is different from that of the
-    current media, the resample or lavcresample audio filter will be inserted
-    into the audio filter layer to compensate for the difference. The type of
-    resampling can be controlled by the ``--af-adv`` option.
+    Select the output sample rate to be used (of course sound cards have
+    limits on this). If the sample frequency selected is different from that
+    of the current media, the resample or lavcresample audio filter will be
+    inserted into the audio filter layer to compensate for the difference. The
+    type of resampling can be controlled by the ``--af-adv`` option.
 
 --ss=<time>
     Seek to given time position.
@@ -1506,10 +1507,10 @@ DEMUXER/STREAM OPTIONS
     Tells MPlayer not to discard TS packets reported as broken in the stream.
     Sometimes needed to play corrupted MPEG-TS files.
 
---tsprobe=<byte position>
-    When playing an MPEG-TS stream, this option lets you specify how many bytes
-    in the stream you want MPlayer to search for the desired audio and video
-    IDs.
+--tsprobe=<bytecount>
+    When playing an MPEG-TS stream, this option lets you specify how many
+    bytes in the stream you want MPlayer to search for the desired audio and
+    video IDs.
 
 --tsprog=<1-65534>
     When playing an MPEG-TS stream, you can specify with this option which
@@ -1517,11 +1518,11 @@ DEMUXER/STREAM OPTIONS
     ``--aid``.
 
 --tv=<option1:option2:...>
-    This option tunes various properties of the TV capture module. For watching
-    TV with MPlayer, use ``tv://`` or ``tv://<channel_number>`` or even
-    ``tv://<channel_name>`` (see option channels for channel_name below) as a
-    movie URL. You can also use ``tv:///<input_id>`` to start watching a movie
-    from a composite or S-Video input (see option input for details).
+    This option tunes various properties of the TV capture module. For
+    watching TV with MPlayer, use ``tv://`` or ``tv://<channel_number>`` or
+    even ``tv://<channel_name>`` (see option channels for channel_name below)
+    as a movie URL. You can also use ``tv:///<input_id>`` to start watching a
+    movie from a composite or S-Video input (see option input for details).
 
     Available options are:
 
@@ -1539,8 +1540,8 @@ DEMUXER/STREAM OPTIONS
 
     device=<value>
         Specify TV device (default: ``/dev/video0``). NOTE: For the bsdbt848
-        driver you can provide both bktr and tuner device names separating them
-        with a comma, tuner after bktr (e.g. ``--tv
+        driver you can provide both bktr and tuner device names separating
+        them with a comma, tuner after bktr (e.g. ``--tv
         device=/dev/bktr1,/dev/tuner1``).
 
     input=<value>
@@ -1552,10 +1553,10 @@ DEMUXER/STREAM OPTIONS
         compatible with the channels parameter.
 
     outfmt=<value>
-        Specify the output format of the tuner with a preset value supported by
-        the V4L driver (yv12, rgb32, rgb24, rgb16, rgb15, uyvy, yuy2, i420) or
-        an arbitrary format given as hex value. Try outfmt=help for a list of
-        all available formats.
+        Specify the output format of the tuner with a preset value supported
+        by the V4L driver (yv12, rgb32, rgb24, rgb16, rgb15, uyvy, yuy2, i420)
+        or an arbitrary format given as hex value. Try outfmt=help for a list
+        of all available formats.
 
     width=<value>
         output window width
@@ -1570,9 +1571,9 @@ DEMUXER/STREAM OPTIONS
         maximum size of the capture buffer in megabytes (default: dynamical)
 
     norm=<value>
-        For bsdbt848 and v4l, PAL, SECAM, NTSC are available. For v4l2, see the
-        console output for a list of all available norms, also see the normid
-        option below.
+        For bsdbt848 and v4l, PAL, SECAM, NTSC are available. For v4l2, see
+        the console output for a list of all available norms, also see the
+        normid option below.
 
     normid=<value> (v4l2 only)
         Sets the TV norm to the given numeric ID. The TV norm depends on the
@@ -1582,9 +1583,9 @@ DEMUXER/STREAM OPTIONS
         Set tuner to <value> channel.
 
     chanlist=<value>
-        available: argentina, australia, china-bcast, europe-east, europe-west,
-        france, ireland, italy, japan-bcast, japan-cable, newzealand, russia,
-        southafrica, us-bcast, us-cable, us-cable-hrc
+        available: argentina, australia, china-bcast, europe-east,
+        europe-west, france, ireland, italy, japan-bcast, japan-cable,
+        newzealand, russia, southafrica, us-bcast, us-cable, us-cable-hrc
 
     channels=<chan>-<name>[=<norm>],<chan>-<name>[=<norm>],...
         Set names for channels.
@@ -1592,9 +1593,10 @@ DEMUXER/STREAM OPTIONS
         *NOTE*: If <chan> is an integer greater than 1000, it will be treated
         as frequency (in kHz) rather than channel name from frequency table.
         Use _ for spaces in names (or play with quoting ;-). The channel names
-        will then be written using OSD, and the slave commands tv_step_channel,
-        tv_set_channel and tv_last_channel will be usable for a remote control
-        (see LIRC). Not compatible with the frequency parameter.
+        will then be written using OSD, and the slave commands
+        tv_step_channel, tv_set_channel and tv_last_channel will be usable for
+        a remote control (see LIRC). Not compatible with the frequency
+        parameter.
 
         *NOTE*: The channel number will then be the position in the 'channels'
         list, beginning with 1.
@@ -1625,14 +1627,14 @@ DEMUXER/STREAM OPTIONS
     forcechan=<1-2>
         By default, the count of recorded audio channels is determined
         automatically by querying the audio mode from the TV card. This option
-        allows forcing stereo/mono recording regardless of the amode option and
-        the values returned by v4l. This can be used for troubleshooting when
-        the TV card is unable to report the current audio mode.
+        allows forcing stereo/mono recording regardless of the amode option
+        and the values returned by v4l. This can be used for troubleshooting
+        when the TV card is unable to report the current audio mode.
 
     adevice=<value>
         Set an audio device. <value> should be ``/dev/xxx`` for OSS and a
-        hardware ID for ALSA. You must replace any ':' by a '.' in the hardware
-        ID for ALSA.
+        hardware ID for ALSA. You must replace any ':' by a '.' in the
+        hardware ID for ALSA.
 
     audioid=<value>
         Choose an audio output of the capture card, if it has more than one.
@@ -1650,15 +1652,15 @@ DEMUXER/STREAM OPTIONS
         control. If this option is omitted, gain control will not be modified.
 
     immediatemode=<bool>
-        A value of 0 means capture and buffer audio and video together. A value
-        of 1 (default) means to do video capture only and let the audio go
-        through a loopback cable from the TV card to the sound card.
+        A value of 0 means capture and buffer audio and video together. A
+        value of 1 (default) means to do video capture only and let the audio
+        go through a loopback cable from the TV card to the sound card.
 
     mjpeg
         Use hardware MJPEG compression (if the card supports it). When using
         this option, you do not need to specify the width and height of the
-        output window, because MPlayer will determine it automatically from the
-        decimation value (see below).
+        output window, because MPlayer will determine it automatically from
+        the decimation value (see below).
 
     decimation=<1|2|4>
         choose the size of the picture that will be compressed by hardware
@@ -1698,33 +1700,36 @@ DEMUXER/STREAM OPTIONS
         Specify initial TV teletext page number (default: 100).
 
     tlang=<-1-127>
-        Specify default teletext language code (default: 0), which will be used
-        as primary language until a type 28 packet is received. Useful when the
-        teletext system uses a non-latin character set, but language codes are
-        not transmitted via teletext type 28 packets for some reason. To see a
-        list of supported language codes set this option to -1.
+        Specify default teletext language code (default: 0), which will be
+        used as primary language until a type 28 packet is received. Useful
+        when the teletext system uses a non-latin character set, but language
+        codes are not transmitted via teletext type 28 packets for some
+        reason. To see a list of supported language codes set this option to
+        -1.
 
     hidden_video_renderer (dshow only)
-        Terminate stream with video renderer instead of Null renderer (default:
-        off). Will help if video freezes but audio does not.
+        Terminate stream with video renderer instead of Null renderer
+        (default: off). Will help if video freezes but audio does not.
 
-        *NOTE*: May not work with ``--vo=directx`` and ``--vf=crop`` combination.
+        *NOTE*: May not work with ``--vo=directx`` and ``--vf=crop``
+        combination.
 
     hidden_vp_renderer (dshow only)
         Terminate VideoPort pin stream with video renderer instead of removing
         it from the graph (default: off). Useful if your card has a VideoPort
         pin and video is choppy.
 
-        *NOTE*: May not work with ``--vo=directx`` and ``--vf=crop`` combination.
+        *NOTE*: May not work with ``--vo=directx`` and ``--vf=crop``
+        combination.
 
     system_clock (dshow only)
         Use the system clock as sync source instead of the default graph clock
         (usually the clock from one of the live sources in graph).
 
     normalize_audio_chunks (dshow only)
-        Create audio chunks with a time length equal to video frame time length
-        (default: off). Some audio cards create audio chunks about 0.5s in
-        size, resulting in choppy video when using immediatemode=0.
+        Create audio chunks with a time length equal to video frame time
+        length (default: off). Some audio cards create audio chunks about 0.5s
+        in size, resulting in choppy video when using immediatemode=0.
 
 --tvscan=<option1:option2:...>
     Tune the TV channel scanner. MPlayer will also print value for "-tv
@@ -1848,9 +1853,8 @@ OSD/SUBTITLE OPTIONS
     Enabled by default.
 
 --autosub, --no-autosub
-    Load additional subtitle files matching the video filename.
-    Enabled by default.
-    See also ``--sub-fuzziness``.
+    Load additional subtitle files matching the video filename. Enabled by
+    default. See also ``--sub-fuzziness``.
 
 --dumpjacosub
     Convert the given subtitle (specified with the ``--sub`` option) to the
@@ -1863,8 +1867,9 @@ OSD/SUBTITLE OPTIONS
     directory.
 
 --dumpmpsub
-    Convert the given subtitle (specified with the ``--sub`` option) to MPlayer's
-    subtitle format, MPsub. Creates a dump.mpsub file in the current directory.
+    Convert the given subtitle (specified with the ``--sub`` option) to
+    MPlayer's subtitle format, MPsub. Creates a dump.mpsub file in the current
+    directory.
 
 --dumpsami
     Convert the given subtitle (specified with the ``--sub`` option) to the
@@ -1873,8 +1878,8 @@ OSD/SUBTITLE OPTIONS
 
 --dumpsrtsub
     Convert the given subtitle (specified with the ``--sub`` option) to the
-    time-based SubViewer (SRT) subtitle format. Creates a ``dumpsub.srt`` file in
-    the current directory.
+    time-based SubViewer (SRT) subtitle format. Creates a ``dumpsub.srt`` file
+    in the current directory.
 
     *NOTE*: Some broken hardware players choke on SRT subtitle files with Unix
     line endings. If you are unlucky enough to have such a box, pass your
@@ -1887,8 +1892,8 @@ OSD/SUBTITLE OPTIONS
     options.
 
 --embeddedfonts, --no-embeddedfonts
-    Use fonts embedded in Matroska container files and ASS scripts
-    (default: enabled). These fonts can be used for SSA/ASS subtitle rendering
+    Use fonts embedded in Matroska container files and ASS scripts (default:
+    enabled). These fonts can be used for SSA/ASS subtitle rendering
     (``--ass`` option).
 
 --ffactor=<number>
@@ -1907,13 +1912,12 @@ OSD/SUBTITLE OPTIONS
     Use this if commas in subtitles are shown at the start of a sentence
     instead of at the end.
 
---font=<font pattern/file>
+--font=<pattern-or-filename>
     Specify font to use for OSD and for subtitles that do not themselves
-    specify a particular font. See also ``--subfont``.
-    With fontconfig enabled the argument is a fontconfig pattern and the
-    default is ``sans``.
-    Without fontconfig the argument is a filename and the default is
-    ``~/.mplayer/subfont.ttf`` with freetype enabled,
+    specify a particular font. See also ``--subfont``. With fontconfig enabled
+    the argument is a fontconfig pattern and the default is ``sans``. Without
+    fontconfig the argument is a filename and the default is
+    ``~/.mplayer/subfont.ttf`` with freetype enabled, or
     ``~/.mplayer/font/font.desc`` without it.
 
     *EXAMPLE*:
@@ -1927,15 +1931,16 @@ OSD/SUBTITLE OPTIONS
     Enables the use of fontconfig managed fonts. Enabled by default.
 
 --forcedsubsonly
-    Display only forced subtitles for the DVD subtitle stream selected by e.g. ``--slang``.
+    Display only forced subtitles for the DVD subtitle stream selected by e.g.
+    ``--slang``.
 
---fribidi-charset=<charset name>
+--fribidi-charset=<name>
     Specifies the character set that will be passed to FriBiDi when decoding
     non-UTF-8 subtitles (default: ISO8859-8).
 
---ifo=<VOBsub IFO file>
-    Indicate the file that will be used to load palette and frame size for
-    VOBsub subtitles.
+--ifo=<file>
+    Indicate the VOBsub IFO file that will be used to load palette and frame
+    size for VOBsub subtitles.
 
 --osd-duration=<time>
     Set the duration of the OSD messages in ms (default: 1000).
@@ -1946,8 +1951,8 @@ OSD/SUBTITLE OPTIONS
 
     :0: Do not display fractions (default).
     :1: Show the first two decimals.
-    :2: Show approximate frame count within current second. This frame count is
-        not accurate but only an approximation. For variable fps, the
+    :2: Show approximate frame count within current second. This frame count
+        is not accurate but only an approximation. For variable fps, the
         approximation is known to be far off the correct frame count.
 
 --osdlevel=<0-3>
@@ -1970,15 +1975,15 @@ OSD/SUBTITLE OPTIONS
 
 --nosub
     Disables any otherwise auto-selected internal subtitles (as e.g. the
-    Matroska/mkv demuxer supports).
-    Use ``--no-autosub`` to disable the loading of external subtitle files.
+    Matroska/mkv demuxer supports). Use ``--no-autosub`` to disable the
+    loading of external subtitle files.
 
---slang=<language code[,language code,...]>
+--slang=<languagecode[,languagecode,...]>
     Specify a priority list of subtitle languages to use. Different container
     formats employ different language codes. DVDs use ISO 639-1 two letter
     language codes, Matroska uses ISO 639-2 three letter language codes while
     OGM uses a free-form identifier. MPlayer prints the available languages
-    when run in verbose (``-v``) mode.  See also ``--sid``.
+    when run in verbose (``-v``) mode. See also ``--sid``.
 
     *EXAMPLE*:
 
@@ -2008,8 +2013,8 @@ OSD/SUBTITLE OPTIONS
     :2:   Align at bottom.
 
 --spugauss=<0.0-3.0>
-    Variance parameter of gaussian used by ``--spuaa=4``. Higher means more blur
-    (default: 1.0).
+    Variance parameter of gaussian used by ``--spuaa=4``. Higher means more
+    blur (default: 1.0).
 
 --sub=<subtitlefile1,subtitlefile2,...>
     Use/display these subtitle files. Only one file can be displayed at the
@@ -2021,13 +2026,13 @@ OSD/SUBTITLE OPTIONS
 
 --sub-bg-color=<0-255>
     Specify the color value for subtitles and OSD backgrounds. Currently
-    subtitles are grayscale so this value is equivalent to the intensity of the
-    color. 255 means white and 0 black.
+    subtitles are grayscale so this value is equivalent to the intensity of
+    the color. 255 means white and 0 black.
 
 --sub-demuxer=<[+]name>
     Force subtitle demuxer type for ``--subfile``. Using a '+' before the name
-    will force it, this will skip some checks!
-    Give the demuxer name as printed by ``--sub-demuxer=help``.
+    will force it, this will skip some checks! Give the demuxer name as
+    printed by ``--sub-demuxer=help``.
 
 --sub-fuzziness=<mode>
     Adjust matching fuzziness when searching for subtitles:
@@ -2037,8 +2042,8 @@ OSD/SUBTITLE OPTIONS
     :2: Load all subs in the current and ``--sub-paths`` directories.
 
 --sub-no-text-pp
-    Disables any kind of text post processing done after loading the subtitles.
-    Used for debug purposes.
+    Disables any kind of text post processing done after loading the
+    subtitles. Used for debug purposes.
 
 --subalign=<0-2>
     Specify which edge of the subtitles should be aligned at the height given
@@ -2049,10 +2054,11 @@ OSD/SUBTITLE OPTIONS
     :2: Align subtitle bottom edge (default).
 
 --subcc=<1-4>
-    Display DVD Closed Caption (CC) subtitles from the specified channel. These
-    are *not* the VOB subtitles, these are special ASCII subtitles for the
-    hearing impaired encoded in the VOB userdata stream on most region 1 DVDs.
-    CC subtitles have not been spotted on DVDs from other regions so far.
+    Display DVD Closed Caption (CC) subtitles from the specified channel.
+    These are *not* the VOB subtitles, these are special ASCII subtitles for
+    the hearing impaired encoded in the VOB userdata stream on most region 1
+    DVDs. CC subtitles have not been spotted on DVDs from other regions so
+    far.
 
 --subcp=<codepage>
     If your system supports ``iconv(3)``, you can use this option to specify
@@ -2067,23 +2073,23 @@ OSD/SUBTITLE OPTIONS
 
     ``--subcp=enca:<language>:<fallback codepage>``
 
-    You can specify your language using a two letter language code to make ENCA
-    detect the codepage automatically. If unsure, enter anything and watch
-    mplayer ``-v`` output for available languages. Fallback codepage specifies
-    the codepage to use, when autodetection fails.
+    You can specify your language using a two letter language code to make
+    ENCA detect the codepage automatically. If unsure, enter anything and
+    watch mplayer ``-v`` output for available languages. Fallback codepage
+    specifies the codepage to use, when autodetection fails.
 
     *EXAMPLE*:
 
-    - ``--subcp=enca:cs:latin2`` guess the encoding, assuming the subtitles are
-      Czech, fall back on latin 2, if the detection fails.
+    - ``--subcp=enca:cs:latin2`` guess the encoding, assuming the subtitles
+      are Czech, fall back on latin 2, if the detection fails.
     - ``--subcp=enca:pl:cp1250`` guess the encoding for Polish, fall back on
       cp1250.
 
 --sub-paths=<path1:path2:...>
-    Specify extra directories where to search for subtitles matching the video.
-    Multiple directories can be separated by ":" (";" on Windows). Paths can be
-    relative or absolute. Relative paths are interpreted relative to video file
-    directory.
+    Specify extra directories where to search for subtitles matching the
+    video. Multiple directories can be separated by ":" (";" on Windows).
+    Paths can be relative or absolute. Relative paths are interpreted relative
+    to video file directory.
 
     *EXAMPLE*: Assuming that ``/path/to/movie/movie.avi`` is played and
     ``--sub-paths=sub:subtitles:/tmp/subs`` is specified, MPlayer searches for
@@ -2100,9 +2106,10 @@ OSD/SUBTITLE OPTIONS
 
 --subfile=<filename>
     (BETA CODE)
-    Currently useless. Same as ``--audiofile``, but for subtitle streams (OggDS?).
+    Currently useless. Same as ``--audiofile``, but for subtitle streams
+    (OggDS?).
 
---subfont=<font to use>
+--subfont=<pattern-or-filename>
     Sets the subtitle font (see ``--font``). If no ``--subfont`` is given,
     ``--font`` is used for subtitles too.
 
@@ -2122,8 +2129,8 @@ OSD/SUBTITLE OPTIONS
     Sets the font blur radius (default: 2).
 
 --subfont-encoding=<value>
-    Sets the font encoding. When set to 'unicode', all the glyphs from the font
-    file will be rendered and unicode will be used (default: unicode).
+    Sets the font encoding. When set to 'unicode', all the glyphs from the
+    font file will be rendered and unicode will be used (default: unicode).
 
 --subfont-osd-scale=<0-100>
     Sets the autoscale coefficient of the OSD elements (default: 4).
@@ -2138,8 +2145,8 @@ OSD/SUBTITLE OPTIONS
 --subfps=<rate>
     Specify the framerate of the subtitle file (default: movie fps).
 
-    *NOTE*: <rate> > movie fps speeds the subtitles up for frame-based subtitle
-    files and slows them down for time-based ones.
+    *NOTE*: <rate> > movie fps speeds the subtitles up for frame-based
+    subtitle files and slows them down for time-based ones.
 
 --subpos=<0-100>
     Specify the position of subtitles on the screen. The value is the vertical
@@ -2154,7 +2161,7 @@ OSD/SUBTITLE OPTIONS
     Display OSD messages on the console when no video output is available.
     Enabled by default.
 
---term-osd-esc=<escape sequence>
+--term-osd-esc=<string>
     Specify the escape sequence to use before writing an OSD message on the
     console. The escape sequence should move the pointer to the beginning of
     the line used for the OSD and clear it (default: ``^[[A\r^[[K``).
@@ -2162,16 +2169,16 @@ OSD/SUBTITLE OPTIONS
 --unicode
     Tells MPlayer to handle the subtitle file as unicode.
 
---unrarexec=<path to unrar executable>
+--unrarexec=<filename>
     Specify the path to the unrar executable so MPlayer can use it to access
     rar-compressed VOBsub files (default: not set, so the feature is off). The
-    path must include the executable's filename, i.e. ``/usr/local/bin/unrar``.
-    Not supported on MingW.
+    path must include the executable's filename, i.e.
+    ``/usr/local/bin/unrar``. Not supported on MingW.
 
 --utf8
     Tells MPlayer to handle the subtitle file as UTF-8.
 
---vobsub=<VOBsub file without extension>
+--vobsub=<file>
     Specify a VOBsub file to use for subtitles. Has to be the full pathname
     without extension, i.e. without the ``.idx``, ``.ifo`` or ``.sub``.
 
@@ -2187,8 +2194,8 @@ AUDIO OUTPUT OPTIONS
     Override audio driver/card buffer size detection.
 
 --format=<format>
-    Select the sample format used for output from the audio filter layer to the
-    sound card. The values that <format> can adopt are listed below in the
+    Select the sample format used for output from the audio filter layer to
+    the sound card. The values that <format> can adopt are listed below in the
     description of the ``format`` audio filter.
 
 --gapless-audio
@@ -2197,23 +2204,23 @@ AUDIO OUTPUT OPTIONS
     relies on audio output device buffering to continue playback while moving
     from one file to another. If playback of the new file starts slowly, for
     example because it's played from a remote network location or because you
-    have specified cache settings that require time for the initial cache fill,
-    then the buffered audio may run out before playback of the new file can
-    start.
+    have specified cache settings that require time for the initial cache
+    fill, then the buffered audio may run out before playback of the new file
+    can start.
 
-    *NOTE*: The audio device is opened using parameters chosen according
-    to the first file played and is then kept open for gapless playback.
-    This means that if the first file for example has a low samplerate then
-    the following files may get resampled to the same low samplerate,
-    resulting in reduced sound quality. If you play files with different
-    parameters, consider using options such as ``--srate`` and ``--format``
-    to explicitly select what the shared output format will be.
+    *NOTE*: The audio device is opened using parameters chosen according to
+    the first file played and is then kept open for gapless playback. This
+    means that if the first file for example has a low samplerate then the
+    following files may get resampled to the same low samplerate, resulting in
+    reduced sound quality. If you play files with different parameters,
+    consider using options such as ``--srate`` and ``--format`` to explicitly
+    select what the shared output format will be.
 
 --mixer=<device>
-    Use a mixer device different from the default ``/dev/mixer``. For ALSA this
-    is the mixer name.
+    Use a mixer device different from the default ``/dev/mixer``. For ALSA
+    this is the mixer name.
 
---mixer-channel=<mixer line[,mixer index]>
+--mixer-channel=<name[,index]>
     (``--ao=oss`` and ``--ao=alsa`` only)
     This option will tell MPlayer to use a different channel for controlling
     volume than the default PCM. Options for OSS include **vol, pcm, line**.
@@ -2226,7 +2233,8 @@ AUDIO OUTPUT OPTIONS
     be converted to PCM,1.
 
 --softvol
-    Force the use of the software mixer, instead of using the sound card mixer.
+    Force the use of the software mixer, instead of using the sound card
+    mixer.
 
 --softvol-max=<10.0-10000.0>
     Set the maximum amplification level in percent (default: 110). A value of
@@ -2240,14 +2248,15 @@ AUDIO OUTPUT OPTIONS
 
 --volume=<-1-100>
     Set the startup volume in the mixer, either hardware or software (if used
-    with ``--softvol``). A value of -1 (the default) will not change the volume.
-    See also ``--af=volume``.
+    with ``--softvol``). A value of -1 (the default) will not change the
+    volume. See also ``--af=volume``.
 
 
 AUDIO OUTPUT DRIVERS
 ====================
 
-Audio output drivers are interfaces to different audio output facilities. The syntax is:
+Audio output drivers are interfaces to different audio output facilities. The
+syntax is:
 
 --ao=<driver1[:suboption1[=value]:...],driver2,...[,]>
     Specify a priority list of audio output drivers to be used.
@@ -2339,8 +2348,8 @@ pulse
 
     [<host>][:<output sink>]
         Specify the host and optionally output sink to use. An empty <host>
-        string uses a local connection, "localhost" uses network transfer (most
-        likely not what you want).
+        string uses a local connection, "localhost" uses network transfer
+        (most likely not what you want).
 
 sgi (SGI only)
     native SGI audio output driver
@@ -2409,11 +2418,12 @@ pcm
     raw PCM/wave file writer audio output
 
     (no)waveheader
-        Include or do not include the wave header (default: included). When not
-        included, raw PCM will be generated.
+        Include or do not include the wave header (default: included). When
+        not included, raw PCM will be generated.
     file=<filename>
-        Write the sound to <filename> instead of the default ``audiodump.wav``.
-        If nowaveheader is specified, the default is ``audiodump.pcm``.
+        Write the sound to <filename> instead of the default
+        ``audiodump.wav``. If nowaveheader is specified, the default is
+        ``audiodump.pcm``.
 
 rsound
     audio output to an RSound daemon
@@ -2443,8 +2453,8 @@ VIDEO OUTPUT OPTIONS
     svga, vesa video output drivers.
 
 --border, --no-border
-    Play movie with window border and decorations. Since this is on by default,
-    use ``--no-border`` to disable the standard window decorations.
+    Play movie with window border and decorations. Since this is on by
+    default, use ``--no-border`` to disable the standard window decorations.
 
 --brightness=<-100-100>
     Adjust the brightness of the video signal (default: 0). Not supported by
@@ -2456,8 +2466,8 @@ VIDEO OUTPUT OPTIONS
 
 --display=<name>
     (X11 only)
-    Specify the hostname and display number of the X server you want to display
-    on.
+    Specify the hostname and display number of the X server you want to
+    display on.
 
     *EXAMPLE*:
 
@@ -2539,16 +2549,17 @@ VIDEO OUTPUT OPTIONS
     Adjust where the output is on the screen initially. The x and y
     specifications are in pixels measured from the top-left of the screen to
     the top-left of the image being displayed, however if a percentage sign is
-    given after the argument it turns the value into a percentage of the screen
-    size in that direction. It also supports the standard X11 ``--geometry``
-    option format, in which e.g. +10-50 means "place 10 pixels from the left
-    border and 50 pixels from the lower border" and "--20+-10" means "place 20
-    pixels beyond the right and 10 pixels beyond the top border". If an
-    external window is specified using the ``--wid`` option, then the x and y
-    coordinates are relative to the top-left corner of the window rather than
-    the screen. The coordinates are relative to the screen given with
-    ``--xineramascreen`` for the video output drivers that fully support
-    ``--xineramascreen`` (direct3d, gl, gl2, vdpau, x11, xv, corevideo).
+    given after the argument it turns the value into a percentage of the
+    screen size in that direction. It also supports the standard X11
+    ``--geometry`` option format, in which e.g. +10-50 means "place 10 pixels
+    from the left border and 50 pixels from the lower border" and "--20+-10"
+    means "place 20 pixels beyond the right and 10 pixels beyond the top
+    border". If an external window is specified using the ``--wid`` option,
+    then the x and y coordinates are relative to the top-left corner of the
+    window rather than the screen. The coordinates are relative to the screen
+    given with ``--xineramascreen`` for the video output drivers that fully
+    support ``--xineramascreen`` (direct3d, gl, gl2, vdpau, x11, xv,
+    corevideo).
 
     *NOTE*: May not be supported by some of the older VO drivers.
 
@@ -2560,9 +2571,8 @@ VIDEO OUTPUT OPTIONS
     :100%\:100%: Places the window at the bottom right corner of the screen.
 
 --grabpointer, --no-grabpointer
-    ``-no-grabpointer`` tells the player to not grab the mouse pointer after
-    a video mode change (``--vm``).
-    Useful for multihead setups.
+    ``-no-grabpointer`` tells the player to not grab the mouse pointer after a
+    video mode change (``--vm``). Useful for multihead setups.
 
 --hue=<-100-100>
     Adjust the hue of the video signal (default: 0). You can get a colored
@@ -2570,13 +2580,13 @@ VIDEO OUTPUT OPTIONS
     drivers.
 
 --keepaspect, --no-keepaspect
-    Keep window aspect ratio when resizing windows. Enabled by default.
-    By default MPlayer tries to keep the correct video aspect ratio by
+    Keep window aspect ratio when resizing windows. Enabled by default. By
+    default MPlayer tries to keep the correct video aspect ratio by
     instructing the window manager to maintain window aspect when resizing,
     and by adding black bars if the window manager nevertheless allows window
-    shape to change.
-    This option disables window manager aspect hints and scales the video to
-    completely fill the window without regard for aspect ratio.
+    shape to change. This option disables window manager aspect hints and
+    scales the video to completely fill the window without regard for aspect
+    ratio.
 
 --monitor-dotclock=<range[,range,...]>
     Used with ``--vo=fbdev`` and ``--vo=vesa`` only.
@@ -2602,9 +2612,9 @@ VIDEO OUTPUT OPTIONS
     - ``--monitoraspect=16:9`` or ``--monitoraspect=1.7777``
 
 --monitorpixelaspect=<ratio>
-    Set the aspect of a single pixel of your monitor or TV screen (default: 1).
-    A value of 1 means square pixels (correct for (almost?) all LCDs).
-    See also ``--monitoraspect`` and ``--aspect``.
+    Set the aspect of a single pixel of your monitor or TV screen (default:
+    1). A value of 1 means square pixels (correct for (almost?) all LCDs). See
+    also ``--monitoraspect`` and ``--aspect``.
 
 --name
     Set the window class name for X11-based video output methods.
@@ -2615,9 +2625,10 @@ VIDEO OUTPUT OPTIONS
     quartz, ggi and gl2.
 
 --panscan=<0.0-1.0>
-    Enables pan-and-scan functionality (cropping the sides of e.g. a 16:9 movie
-    to make it fit a 4:3 display without black bands). The range controls how
-    much of the image is cropped. May not work with all video output drivers.
+    Enables pan-and-scan functionality (cropping the sides of e.g. a 16:9
+    movie to make it fit a 4:3 display without black bands). The range
+    controls how much of the image is cropped. May not work with all video
+    output drivers.
 
     *NOTE*: Values between -1 and 0 are allowed as well, but highly
     experimental and may crash or worse. Use at your own risk!
@@ -2663,27 +2674,27 @@ VIDEO OUTPUT OPTIONS
     See also ``--use-filename-title``.
 
 --use-filename-title
-    Set the window title using the media filename, when not set with ``--title``.
-    Supported by X11-based video output drivers.
-    See also ``--title``.
+    Set the window title using the media filename, when not set with
+    ``--title``. Supported by X11-based video output drivers. See also
+    ``--title``.
 
 --vm
-    Try to change to a different video mode. Supported by the dga, x11, xv, sdl
-    and directx video output drivers. If used with the directx video output
-    driver the ``--screenw``, ``--screenh``, ``--bpp`` and ``--refreshrate``
-    options can be used to set the new display mode.
+    Try to change to a different video mode. Supported by the dga, x11, xv,
+    sdl and directx video output drivers. If used with the directx video
+    output driver the ``--screenw``, ``--screenh``, ``--bpp`` and
+    ``--refreshrate`` options can be used to set the new display mode.
 
 --vsync
     Enables VBI for the vesa, dfbmga and svga video output drivers.
 
---wid=<window ID>
+--wid=<ID>
     (X11, OpenGL and DirectX only)
-    This tells MPlayer to attach to an existing window. Useful to embed MPlayer
-    in a browser (e.g. the plugger extension). Earlier this option always
-    filled the given window completely, thus aspect scaling, panscan, etc were
-    no longer handled by MPlayer but had to be managed by the application that
-    created the window. Now aspect is maintained by default. If you don't
-    want that use ``--no-keepaspect``.
+    This tells MPlayer to attach to an existing window. Useful to embed
+    MPlayer in a browser (e.g. the plugger extension). Earlier this option
+    always filled the given window completely, thus aspect scaling, panscan,
+    etc were no longer handled by MPlayer but had to be managed by the
+    application that created the window. Now aspect is maintained by default.
+    If you don't want that use ``--no-keepaspect``.
 
 --xineramascreen=<-2-...>
     In Xinerama configurations (i.e. a single desktop that spans across
@@ -2691,12 +2702,13 @@ VIDEO OUTPUT OPTIONS
     movie on. A value of -2 means fullscreen across the whole virtual display
     (in this case Xinerama information is completely ignored), -1 means
     fullscreen on the display the window currently is on. The initial position
-    set via the ``--geometry`` option is relative to the specified screen. Will
-    usually only work with ``--fstype=-fullscreen`` or ``--fstype=none``. This option
-    is not suitable to only set the startup screen (because it will always
-    display on the given screen in fullscreen mode), ``--geometry`` is the best
-    that is available for that purpose currently. Supported by at least the
-    direct3d, gl, gl2, x11, xv and corevideo video output drivers.
+    set via the ``--geometry`` option is relative to the specified screen.
+    Will usually only work with ``--fstype=-fullscreen`` or ``--fstype=none``.
+    This option is not suitable to only set the startup screen (because it
+    will always display on the given screen in fullscreen mode),
+    ``--geometry`` is the best that is available for that purpose currently.
+    Supported by at least the direct3d, gl, gl2, x11, xv and corevideo video
+    output drivers.
 
 
 VIDEO OUTPUT DRIVERS
@@ -2723,25 +2735,36 @@ in the list. Suboptions are optional and can mostly be omitted.
 Available video output drivers are:
 
 xv (X11 only)
-    Uses the XVideo extension of XFree86 4.x to enable hardware accelerated
-    playback. If you cannot use a hardware specific driver, this is probably
-    the best option. For information about what colorkey is used and how it is
-    drawn run MPlayer with ``-v`` option and look out for the lines tagged with
-    ``[xv common]`` at the beginning.
+    Uses the XVideo extension to enable hardware accelerated playback. If you
+    cannot use a hardware specific driver, this is probably the best option.
+    For information about what colorkey is used and how it is drawn run
+    MPlayer with ``-v`` option and look out for the lines tagged with ``[xv
+    common]`` at the beginning.
 
     adaptor=<number>
         Select a specific XVideo adaptor (check xvinfo results).
     port=<number>
         Select a specific XVideo port.
     ck=<cur|use|set>
-        Select the source from which the colorkey is taken (default: cur). cur
-        The default takes the colorkey currently set in Xv. use Use but do not
-        set the colorkey from MPlayer (use ``--colorkey`` option to change it).
-        set Same as use but also sets the supplied colorkey.
+        Select the source from which the colorkey is taken (default: cur).
+
+        cur
+          The default takes the colorkey currently set in Xv.
+        use
+          Use but do not set the colorkey from MPlayer (use the ``--colorkey``
+          option to change it).
+        set
+          Same as use but also sets the supplied colorkey.
+
     ck-method=<man|bg|auto>
-        Sets the colorkey drawing method (default: man). man Draw the colorkey
-        manually (reduces flicker in some cases). bg Set the colorkey as window
-        background. auto Let Xv draw the colorkey.
+        Sets the colorkey drawing method (default: man).
+
+        man
+          Draw the colorkey manually (reduces flicker in some cases).
+        bg
+          Set the colorkey as window background.
+        auto
+          Let Xv draw the colorkey.
 
 x11 (X11 only)
     Shared memory video output driver without hardware acceleration that works
@@ -2780,8 +2803,8 @@ vdpau (X11 only)
         2
             Bob deinterlacing, similar to ``--vf=tfields=1``.
         3
-            motion adaptive temporal deinterlacing. May lead to A/V desync with
-            slow video hardware and/or high resolution.
+            motion adaptive temporal deinterlacing. May lead to A/V desync
+            with slow video hardware and/or high resolution.
         4
             motion adaptive temporal deinterlacing with edge-guided spatial
             interpolation. Needs fast video hardware.
@@ -2794,8 +2817,8 @@ vdpau (X11 only)
         deinterlacing.
     colorspace=<0-3>
         Select the color space for YUV to RGB conversion. In general BT.601
-        should be used for standard definition (SD) content and BT.709 for high
-        definition (HD) content. Using incorrect color space results in
+        should be used for standard definition (SD) content and BT.709 for
+        high definition (HD) content. Using incorrect color space results in
         slightly under or over saturated and shifted colors.
 
         0
@@ -2815,17 +2838,17 @@ vdpau (X11 only)
             Apply high quality VDPAU scaling (needs capable hardware).
     studio
         Output video in studio level RGB (16-235). This is what TVs and video
-        monitors generally expect. By default PC level RGB (0-255) suitable for
-        PC monitors is used. Providing studio level output to a device
+        monitors generally expect. By default PC level RGB (0-255) suitable
+        for PC monitors is used. Providing studio level output to a device
         expecting PC level input results in grey blacks and dim whites, the
         reverse in crushed blacks and whites.
     fps=<number>
         Override autodetected display refresh rate value (the value is needed
-        for framedrop to allow video playback rates higher than display refresh
-        rate, and for vsync-aware frame timing adjustments). Default 0 means
-        use autodetected value. A positive value is interpreted as a refresh
-        rate in Hz and overrides the autodetected value. A negative value
-        disables all timing adjustment and framedrop logic.
+        for framedrop to allow video playback rates higher than display
+        refresh rate, and for vsync-aware frame timing adjustments). Default 0
+        means use autodetected value. A positive value is interpreted as a
+        refresh rate in Hz and overrides the autodetected value. A negative
+        value disables all timing adjustment and framedrop logic.
     queuetime_windowed=<number> and queuetime_fs=<number>
         Use VDPAU's presentation queue functionality to queue future video
         frame changes at most this many milliseconds in advance (default: 50).
@@ -2835,36 +2858,36 @@ vdpau (X11 only)
         3). See below for additional information.
 
     Using the VDPAU frame queueing functionality controlled by the queuetime
-    options makes MPlayer's frame flip timing less sensitive to system CPU load
-    and allows MPlayer to start decoding the next frame(s) slightly earlier
-    which can reduce jitter caused by individual slow-to-decode frames. However
-    the NVIDIA graphics drivers can make other window behavior such as window
-    moves choppy if VDPAU is using the blit queue (mainly happens if you have
-    the composite extension enabled) and this feature is active. If this
-    happens on your system and it bothers you then you can set the queuetime
-    value to 0 to disable this feature. The settings to use in windowed and
-    fullscreen mode are separate because there should be less reason to disable
-    this for fullscreen mode (as the driver issue shouldn't affect the video
-    itself).
+    options makes MPlayer's frame flip timing less sensitive to system CPU
+    load and allows MPlayer to start decoding the next frame(s) slightly
+    earlier which can reduce jitter caused by individual slow-to-decode
+    frames. However the NVIDIA graphics drivers can make other window behavior
+    such as window moves choppy if VDPAU is using the blit queue (mainly
+    happens if you have the composite extension enabled) and this feature is
+    active. If this happens on your system and it bothers you then you can set
+    the queuetime value to 0 to disable this feature. The settings to use in
+    windowed and fullscreen mode are separate because there should be less
+    reason to disable this for fullscreen mode (as the driver issue shouldn't
+    affect the video itself).
 
     You can queue more frames ahead by increasing the queuetime values and the
     output_surfaces count (to ensure enough surfaces to buffer video for a
     certain time ahead you need at least as many surfaces as the video has
     frames during that time, plus two). This could help make video smoother in
-    some cases. The main downsides are increased video RAM requirements for the
-    surfaces and laggier display response to user commands (display changes
-    only become visible some time after they're queued). The graphics driver
-    implementation may also have limits on the length of maximum queuing time
-    or number of queued surfaces that work well or at all.
+    some cases. The main downsides are increased video RAM requirements for
+    the surfaces and laggier display response to user commands (display
+    changes only become visible some time after they're queued). The graphics
+    driver implementation may also have limits on the length of maximum
+    queuing time or number of queued surfaces that work well or at all.
 
 dga (X11 only)
-    Play video through the XFree86 Direct Graphics Access extension. Considered
-    obsolete.
+    Play video through the XFree86 Direct Graphics Access extension.
+    Considered obsolete.
 
 sdl (SDL only, buggy/outdated)
     Highly platform independent SDL (Simple Directmedia Layer) library video
-    output driver. Since SDL uses its own X11 layer, MPlayer X11 options do not
-    have any effect on SDL. Note that it has several minor bugs
+    output driver. Since SDL uses its own X11 layer, MPlayer X11 options do
+    not have any effect on SDL. Note that it has several minor bugs
     (``--vm``/``--no-vm`` is mostly ignored, ``--fs`` behaves like ``--no-vm``
     should, window is in top-left corner when returning from fullscreen,
     panscan is not supported, ...).
@@ -2896,8 +2919,8 @@ kva (OS/2 only)
     dive
         Force DIVE mode.
     (no)t23
-        Enable or disable workaround for T23 laptop (default: disabled). Try to
-        enable this option if your video card supports upscaling only.
+        Enable or disable workaround for T23 laptop (default: disabled). Try
+        to enable this option if your video card supports upscaling only.
 
 quartz (Mac OS X only)
     Mac OS X Quartz video output driver. Under some circumstances, it might be
@@ -2914,10 +2937,11 @@ corevideo (Mac OS X 10.4 or 10.3.9 with QuickTime 7)
 
     device_id=<number>
         Choose the display device to use for fullscreen or set it to -1 to
-        always use the same screen the video window is on (default: -1 - auto).
+        always use the same screen the video window is on (default: -1 -
+        auto).
     shared_buffer
-        Write output to a shared memory buffer instead of displaying it and try
-        to open an existing NSConnection for communication with a GUI.
+        Write output to a shared memory buffer instead of displaying it and
+        try to open an existing NSConnection for communication with a GUI.
     buffer_name=<name>
         Name of the shared buffer created with shm_open as well as the name of
         the NSConnection MPlayer will try to open (default: "mplayerosx").
@@ -2961,39 +2985,39 @@ svga
         Use only native drawing functions. This avoids direct rendering, OSD
         and hardware acceleration.
     retrace
-        Force frame switch on vertical retrace. Usable only with ``--double``. It
-        has the same effect as the ``--vsync`` option.
+        Force frame switch on vertical retrace. Usable only with ``--double``.
+        It has the same effect as the ``--vsync`` option.
     sq
         Try to select a video mode with square pixels.
 
 gl
-    OpenGL video output driver, simple version. Video size must be smaller than
-    the maximum texture size of your OpenGL implementation. Intended to work
-    even with the most basic OpenGL implementations, but also makes use of
-    newer extensions, which allow support for more colorspaces and direct
+    OpenGL video output driver, simple version. Video size must be smaller
+    than the maximum texture size of your OpenGL implementation. Intended to
+    work even with the most basic OpenGL implementations, but also makes use
+    of newer extensions, which allow support for more colorspaces and direct
     rendering. For optimal speed try adding the options ``--dr=-noslices``
 
     The code performs very few checks, so if a feature does not work, this
     might be because it is not supported by your card/OpenGL implementation
-    even if you do not get any error message. Use ``glxinfo`` or a similar tool
-    to display the supported OpenGL extensions.
+    even if you do not get any error message. Use ``glxinfo`` or a similar
+    tool to display the supported OpenGL extensions.
 
     (no)ati-hack
         ATI drivers may give a corrupted image when PBOs are used (when using
-        ``--dr`` or `force-pbo`). This option fixes this, at the expense of using
-        a bit more memory.
+        ``--dr`` or `force-pbo`). This option fixes this, at the expense of
+        using a bit more memory.
     (no)force-pbo
         Always uses PBOs to transfer textures even if this involves an extra
-        copy. Currently this gives a little extra speed with NVidia drivers and
-        a lot more speed with ATI drivers. May need ``--no-slices`` and the
-        ati-hack suboption to work correctly.
+        copy. Currently this gives a little extra speed with NVidia drivers
+        and a lot more speed with ATI drivers. May need ``--no-slices`` and
+        the ati-hack suboption to work correctly.
     (no)scaled-osd
         Changes the way the OSD behaves when the size of the window changes
         (default: disabled). When enabled behaves more like the other video
         output drivers, which is better for fixed-size fonts. Disabled looks
         much better with FreeType fonts and uses the borders in fullscreen
-        mode. Does not work correctly with ass subtitles (see ``--ass``), you can
-        instead render them without OpenGL support via ``--vf=ass``.
+        mode. Does not work correctly with ass subtitles (see ``--ass``), you
+        can instead render them without OpenGL support via ``--vf=ass``.
     osdcolor=<0xAARRGGBB>
         Color for OSD (default: 0x00ffffff, corresponds to non-transparent
         white).
@@ -3021,8 +3045,8 @@ gl
         most cases this is probably slower than doing software conversion to
         RGB.
     yuv=<n>
-        Select the type of YUV to RGB conversion. The default is auto-detection
-        deciding between values 0 and 2.
+        Select the type of YUV to RGB conversion. The default is
+        auto-detection deciding between values 0 and 2.
 
         0
             Use software conversion. Compatible with all OpenGL versions.
@@ -3057,11 +3081,11 @@ gl
         6
             Use a 3D texture to do conversion via lookup. Needs the
             ``GL_ARB_fragment_program extension`` and at least four texture
-            units. Extremely slow (software emulation) on some (all?) ATI cards
-            since it uses a texture with border pixels. Provides brightness,
-            contrast, saturation, hue and gamma control. Gamma can also be set
-            independently for red, green and blue. Speed depends more on GPU
-            memory bandwidth than other methods.
+            units. Extremely slow (software emulation) on some (all?) ATI
+            cards since it uses a texture with border pixels. Provides
+            brightness, contrast, saturation, hue and gamma control. Gamma can
+            also be set independently for red, green and blue. Speed depends
+            more on GPU memory bandwidth than other methods.
 
     colorspace
         Select the color space for YUV to RGB conversion.
@@ -3110,8 +3134,8 @@ gl
             strength of 0.5 (see `filter-strength`).
 
     cscale=<n>
-        Select the scaling function to use for chrominance scaling. For details
-        see `lscale`.
+        Select the scaling function to use for chrominance scaling. For
+        details see `lscale`.
     filter-strength=<value>
         Set the effect strength for the `lscale`/`cscale` filters that support
         it.
@@ -3136,8 +3160,8 @@ gl
         Load a custom fragment program from <filename>. See
         ``TOOLS/edgedect.fp`` for an example.
     customtex=<filename>
-        Load a custom "gamma ramp" texture from <filename>. This can be used in
-        combination with yuv=4 or with the customprog option.
+        Load a custom "gamma ramp" texture from <filename>. This can be used
+        in combination with yuv=4 or with the customprog option.
     (no)customtlin
         If enabled (default) use ``GL_LINEAR`` interpolation, otherwise use
         ``GL_NEAREST`` for customtex texture.
@@ -3151,8 +3175,8 @@ gl
         implementations this is very slow for any non-RGB formats. Default is
         disabled.
 
-    Normally there is no reason to use the following options, they mostly exist
-    for testing purposes.
+    Normally there is no reason to use the following options, they mostly
+    exist for testing purposes.
 
     (no)glfinish
         Call ``glFinish()`` before swapping buffers. Slower but in some cases
@@ -3186,17 +3210,17 @@ gl2
         same as gl (default: enabled)
     yuv=<n>
         Select the type of YUV to RGB conversion. If set to anything except 0
-        OSD will be disabled and brightness, contrast and gamma setting is only
-        available via the global X server settings. Apart from this the values
-        have the same meaning as for ``--vo=gl``.
+        OSD will be disabled and brightness, contrast and gamma setting is
+        only available via the global X server settings. Apart from this the
+        values have the same meaning as for ``--vo=gl``.
 
 matrixview
     OpenGL-based renderer creating a Matrix-like running-text effect.
 
     cols=<n>
-        Number of text columns to display. Very low values (< 16) will probably
-        fail due to scaler limitations. Values not divisible by 16 may cause
-        issues as well.
+        Number of text columns to display. Very low values (< 16) will
+        probably fail due to scaler limitations. Values not divisible by 16
+        may cause issues as well.
     rows=<n>
         Number of text rows to display. Very low values (< 16) will probably
         fail due to scaler limitations. Values not divisible by 16 may cause
@@ -3212,8 +3236,8 @@ aa
 
     *NOTE*: The driver does not handle ``--aspect`` correctly.
 
-    *HINT*: You probably have to specify ``--monitorpixelaspect``. Try ``mplayer
-    --vo=aa --monitorpixelaspect=0.5``.
+    *HINT*: You probably have to specify ``--monitorpixelaspect``. Try
+    ``mplayer --vo=aa --monitorpixelaspect=0.5``.
 
 caca
     Color ASCII art video output driver that works on a text console.
@@ -3303,9 +3327,9 @@ xmga (Linux, X11 only)
 
 s3fb (Linux only) (see also ``--dr``)
     S3 Virge specific video output driver. This driver supports the card's YUV
-    conversion and scaling, double buffering and direct rendering features. Use
-    ``--vf=format=yuy2`` to get hardware-accelerated YUY2 rendering, which is much
-    faster than YV12 on this card.
+    conversion and scaling, double buffering and direct rendering features.
+    Use ``--vf=format=yuy2`` to get hardware-accelerated YUY2 rendering, which
+    is much faster than YV12 on this card.
 
     <device>
         Explicitly choose the fbdev device name to use (default: ``/dev/fb0``).
@@ -3314,8 +3338,8 @@ wii (Linux only)
     Nintendo Wii/GameCube specific video output driver.
 
 3dfx (Linux only)
-    3dfx-specific video output driver that directly uses the hardware on top of
-    X11. Only 16 bpp are supported.
+    3dfx-specific video output driver that directly uses the hardware on top
+    of X11. Only 16 bpp are supported.
 
 tdfxfb (Linux only)
     This driver employs the tdfxfb framebuffer driver to play movies with YUV
@@ -3382,9 +3406,9 @@ mpegpes (DVB only)
     file if no DVB card is installed.
 
     card=<1-4>
-        Specifies the device number to use if you have more than one DVB output
-        card (V3 API only, such as 1.x.y series drivers). If not specified
-        MPlayer will search the first usable card.
+        Specifies the device number to use if you have more than one DVB
+        output card (V3 API only, such as 1.x.y series drivers). If not
+        specified MPlayer will search the first usable card.
     <filename>
         output filename (default: ``./grab.mpg``)
 
@@ -3401,9 +3425,9 @@ yuv4mpeg
     the same as the one employed by mjpegtools, so this is useful if you want
     to process the video with the mjpegtools suite. It supports the YV12
     format. If your source file has a different format and is interlaced, make
-    sure to use ``--vf=scale=::1`` to ensure the conversion uses interlaced mode.
-    You can combine it with the ``--fixed-vo`` option to concatenate files with
-    the same dimensions and fps value.
+    sure to use ``--vf=scale=::1`` to ensure the conversion uses interlaced
+    mode. You can combine it with the ``--fixed-vo`` option to concatenate
+    files with the same dimensions and fps value.
 
     interlaced
         Write the output as interlaced frames, top field first.
@@ -3416,17 +3440,17 @@ yuv4mpeg
     not interlaced).
 
 gif89a
-    Output each frame into a single animated GIF file in the current directory.
-    It supports only RGB format with 24 bpp and the output is converted to 256
-    colors.
+    Output each frame into a single animated GIF file in the current
+    directory. It supports only RGB format with 24 bpp and the output is
+    converted to 256 colors.
 
     <fps>
         Float value to specify framerate (default: 5.0).
     <output>
         Specify the output filename (default: ``./out.gif``).
 
-    *NOTE*: You must specify the framerate before the filename or the framerate
-    will be part of the filename.
+    *NOTE*: You must specify the framerate before the filename or the
+    framerate will be part of the filename.
 
     *EXAMPLE*: ``mplayer video.nut --vo=gif89a:fps=15:output=test.gif``
 
@@ -3454,9 +3478,9 @@ jpeg
         or larger than 1 (default: 1000).
 
 pnm
-    Output each frame into a PNM file in the current directory. Each file takes
-    the frame number padded with leading zeros as name. It supports PPM, PGM
-    and PGMYUV files in both raw and ASCII mode. See also ``pnm(5)``,
+    Output each frame into a PNM file in the current directory. Each file
+    takes the frame number padded with leading zeros as name. It supports PPM,
+    PGM and PGMYUV files in both raw and ASCII mode. See also ``pnm(5)``,
     ``ppm(5)`` and ``pgm(5)``.
 
     ppm
@@ -3480,23 +3504,24 @@ pnm
         or larger than 1 (default: 1000).
 
 png
-    Output each frame into a PNG file in the current directory. Each file takes
-    the frame number padded with leading zeros as name. 24bpp RGB and BGR
-    formats are supported.
+    Output each frame into a PNG file in the current directory. Each file
+    takes the frame number padded with leading zeros as name. 24bpp RGB and
+    BGR formats are supported.
 
     z=<0-9>
         Specifies the compression level. 0 is no compression, 9 is maximum
         compression.
     alpha
         Create PNG files with an alpha channel. Note that MPlayer in general
-        does not support alpha, so this will only be useful in some rare cases.
+        does not support alpha, so this will only be useful in some rare
+        cases.
 
 tga
     Output each frame into a Targa file in the current directory. Each file
     takes the frame number padded with leading zeros as name. The purpose of
     this video output driver is to have a simple lossless image writer to use
-    without any external library. It supports the BGR[A] color format, with 15,
-    24 and 32 bpp. You can force a particular format with the format video
+    without any external library. It supports the BGR[A] color format, with
+    15, 24 and 32 bpp. You can force a particular format with the format video
     filter.
 
     *EXAMPLE*: ``mplayer video.nut --vf=format=bgr15 --vo=tga``
@@ -3519,8 +3544,9 @@ DECODING/FILTERING OPTIONS
     :``--ac=mp3acm``:     Force the l3codeca.acm MP3 codec.
     :``--ac=mad,``:       Try libmad first, then fall back on others.
     :``--ac=hwac3,a52,``: Try hardware AC-3 passthrough, software AC-3, then
-                       others.
-    :``--ac=hwdts,``:     Try hardware DTS passthrough, then fall back on others.
+                          others.
+    :``--ac=hwdts,``:     Try hardware DTS passthrough, then fall back on
+                          others.
     :``--ac=-ffmp3,``:    Skip FFmpeg's MP3 decoder.
 
 --af-adv=<force=(0-7):list=(filters)>
@@ -3551,8 +3577,8 @@ DECODING/FILTERING OPTIONS
             Use automatic insertion of filters according to 2 above, but use
             floating point processing when possible.
         7
-            Use no automatic insertion of filters according to 3 above, and use
-            floating point processing when possible.
+            Use no automatic insertion of filters according to 3 above, and
+            use floating point processing when possible.
 
     list=<filters>
         Same as ``--af``.
@@ -3664,10 +3690,11 @@ DECODING/FILTERING OPTIONS
         :4: very aggressive
 
     fast (MPEG-2, MPEG-4, and H.264 only)
-        Enable optimizations which do not comply to the specification and might
-        potentially cause problems, like simpler dequantization, simpler motion
-        compensation, assuming use of the default quantization matrix, assuming
-        YUV 4:2:0 and skipping a few checks to detect damaged bitstreams.
+        Enable optimizations which do not comply to the specification and
+        might potentially cause problems, like simpler dequantization, simpler
+        motion compensation, assuming use of the default quantization matrix,
+        assuming YUV 4:2:0 and skipping a few checks to detect damaged
+        bitstreams.
 
     gray
         grayscale only decoding (a bit faster than with color)
@@ -3725,7 +3752,8 @@ DECODING/FILTERING OPTIONS
 
     skipframe=<skipvalue>
         Skips decoding of frames completely. Big speedup, but jerky motion and
-        sometimes bad artifacts (see skiploopfilter for available skip values).
+        sometimes bad artifacts (see skiploopfilter for available skip
+        values).
 
     threads=<0-16>
         Number of threads to use for decoding. Whether threading is actually
@@ -3752,11 +3780,10 @@ DECODING/FILTERING OPTIONS
     unreliable.
 
 --pp=<quality>
-    This option only works when decoding video with Win32 DirectShow DLLs
-    with internal postprocessingi routines. See also ``--vf=pp``.
-    Set the DLL postprocess level.
-    The valid range of ``--pp`` values varies by
-    codec, it is mostly 0-6, where 0=disable, 6=slowest/best.
+    This option only works when decoding video with Win32 DirectShow DLLs with
+    internal postprocessingi routines. See also ``--vf=pp``. Set the DLL
+    postprocess level. The valid range of ``--pp`` values varies by codec, it
+    is mostly 0-6, where 0=disable, 6=slowest/best.
 
 --pphelp
     Show a summary about the available postprocess filters and their usage.
@@ -3788,10 +3815,10 @@ DECODING/FILTERING OPTIONS
     :1: left channel
     :2: right channel
 
---sws=<software scaler type>
-    Specify the software scaler algorithm to be used with the ``--zoom`` option.
-    This affects video output drivers which lack hardware acceleration, e.g.
-    x11.  See also ``--vf=scale`` and ``--zoom``.
+--sws=<n>
+    Specify the software scaler algorithm to be used with the ``--zoom``
+    option. This affects video output drivers which lack hardware
+    acceleration, e.g. x11. See also ``--vf=scale`` and ``--zoom``.
 
     Available types are:
 
@@ -3807,8 +3834,8 @@ DECODING/FILTERING OPTIONS
     :9:  lanczos
     :10: natural bicubic spline
 
-    *NOTE*: Some ``--sws`` options are tunable.The description of the scale video
-    filter has further information.
+    *NOTE*: Some ``--sws`` options are tunable. The description of the scale
+    video filter has further information.
 
 --vc=<[-\|+]codec1,[-\|+]codec2,...[,]>
     Specify a priority list of video codecs to be used, according to their
@@ -3823,8 +3850,8 @@ DECODING/FILTERING OPTIONS
 
     :``--vc=divx``:             Force Win32/VfW DivX codec, no fallback.
     :``--vc=-divxds,-divx,``:   Skip Win32 DivX codecs.
-    :``--vc=ffmpeg12,mpeg12,``: Try libavcodec's MPEG-1/2 codec, then libmpeg2,
-                               then others.
+    :``--vc=ffmpeg12,mpeg12,``: Try libavcodec's MPEG-1/2 codec, then
+                                libmpeg2, then others.
 
 
 --vfm=<driver1,driver2,...>
@@ -3836,10 +3863,11 @@ DECODING/FILTERING OPTIONS
 
     *EXAMPLE*:
 
-    :``--vfm=ffmpeg,dshow,vfw``:   Try the libavcodec, then Directshow, then VfW
-                                codecs and fall back on others, if they do not
-                                work.
-    :``--vfm=xanim``:              Try XAnim codecs first.
+    :``--vfm=ffmpeg,dshow,vfw``:
+        Try the libavcodec, then Directshow, then VfW codecs and fall back on
+        others, if they do not work.
+    :``--vfm=xanim``:
+        Try XAnim codecs first.
 
 -x <x>
     Scale image to width <x> (if software/hardware scaling is available).
@@ -3849,8 +3877,8 @@ DECODING/FILTERING OPTIONS
     Specify additional parameters when decoding with Xvid.
 
     *NOTE*: Since libavcodec is faster than Xvid you might want to use the
-    libavcodec postprocessing filter (``--vf=pp``) and decoder (``--vfm=ffmpeg``)
-    instead.
+    libavcodec postprocessing filter (``--vf=pp``) and decoder
+    (``--vfm=ffmpeg``) instead.
 
     Xvid's internal postprocessing filters:
 
@@ -3858,10 +3886,9 @@ DECODING/FILTERING OPTIONS
     :deblock-luma   (see also ``--vf=pp``):    luma deblock filter
     :dering-luma    (see also ``--vf=pp``):    luma deringing filter
     :dering-chroma  (see also ``--vf=pp``):    chroma deringing filter
-    :filmeffect     (see also ``--vf=noise``): Adds artificial film grain to the
-                                            video. May increase perceived
-                                            quality, while lowering true
-                                            quality.
+    :filmeffect     (see also ``--vf=noise``):
+        Adds artificial film grain to the video. May increase perceived
+        quality, while lowering true quality.
 
     rendering methods:
 
@@ -3880,8 +3907,8 @@ DECODING/FILTERING OPTIONS
 
 --zoom
     Allow software scaling, where available. This will allow scaling with
-    output drivers (like x11, fbdev) that do not support hardware scaling where
-    MPlayer disables scaling by default for performance reasons.
+    output drivers (like x11, fbdev) that do not support hardware scaling
+    where MPlayer disables scaling by default for performance reasons.
 
 
 AUDIO FILTERS
@@ -3924,8 +3951,8 @@ resample[=srate[:sloppy[:type]]]
         output sample frequency in Hz. The valid range for this parameter is
         8000 to 192000. If the input and output sample frequency are the same
         or if this parameter is omitted the filter is automatically unloaded.
-        A high sample frequency normally improves the audio quality, especially
-        when used in combination with other filters.
+        A high sample frequency normally improves the audio quality,
+        especially when used in combination with other filters.
     <sloppy>
         Allow (1) or disallow (0) the output frequency to differ slightly from
         the frequency given by <srate> (default: 1). Can be used if the
@@ -3933,9 +3960,11 @@ resample[=srate[:sloppy[:type]]]
     <type>
         Select which resampling method to use.
 
-        :0: linear interpolation (fast, poor quality especially when upsampling)
+        :0: linear interpolation (fast, poor quality especially when
+            upsampling)
         :1: polyphase filterbank and integer processing
-        :2: polyphase filterbank and floating point processing (slow, best quality)
+        :2: polyphase filterbank and floating point processing
+            (slow, best quality)
 
     *EXAMPLE*:
 
@@ -3964,13 +3993,14 @@ lavcresample[=srate[:length[:linear[:count[:cutoff]]]]]
 lavcac3enc[=tospdif[:bitrate[:minchn]]]
     Encode multi-channel audio to AC-3 at runtime using libavcodec. Supports
     16-bit native-endian input format, maximum 6 channels. The output is
-    big-endian when outputting a raw AC-3 stream, native-endian when outputting
-    to S/PDIF. The output sample rate of this filter is same with the input
-    sample rate. When input sample rate is 48kHz, 44.1kHz, or 32kHz, this
-    filter directly use it. Otherwise a resampling filter is auto-inserted
-    before this filter to make the input and output sample rate be 48kHz. You
-    need to specify ``--channels=N`` to make the decoder decode audio into
-    N-channel, then the filter can encode the N-channel input to AC-3.
+    big-endian when outputting a raw AC-3 stream, native-endian when
+    outputting to S/PDIF. The output sample rate of this filter is same with
+    the input sample rate. When input sample rate is 48kHz, 44.1kHz, or 32kHz,
+    this filter directly use it. Otherwise a resampling filter is
+    auto-inserted before this filter to make the input and output sample rate
+    be 48kHz. You need to specify ``--channels=N`` to make the decoder decode
+    audio into N-channel, then the filter can encode the N-channel input to
+    AC-3.
 
     <tospdif>
         Output raw AC-3 stream if zero or not set, output to S/PDIF for
@@ -4006,7 +4036,8 @@ sinesuppress[=freq:decay]
     noise on low quality audio equipment. It probably only works on mono input.
 
     <freq>
-        The frequency of the sine which should be removed (in Hz) (default: 50)
+        The frequency of the sine which should be removed (in Hz) (default:
+        50)
     <decay>
         Controls the adaptivity (a larger value will make the filter adapt to
         amplitude and phase changes quicker, a smaller value will make the
@@ -4015,8 +4046,8 @@ sinesuppress[=freq:decay]
 
 bs2b[=option1:option2:...]
     Bauer stereophonic to binaural transformation using ``libbs2b``. Improves
-    the headphone listening experience by making the sound similar to that from
-    loudspeakers, allowing each ear to hear both channels and taking into
+    the headphone listening experience by making the sound similar to that
+    from loudspeakers, allowing each ear to hear both channels and taking into
     account the distance difference and the head shadowing effect. It is
     applicable only to 2 channel audio.
 
@@ -4032,8 +4063,8 @@ bs2b[=option1:option2:...]
         :cmoy:    Chu Moy circuit implementation (fcut=700, feed=60)
         :jmeier:  Jan Meier circuit implementation (fcut=650, feed=95)
 
-    If fcut or feed options are specified together with a profile, they will be
-    applied on top of the selected profile.
+    If fcut or feed options are specified together with a profile, they will
+    be applied on top of the selected profile.
 
 hrtf[=flag]
     Head-related transfer function: Converts multichannel audio to 2 channel
@@ -4049,8 +4080,8 @@ hrtf[=flag]
 
 equalizer=[g1:g2:g3:...:g10]
     10 octave band graphic equalizer, implemented using 10 IIR band pass
-    filters. This means that it works regardless of what type of audio is being
-    played back. The center frequencies for the 10 bands are:
+    filters. This means that it works regardless of what type of audio is
+    being played back. The center frequencies for the 10 bands are:
 
     === ==========
     No. frequency
@@ -4069,8 +4100,8 @@ equalizer=[g1:g2:g3:...:g10]
 
     If the sample rate of the sound being played is lower than the center
     frequency for a frequency band, then that band will be disabled. A known
-    bug with this filter is that the characteristics for the uppermost band are
-    not completely symmetric if the sample rate is close to the center
+    bug with this filter is that the characteristics for the uppermost band
+    are not completely symmetric if the sample rate is close to the center
     frequency of that band. This problem can be worked around by upsampling
     the sound using the resample filter before it reaches this filter.
 
@@ -4114,26 +4145,26 @@ channels=nch[:nr:from1:to1:from2:to2:from3:to3:...]
         channel 0 to channels 0 to 3. Channel 4 and 5 will contain silence.
 
 format[=format]
-    Convert between different sample formats. Automatically enabled when needed
-    by the sound card or another filter. See also ``--format``.
+    Convert between different sample formats. Automatically enabled when
+    needed by the sound card or another filter. See also ``--format``.
 
     <format>
         Sets the desired format. The general form is 'sbe', where 's' denotes
         the sign (either 's' for signed or 'u' for unsigned), 'b' denotes the
-        number of bits per sample (16, 24 or 32) and 'e' denotes the endianness
-        ('le' means little-endian, 'be' big-endian and 'ne' the endianness of
-        the computer MPlayer is running on). Valid values (amongst others)
-        are: 's16le', 'u32be' and 'u24ne'. Exceptions to this rule that are
-        also valid format specifiers: u8, s8, floatle, floatbe, floatne, mulaw,
-        alaw, mpeg2, ac3 and imaadpcm.
+        number of bits per sample (16, 24 or 32) and 'e' denotes the
+        endianness ('le' means little-endian, 'be' big-endian and 'ne' the
+        endianness of the computer MPlayer is running on). Valid values
+        (amongst others) are: 's16le', 'u32be' and 'u24ne'. Exceptions to this
+        rule that are also valid format specifiers: u8, s8, floatle, floatbe,
+        floatne, mulaw, alaw, mpeg2, ac3 and imaadpcm.
 
 volume[=v[:sc]]
     Implements software volume control. Use this filter with caution since it
     can reduce the signal to noise ratio of the sound. In most cases it is
     best to set the level for the PCM sound to max, leave this filter out and
-    control the output level to your speakers with the master volume control of
-    the mixer. In case your sound card has a digital PCM mixer instead of an
-    analog one, and you hear distortion, use the MASTER mixer instead. If
+    control the output level to your speakers with the master volume control
+    of the mixer. In case your sound card has a digital PCM mixer instead of
+    an analog one, and you hear distortion, use the MASTER mixer instead. If
     there is an external amplifier connected to the computer (this is almost
     always the case), the noise level can be minimized by adjusting the master
     level and the volume knob on the amplifier until the hissing noise in the
@@ -4144,8 +4175,8 @@ volume[=v[:sc]]
     only works with floating-point data, use e.g. ``--af-adv=force=5``, or use
     ``--af=stats``.
 
-    *NOTE*: This filter is not reentrant and can therefore only be enabled once
-    for every audio stream.
+    *NOTE*: This filter is not reentrant and can therefore only be enabled
+    once for every audio stream.
 
     <v>
         Sets the desired gain in dB for all channels in the stream from -200dB
@@ -4168,20 +4199,20 @@ volume[=v[:sc]]
 pan=n[:L00:L01:L02:...L10:L11:L12:...Ln0:Ln1:Ln2:...]
     Mixes channels arbitrarily. Basically a combination of the volume and the
     channels filter that can be used to down-mix many channels to only a few,
-    e.g. stereo to mono or vary the "width" of the center speaker in a surround
-    sound system. This filter is hard to use, and will require some tinkering
-    before the desired result is obtained. The number of options for this
-    filter depends on the number of output channels. An example how to downmix
-    a six-channel file to two channels with this filter can be found in the
-    examples section near the end.
+    e.g. stereo to mono or vary the "width" of the center speaker in a
+    surround sound system. This filter is hard to use, and will require some
+    tinkering before the desired result is obtained. The number of options for
+    this filter depends on the number of output channels. An example how to
+    downmix a six-channel file to two channels with this filter can be found
+    in the examples section near the end.
 
     <n>
         number of output channels (1-8)
     <Lij>
         How much of input channel i is mixed into output channel j (0-1). So
         in principle you first have n numbers saying what to do with the first
-        input channel, then n numbers that act on the second input channel etc.
-        If you do not specify any numbers for some input channels, 0 is
+        input channel, then n numbers that act on the second input channel
+        etc. If you do not specify any numbers for some input channels, 0 is
         assumed.
 
     *EXAMPLE*:
@@ -4201,18 +4232,19 @@ sub[=fc:ch]
     Butterworth filter with a default cutoff frequency of 60Hz and added to a
     separate channel in the audio stream.
 
-    *Warning*: Disable this filter when you are playing DVDs with Dolby Digital
-    5.1 sound, otherwise this filter will disrupt the sound to the subwoofer.
+    *Warning*: Disable this filter when you are playing DVDs with Dolby
+    Digital 5.1 sound, otherwise this filter will disrupt the sound to the
+    subwoofer.
 
     <fc>
         cutoff frequency in Hz for the low-pass filter (20Hz to 300Hz)
-        (default: 60Hz) For the best result try setting the cutoff frequency as
-        low as possible. This will improve the stereo or surround sound
+        (default: 60Hz) For the best result try setting the cutoff frequency
+        as low as possible. This will improve the stereo or surround sound
         experience.
     <ch>
-        Determines the channel number in which to insert the sub-channel audio.
-        Channel number can be between 0 and 7 (default: 5). Observe that the
-        number of channels will automatically be increased to <ch> if
+        Determines the channel number in which to insert the sub-channel
+        audio. Channel number can be between 0 and 7 (default: 5). Observe
+        that the number of channels will automatically be increased to <ch> if
         necessary.
 
     *EXAMPLE*:
@@ -4251,9 +4283,9 @@ surround[=delay]
         rear speakers.
 
 delay[=ch1:ch2:...]
-    Delays the sound to the loudspeakers such that the sound from the different
-    channels arrives at the listening position simultaneously. It is only
-    useful if you have more than 2 loudspeakers.
+    Delays the sound to the loudspeakers such that the sound from the
+    different channels arrives at the listening position simultaneously. It is
+    only useful if you have more than 2 loudspeakers.
 
     ch1,ch2,...
         The delay in ms that should be imposed on each channel (floating point
@@ -4266,8 +4298,8 @@ delay[=ch1:ch2:...]
        system). There is no point in compensating for the subwoofer (you will
        not hear the difference anyway).
 
-    2. Subtract the distances s1 to s5 from the maximum distance, i.e. ``s[i] =
-       max(s) - s[i]; i = 1...5``.
+    2. Subtract the distances s1 to s5 from the maximum distance, i.e.
+       ``s[i] = max(s) - s[i]; i = 1...5``.
 
     3. Calculate the required delays in ms as ``d[i] = 1000*s[i]/342; i =
        1...5``.
@@ -4304,8 +4336,8 @@ extrastereo[=mul]
 
     <mul>
         Sets the difference coefficient (default: 2.5). 0.0 means mono sound
-        (average of both channels), with 1.0 sound will be unchanged, with -1.0
-        left and right channels will be swapped.
+        (average of both channels), with 1.0 sound will be unchanged, with
+        -1.0 left and right channels will be swapped.
 
 volnorm[=method:target]
     Maximizes the volume without distorting the sound.
@@ -4340,9 +4372,9 @@ ladspa=file:label[:controls...]
     <controls>
         Controls are zero or more floating point values that determine the
         behavior of the loaded plugin (for example delay, threshold or gain).
-        In verbose mode (add ``-v`` to the MPlayer command line), all available
-        controls and their valid ranges are printed. This eliminates the use of
-        'analyseplugin' from the LADSPA SDK.
+        In verbose mode (add ``-v`` to the MPlayer command line), all
+        available controls and their valid ranges are printed. This eliminates
+        the use of 'analyseplugin' from the LADSPA SDK.
 
 comp
     Compressor/expander filter usable for microphone input. Prevents artifacts
@@ -4367,8 +4399,8 @@ scaletempo[=option1:option2:...]
     This works by playing 'stride' ms of audio at normal speed then consuming
     'stride*scale' ms of input audio. It pieces the strides together by
     blending 'overlap'% of stride with audio following the previous stride. It
-    optionally performs a short statistical analysis on the next 'search' ms of
-    audio to determine the best overlap position.
+    optionally performs a short statistical analysis on the next 'search' ms
+    of audio to determine the best overlap position.
 
     scale=<amount>
         Nominal amount to scale tempo. Scales this amount in addition to
@@ -4496,17 +4528,17 @@ cropdetect[=limit:round[:reset]]
         only even dimensions (needed for 4:2:2 video). 16 is best when
         encoding to most video codecs.
     <reset>
-        Counter that determines after how many frames cropdetect will reset the
-        previously detected largest video area and start over to detect the
-        current optimal crop area (default: 0). This can be useful when
+        Counter that determines after how many frames cropdetect will reset
+        the previously detected largest video area and start over to detect
+        the current optimal crop area (default: 0). This can be useful when
         channel logos distort the video area. 0 indicates never reset and
         return the largest area encountered during playback.
 
 rectangle[=w:h:x:y]
     Draws a rectangle of the requested width and height at the specified
     coordinates over the image and prints current rectangle parameters to the
-    console. This can be used to find optimal cropping parameters. If you
-    bind the ``input.conf`` directive 'change_rectangle' to keystrokes, you can
+    console. This can be used to find optimal cropping parameters. If you bind
+    the ``input.conf`` directive 'change_rectangle' to keystrokes, you can
     move and resize the rectangle on the fly.
 
     <w>,<h>
@@ -4558,8 +4590,8 @@ mirror
 
 rotate[=<0-7>]
     Rotates the image by 90 degrees and optionally flips it. For values
-    between 4-7 rotation is only done if the movie geometry is portrait and not
-    landscape.
+    between 4-7 rotation is only done if the movie geometry is portrait and
+    not landscape.
 
     :0: Rotate by 90 degrees clockwise and flip (default).
     :1: Rotate by 90 degrees clockwise.
@@ -4573,8 +4605,8 @@ scale[=w:h[:interlaced[:chr_drop[:par[:par2[:presize[:noup[:arnd]]]]]]]]
     <w>,<h>
         scaled width/height (default: original width/height)
 
-        *NOTE*: If ``--zoom`` is used, and underlying filters (including libvo)
-        are incapable of scaling, it defaults to d_width/d_height!
+        *NOTE*: If ``--zoom`` is used, and underlying filters (including
+        libvo) are incapable of scaling, it defaults to d_width/d_height!
 
         :0:      scaled d_width/d_height
         :-1:     original width/height
@@ -4659,8 +4691,8 @@ dsize[=aspect|w:h:aspect-method:r]
         *EXAMPLE*:
 
         ``dsize=800:-2``
-            Specifies a display resolution of 800x600 for a 4/3 aspect video, or
-            800x450 for a 16/9 aspect video.
+            Specifies a display resolution of 800x600 for a 4/3 aspect video,
+            or 800x450 for a 16/9 aspect video.
 
     <aspect-method>
         Modifies width and height according to original aspect ratios.
@@ -4718,8 +4750,8 @@ format[=fourcc[:outfourcc]]
 
 noformat[=fourcc]
     Restricts the colorspace for the next filter without doing any conversion.
-    Unlike the format filter, this will allow any colorspace except the one you
-    specify.
+    Unlike the format filter, this will allow any colorspace except the one
+    you specify.
 
     *NOTE*: For a list of available formats see ``noformat=fmt=help``.
 
@@ -4855,13 +4887,13 @@ pp[=filter1[:option1[:option2...]]/[-]filter2...]
         Enable default filters & temporal denoiser.
 
     ``--vf=pp=hb:y/vb:a``
-        Horizontal deblocking on luminance only, and switch vertical deblocking
-        on or off automatically depending on available CPU time.
+        Horizontal deblocking on luminance only, and switch vertical
+        deblocking on or off automatically depending on available CPU time.
 
 spp[=quality[:qp[:mode]]]
     Simple postprocessing filter that compresses and decompresses the image at
-    several (or - in the case of quality level 6 - all) shifts and averages the
-    results.
+    several (or - in the case of quality level 6 - all) shifts and averages
+    the results.
 
     <quality>
         0-6 (default: 3)
@@ -4878,12 +4910,12 @@ spp[=quality[:qp[:mode]]]
 
 uspp[=quality[:qp]]
     Ultra simple & slow postprocessing filter that compresses and decompresses
-    the image at several (or - in the case of quality level 8 - all) shifts and
-    averages the results.
+    the image at several (or - in the case of quality level 8 - all) shifts
+    and averages the results.
 
-    The way this differs from the behavior of spp is that uspp actually encodes
-    & decodes each case with libavcodec Snow, whereas spp uses a simplified
-    intra only 8x8 DCT similar to MJPEG.
+    The way this differs from the behavior of spp is that uspp actually
+    encodes & decodes each case with libavcodec Snow, whereas spp uses a
+    simplified intra only 8x8 DCT similar to MJPEG.
 
     <quality>
         0-8 (default: 3)
@@ -4910,8 +4942,8 @@ fspp[=quality[:qp[:strength[:bframes]]]]
         1: use QP from B-frames too (may cause flicker)
 
 pp7[=qp[:mode]]
-    Variant of the spp filter, similar to spp=6 with 7 point DCT where only the
-    center sample is used after IDCT.
+    Variant of the spp filter, similar to spp=6 with 7 point DCT where only
+    the center sample is used after IDCT.
 
     <qp>
         Force quantization parameter (default: 0, use QP from video).
@@ -5006,7 +5038,8 @@ denoise3d[=luma_spatial:chroma_spatial:luma_tmp:chroma_tmp]
     <luma_tmp>
         luma temporal strength (default: 6)
     <chroma_tmp>
-        chroma temporal strength (default: ``luma_tmp*chroma_spatial/luma_spatial``)
+        chroma temporal strength (default:
+        ``luma_tmp*chroma_spatial/luma_spatial``)
 
 hqdn3d[=luma_spatial:chroma_spatial:luma_tmp:chroma_tmp]
     High precision/quality version of the denoise3d filter. Parameters and
@@ -5036,8 +5069,8 @@ eq[=brightness:contrast] (OBSOLETE)
 eq2[=gamma:contrast:brightness:saturation:rg:gg:bg:weight]
     Alternative software equalizer that uses lookup tables (very slow),
     allowing gamma correction in addition to simple brightness and contrast
-    adjustment. Note that it uses the same MMX optimized code as ``--vf=eq`` if
-    all gamma values are 1.0. The parameters are given as floating point
+    adjustment. Note that it uses the same MMX optimized code as ``--vf=eq``
+    if all gamma values are 1.0. The parameters are given as floating point
     values.
 
     <0.1-10>
@@ -5073,10 +5106,11 @@ hue[=hue:saturation]
         (default: 1.0)
 
 halfpack[=f]
-    Convert planar YUV 4:2:0 to half-height packed 4:2:2, downsampling luma but
-    keeping all chroma samples. Useful for output to low-resolution display
-    devices when hardware downscaling is poor quality or is not available. Can
-    also be used as a primitive luma-only deinterlacer with very low CPU usage.
+    Convert planar YUV 4:2:0 to half-height packed 4:2:2, downsampling luma
+    but keeping all chroma samples. Useful for output to low-resolution
+    display devices when hardware downscaling is poor quality or is not
+    available. Can also be used as a primitive luma-only deinterlacer with
+    very low CPU usage.
 
     <f>
         By default, halfpack averages pairs of lines when downsampling. Any
@@ -5099,10 +5133,10 @@ ilpack[=mode]
         :1: linear interpolation (default)
 
 decimate[=max:hi:lo:frac]
-    Drops frames that do not differ greatly from the previous frame in order to
-    reduce framerate. The main use of this filter is for very-low- bitrate
-    encoding (e.g. streaming over dialup modem), but it could in theory be used
-    for fixing movies that were inverse-telecined incorrectly.
+    Drops frames that do not differ greatly from the previous frame in order
+    to reduce framerate. The main use of this filter is for very-low- bitrate
+    encoding (e.g. streaming over dialup modem), but it could in theory be
+    used for fixing movies that were inverse-telecined incorrectly.
 
     <max>
         Sets the maximum number of consecutive frames which can be dropped (if
@@ -5191,16 +5225,16 @@ il[=d|i][s][:[d|i][s]]
 fil[=i|d]
     (De)interleaves lines. This filter is very similar to the il filter but
     much faster, the main disadvantage is that it does not always work.
-    Especially if combined with other filters it may produce randomly messed up
-    images, so be happy if it works but do not complain if it does not for your
-    combination of filters.
+    Especially if combined with other filters it may produce randomly messed
+    up images, so be happy if it works but do not complain if it does not for
+    your combination of filters.
 
     :d: Deinterleave fields, placing them side by side.
     :i: Interleave fields again (reversing the effect of fil=d).
 
 field[=n]
-    Extracts a single field from an interlaced image using stride arithmetic to
-    avoid wasting CPU time. The optional argument n specifies whether to
+    Extracts a single field from an interlaced image using stride arithmetic
+    to avoid wasting CPU time. The optional argument n specifies whether to
     extract the even or the odd field (depending on whether n is even or odd).
 
 detc[=var1=value1:var2=value2:...]
@@ -5209,8 +5243,8 @@ detc[=var1=value1:var2=value2:...]
     primitive inverse telecine filter to be added to MPlayer. It works by
     latching onto the telecine 3:2 pattern and following it as long as
     possible. This makes it suitable for perfectly-telecined material, even in
-    the presence of a fair degree of noise, but it will fail in the presence of
-    complex post-telecine edits. Development on this filter is no longer
+    the presence of a fair degree of noise, but it will fail in the presence
+    of complex post-telecine edits. Development on this filter is no longer
     taking place, as ivtc, pullup, and filmdint are better for most
     applications. The following arguments (see syntax above) may be used to
     control detc's behavior:
@@ -5245,10 +5279,10 @@ ivtc[=1]
     independently for each frame. This will give much better results for
     material that has undergone heavy editing after telecine was applied, but
     as a result it is not as forgiving of noisy input, for example TV capture.
-    The optional parameter (ivtc=1) corresponds to the dr=1 option for the detc
-    filter, and should not be used with MPlayer. Further development on ivtc
-    has stopped, as the pullup and filmdint filters appear to be much more
-    accurate.
+    The optional parameter (ivtc=1) corresponds to the dr=1 option for the
+    detc filter, and should not be used with MPlayer. Further development on
+    ivtc has stopped, as the pullup and filmdint filters appear to be much
+    more accurate.
 
 pullup[=jl:jr:jt:jb:sb:mp]
     Third-generation pulldown reversal (inverse telecine) filter, capable of
@@ -5270,10 +5304,10 @@ pullup[=jl:jr:jt:jb:sb:mp]
         Setting this option to 1 will reduce the chances of pullup generating
         an occasional mismatched frame, but it may also cause an excessive
         number of frames to be dropped during high motion sequences.
-        Conversely, setting it to -1 will make pullup match fields more easily.
-        This may help processing of video where there is slight blurring
-        between the fields, but may also cause there to be interlaced frames in
-        the output.
+        Conversely, setting it to -1 will make pullup match fields more
+        easily. This may help processing of video where there is slight
+        blurring between the fields, but may also cause there to be interlaced
+        frames in the output.
 
     mp (metric plane)
         This option may be set to 1 or 2 to use a chroma plane instead of the
@@ -5291,23 +5325,24 @@ filmdint[=options]
     the frame breaks. If a field has no match, it is deinterlaced with simple
     linear approximation. If the source is MPEG-2, this must be the first
     filter to allow access to the field-flags set by the MPEG-2 decoder.
-    Depending on the source MPEG, you may be fine ignoring this advice, as long
-    as you do not see lots of "Bottom-first field" warnings. With no options
-    it does normal inverse telecine. When this filter is used with MPlayer, it
-    will result in an uneven framerate during playback, but it is still
-    generally better than using pp=lb or no deinterlacing at all. Multiple
-    options can be specified separated by /.
+    Depending on the source MPEG, you may be fine ignoring this advice, as
+    long as you do not see lots of "Bottom-first field" warnings. With no
+    options it does normal inverse telecine. When this filter is used with
+    MPlayer, it will result in an uneven framerate during playback, but it is
+    still generally better than using pp=lb or no deinterlacing at all.
+    Multiple options can be specified separated by /.
 
     crop=<w>:<h>:<x>:<y>
-        Just like the crop filter, but faster, and works on mixed hard and soft
-        telecined content as well as when y is not a multiple of 4. If x or y
-        would require cropping fractional pixels from the chroma planes, the
-        crop area is extended. This usually means that x and y must be even.
+        Just like the crop filter, but faster, and works on mixed hard and
+        soft telecined content as well as when y is not a multiple of 4. If x
+        or y would require cropping fractional pixels from the chroma planes,
+        the crop area is extended. This usually means that x and y must be
+        even.
 
     io=<ifps>:<ofps>
         For each ifps input frames the filter will output ofps frames. This
-        could be used to filter movies that are broadcast on TV at a frame rate
-        different from their original framerate.
+        could be used to filter movies that are broadcast on TV at a frame
+        rate different from their original framerate.
 
     luma_only=<n>
         If n is nonzero, the chroma plane is copied unchanged. This is useful
@@ -5330,8 +5365,8 @@ filmdint[=options]
         luma levels used to find the frame breaks is reduced from 256 to 128,
         which results in a faster filter without losing much accuracy. If n=4
         or 5, a faster, but much less accurate metric will be used to find the
-        frame breaks, which is more likely to misdetect high vertical detail as
-        interlaced content.
+        frame breaks, which is more likely to misdetect high vertical detail
+        as interlaced content.
 
     verbose=<n>
         If n is nonzero, print the detailed metrics for each frame. Useful for
@@ -5339,8 +5374,8 @@ filmdint[=options]
 
     dint_thres=<n>
         Deinterlace threshold. Used during de-interlacing of unmatched frames.
-        Larger value means less deinterlacing, use n=256 to completely turn off
-        deinterlacing. Default is n=8.
+        Larger value means less deinterlacing, use n=256 to completely turn
+        off deinterlacing. Default is n=8.
 
     comb_thres=<n>
         Threshold for comparing a top and bottom fields. Defaults to 128.
@@ -5353,22 +5388,23 @@ filmdint[=options]
 
 divtc[=options]
     Inverse telecine for deinterlaced video. If 3:2-pulldown telecined video
-    has lost one of the fields or is deinterlaced using a method that keeps one
-    field and interpolates the other, the result is a juddering video that has
-    every fourth frame duplicated. This filter is intended to find and drop
-    those duplicates and restore the original film framerate. Two different
-    modes are available: One pass mode is the default and is straightforward to
-    use, but has the disadvantage that any changes in the telecine phase (lost
-    frames or bad edits) cause momentary judder until the filter can resync
-    again. Two pass mode avoids this by analyzing the whole video beforehand so
-    it will have forward knowledge about the phase changes and can resync at
-    the exact spot. These passes do *not* correspond to pass one and two of the
-    encoding process. You must run an extra pass using divtc pass one before
-    the actual encoding throwing the resulting video away. Use ``--nosound
-    --ovc=raw -o /dev/null`` to avoid wasting CPU power for this pass. You may
-    add something like ``crop=2:2:0:0`` after divtc to speed things up even
-    more.  Then use divtc pass two for the actual encoding. If you use multiple
-    encoder passes, use divtc pass two for all of them. The options are:
+    has lost one of the fields or is deinterlaced using a method that keeps
+    one field and interpolates the other, the result is a juddering video that
+    has every fourth frame duplicated. This filter is intended to find and
+    drop those duplicates and restore the original film framerate. Two
+    different modes are available: One pass mode is the default and is
+    straightforward to use, but has the disadvantage that any changes in the
+    telecine phase (lost frames or bad edits) cause momentary judder until the
+    filter can resync again. Two pass mode avoids this by analyzing the whole
+    video beforehand so it will have forward knowledge about the phase changes
+    and can resync at the exact spot. These passes do *not* correspond to pass
+    one and two of the encoding process. You must run an extra pass using
+    divtc pass one before the actual encoding throwing the resulting video
+    away. Use ``--nosound --ovc=raw -o /dev/null`` to avoid wasting CPU power
+    for this pass. You may add something like ``crop=2:2:0:0`` after divtc to
+    speed things up even more. Then use divtc pass two for the actual
+    encoding. If you use multiple encoder passes, use divtc pass two for all
+    of them. The options are:
 
     pass=1|2
         Use two pass mode.
@@ -5385,9 +5421,10 @@ divtc[=options]
     window=<numframes>
         Set the number of past frames to look at when searching for pattern
         (default: 30). Longer window improves the reliability of the pattern
-        search, but shorter window improves the reaction time to the changes in
-        the telecine phase. This only affects the one pass mode. The two pass
-        mode currently uses fixed window that extends to both future and past.
+        search, but shorter window improves the reaction time to the changes
+        in the telecine phase. This only affects the one pass mode. The two
+        pass mode currently uses fixed window that extends to both future and
+        past.
 
     phase=0|1|2|3|4
         Sets the initial telecine phase for one pass mode (default: 0). The
@@ -5399,18 +5436,18 @@ divtc[=options]
         pass, you get constant phase result.
 
     deghost=<value>
-        Set the deghosting threshold (0-255 for one pass mode, -255-255 for two
-        pass mode, default 0). If nonzero, deghosting mode is used. This is
-        for video that has been deinterlaced by blending the fields together
-        instead of dropping one of the fields. Deghosting amplifies any
-        compression artifacts in the blended frames, so the parameter value is
-        used as a threshold to exclude those pixels from deghosting that differ
-        from the previous frame less than specified value. If two pass mode is
-        used, then negative value can be used to make the filter analyze the
-        whole video in the beginning of pass-2 to determine whether it needs
-        deghosting or not and then select either zero or the absolute value of
-        the parameter. Specify this option for pass-2, it makes no difference
-        on pass-1.
+        Set the deghosting threshold (0-255 for one pass mode, -255-255 for
+        two pass mode, default 0). If nonzero, deghosting mode is used. This
+        is for video that has been deinterlaced by blending the fields
+        together instead of dropping one of the fields. Deghosting amplifies
+        any compression artifacts in the blended frames, so the parameter
+        value is used as a threshold to exclude those pixels from deghosting
+        that differ from the previous frame less than specified value. If two
+        pass mode is used, then negative value can be used to make the filter
+        analyze the whole video in the beginning of pass-2 to determine
+        whether it needs deghosting or not and then select either zero or the
+        absolute value of the parameter. Specify this option for pass-2, it
+        makes no difference on pass-1.
 
 phase[=t|b|p|a|u|T|B|A|U][:v]
     Delay interlaced video by one field time so that the field order changes.
@@ -5461,7 +5498,8 @@ phase[=t|b|p|a|u|T|B|A|U][:v]
 
     v
         Verbose operation. Prints the selected mode for each frame and the
-        average squared difference between fields for t, b, and p alternatives.
+        average squared difference between fields for t, b, and p
+        alternatives.
 
 telecine[=start]
     Apply 3:2 'telecine' process to increase framerate by 20%. This most
@@ -5642,9 +5680,9 @@ bmovl=hidden:opaque:fifo
     <clear>
         Clear the framebuffer before blitting.
 
-        :0: The image will just be blitted on top of the old one, so you do not
-            need to send 1.8MB of RGBA32 data every time a small part of the
-            screen is updated.
+        :0: The image will just be blitted on top of the old one, so you do
+            not need to send 1.8MB of RGBA32 data every time a small part of
+            the screen is updated.
         :1: clear
 
 framestep=I|[i]step
@@ -5655,10 +5693,10 @@ framestep=I|[i]step
     frames (IBBPBBPBBPBBPBB), for AVI it means every scene change or every
     keyint value.
 
-    When a keyframe is found, an 'I!' string followed by a newline character is
-    printed, leaving the current line of MPlayer output on the screen, because
-    it contains the time (in seconds) and frame number of the keyframe (You can
-    use this information to split the AVI.).
+    When a keyframe is found, an 'I!' string followed by a newline character
+    is printed, leaving the current line of MPlayer output on the screen,
+    because it contains the time (in seconds) and frame number of the keyframe
+    (You can use this information to split the AVI.).
 
     If you call the filter with a numeric parameter 'step' then only one in
     every 'step' frames is rendered.
@@ -5702,8 +5740,8 @@ delogo[=x:y:w:h:t]
         width and height of the cleared rectangle
     <t>
         Thickness of the fuzzy edge of the rectangle (added to w and h). When
-        set to -1, a green rectangle is drawn on the screen to simplify finding
-        the right x,y,w,h parameters.
+        set to -1, a green rectangle is drawn on the screen to simplify
+        finding the right x,y,w,h parameters.
     file=<file>
         You can specify a text file to load the coordinates from.  Each line
         must have a timestamp (in seconds, and in ascending order) and the
@@ -5731,8 +5769,8 @@ screenshot
     what you see on the monitor.
 
 ass
-    Moves SSA/ASS subtitle rendering to an arbitrary point in the filter chain.
-    Only useful with the ``--ass`` option.
+    Moves SSA/ASS subtitle rendering to an arbitrary point in the filter
+    chain. See the ``--ass`` option.
 
     *EXAMPLE*:
 
@@ -5747,7 +5785,8 @@ blackframe[=amount:threshold]
     and the frame number of the last encountered keyframe.
 
     <amount>
-        Percentage of the pixels that have to be below the threshold (default: 98).
+        Percentage of the pixels that have to be below the threshold (default:
+        98).
 
     <threshold>
         Threshold below which a pixel value is considered black (default: 32).
@@ -5787,8 +5826,9 @@ stereo3d[=in:out]
             anaglyph red/cyan color (red filter on left eye, cyan filter on
             right eye)
         arcd or anaglyph_red_cyan_dubois
-            anaglyph red/cyan color optimized with the least squares projection
-            of dubois (red filter on left eye, cyan filter on right eye)
+            anaglyph red/cyan color optimized with the least squares
+            projection of dubois (red filter on left eye, cyan filter on right
+            eye)
         agmg or anaglyph_green_magenta_gray
             anaglyph green/magenta gray (green filter on left eye, magenta
             filter on right eye)
@@ -5855,8 +5895,8 @@ fixpts[=options]
         kept, so setting a huge value or -1 keeps the PTS intact.
 
     autofps=<n>
-        Uses the *n*\th incoming PTS after the end of autostart to determine the
-        framerate.
+        Uses the *n*\th incoming PTS after the end of autostart to determine
+        the framerate.
 
     *EXAMPLE*:
 
@@ -5888,8 +5928,8 @@ behavior of MPlayer.
 
 ``MPLAYER_VERBOSE`` (see also ``-v`` and ``--msglevel``)
     Set the initial verbosity level across all message modules (default: 0).
-    The resulting verbosity corresponds to that of ``--msglevel=5`` plus the value
-    of ``MPLAYER_VERBOSE``.
+    The resulting verbosity corresponds to that of ``--msglevel=5`` plus the
+    value of ``MPLAYER_VERBOSE``.
 
 libaf:
     ``LADSPA_PATH``
@@ -5935,8 +5975,8 @@ libdvdcss:
 
     ``DVDCSS_RAW_DEVICE``
         Specify the raw device to use. Exact usage will depend on your
-        operating system, the Linux utility to set up raw devices is raw(8) for
-        instance. Please note that on most operating systems, using a raw
+        operating system, the Linux utility to set up raw devices is raw(8)
+        for instance. Please note that on most operating systems, using a raw
         device requires highly aligned buffers: Linux requires a 2048 bytes
         alignment (which is the size of a DVD sector).
 
@@ -5961,10 +6001,10 @@ libao2:
         FIXME: Document this.
 
     ``AUDIOSERVER``
-        Specifies the Network Audio System server to which the nas audio output
-        driver should connect and the transport that should be used. If unset
-        DISPLAY is used instead. The transport can be one of tcp and unix.
-        Syntax is ``tcp/<somehost>:<someport>``,
+        Specifies the Network Audio System server to which the nas audio
+        output driver should connect and the transport that should be used. If
+        unset DISPLAY is used instead. The transport can be one of tcp and
+        unix. Syntax is ``tcp/<somehost>:<someport>``,
         ``<somehost>:<instancenumber>`` or ``[unix]:<instancenumber>``. The
         NAS base port is 8000 and <instancenumber> is added to that.
 
