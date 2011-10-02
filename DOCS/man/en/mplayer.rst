@@ -3736,7 +3736,7 @@ DECODING/FILTERING OPTIONS
         deblocking on e.g. MPEG-2 video. But at least for high bitrate HDTV
         this provides a big speedup with no visible quality loss.
 
-        <skipvalue> can be either one of the following:
+        <skipvalue> can be one of the following:
 
         :none:    Never skip.
         :default: Skip useless processing steps (e.g. 0 size packets in AVI).
