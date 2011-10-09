@@ -39,26 +39,11 @@ DESCRIPTION
 ===========
 
 **mplayer** is a movie player for Linux (runs on many other platforms and CPU
-architectures, see the documentation). It plays most MPEG/VOB, AVI,
-ASF/WMA/WMV, RM, QT/MOV/MP4, Ogg/OGM, MKV, VIVO, FLI, NuppelVideo, yuv4mpeg,
-FILM and RoQ files, supported by many native and binary codecs. You can watch
-VCD, SVCD, DVD, Blu-ray, 3ivx, DivX 3/4/5, WMV and even H.264 movies, too.
-
-MPlayer supports a wide range of video and audio output drivers. It works with
-X11, Xv, DGA, OpenGL, SVGAlib, fbdev, AAlib, libcaca, DirectFB, Quartz, Mac OS
-X CoreVideo, but you can also use GGI, SDL (and all their drivers), VESA (on
-every VESA-compatible card, even without X11), some low-level card-specific
-drivers (for Matrox, 3dfx and ATI) and some hardware MPEG decoder boards, such
-as the Siemens DVB, Hauppauge PVR (IVTV) and DXR3/Hollywood+. Most of them
-support software or hardware scaling, so you can enjoy movies in fullscreen
-mode.
-
-MPlayer has an onscreen display (OSD) for status information, nice big
-antialiased shaded subtitles and visual feedback for keyboard controls.
-European/ISO8859-1,2 (Hungarian, English, Czech, etc), Cyrillic and Korean
-fonts are supported along with 12 subtitle formats (MicroDVD, SubRip, OGM,
-SubViewer, Sami, VPlayer, RT, SSA, AQTitle, JACOsub, PJS and our own: MPsub)
-and DVD subtitles (SPU streams, VOBsub and Closed Captions).
+architectures, see the documentation). It supports a wide variety of video
+file formats, audio and video codecs, and subtitle types. Special input URL
+types are available to read input from a variety of sources other than disk
+files. Depending on platform, a variety of different video and audio output
+methods are supported.
 
 Usage examples to get you started quickly can be found at the end of this man
 page.
