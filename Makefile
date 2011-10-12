@@ -267,6 +267,7 @@ SRCS_COMMON = asxparser.c \
               libmpcodecs/ad_dk3adpcm.c \
               libmpcodecs/ad_dvdpcm.c \
               libmpcodecs/ad_ffmpeg.c \
+              libmpcodecs/ad_spdif.c      \
               libmpcodecs/ad_hwac3.c \
               libmpcodecs/ad_hwmpa.c \
               libmpcodecs/ad_imaadpcm.c \

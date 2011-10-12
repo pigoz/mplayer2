@@ -53,6 +53,7 @@ extern const ad_functions_t mpcodecs_ad_libmad;
 extern const ad_functions_t mpcodecs_ad_realaud;
 extern const ad_functions_t mpcodecs_ad_libdv;
 extern const ad_functions_t mpcodecs_ad_qtaudio;
+extern const ad_functions_t mpcodecs_ad_spdif;
 extern const ad_functions_t mpcodecs_ad_twin;
 extern const ad_functions_t mpcodecs_ad_libmusepack;
 extern const ad_functions_t mpcodecs_ad_libdca;
@@ -68,6 +69,7 @@ const ad_functions_t * const mpcodecs_ad_drivers[] =
   &mpcodecs_ad_hwac3,
   &mpcodecs_ad_hwmpa,
   &mpcodecs_ad_ffmpeg,
+  &mpcodecs_ad_spdif,
   &mpcodecs_ad_pcm,
   &mpcodecs_ad_dvdpcm,
   &mpcodecs_ad_alaw,
