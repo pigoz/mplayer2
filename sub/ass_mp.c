@@ -62,7 +62,7 @@ ASS_Track *mp_ass_default_track(ASS_Library *library, struct MPOpts *opts)
 
     track->track_type = TRACK_TYPE_ASS;
     track->Timer = 100.;
-    track->PlayResY = 288;
+    track->PlayResY = 720; //was 288
     track->WrapStyle = 0;
 
     if (opts->ass_styles_file)
