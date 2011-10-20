@@ -36,6 +36,20 @@
 #include "sub/sub.h"
 #include "w32_common.h"
 
+// missing in mingw32?
+typedef BOOL WINAPI (*MP_LPDDENUMCALLBACKEX) (
+    GUID FAR* lpGUID,
+    LPWSTR lpDriverDescription,
+    LPWSTR lpDriverName,
+    LPVOID lpContext,
+    HMONITOR hm
+);
+typedef HRESULT WINAPI (*MP_LPDIRECTDRAWENUMERATEEX) (
+    MP_LPDDENUMCALLBACKEX lpCallback,
+    LPVOID lpContext,
+    DWORD dwFlags
+);
+
 static LPDIRECTDRAWCOLORCONTROL	g_cc = NULL;		//color control interface
 static LPDIRECTDRAW7        g_lpdd = NULL;          //DirectDraw Object
 static LPDIRECTDRAWSURFACE7  g_lpddsPrimary = NULL;  //Primary Surface: viewport through the Desktop
@@ -370,7 +384,7 @@ static uint32_t Directx_InitDirectDraw(void)
 {
 	HRESULT    (WINAPI *OurDirectDrawCreateEx)(GUID *,LPVOID *, REFIID,IUnknown FAR *);
 	DDSURFACEDESC2 ddsd;
-	LPDIRECTDRAWENUMERATEEX OurDirectDrawEnumerateEx;
+	MP_LPDIRECTDRAWENUMERATEEX OurDirectDrawEnumerateEx;
 
 	adapter_count = 0;
 
@@ -385,7 +399,7 @@ static uint32_t Directx_InitDirectDraw(void)
     }
 
 	if(vo_adapter_num){ //display other than default
-        OurDirectDrawEnumerateEx = (LPDIRECTDRAWENUMERATEEX) GetProcAddress(hddraw_dll,"DirectDrawEnumerateExA");
+        OurDirectDrawEnumerateEx = (MP_LPDIRECTDRAWENUMERATEEX) GetProcAddress(hddraw_dll,"DirectDrawEnumerateExA");
         if (!OurDirectDrawEnumerateEx){
             FreeLibrary( hddraw_dll );
             hddraw_dll = NULL;
