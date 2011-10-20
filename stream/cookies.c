@@ -34,6 +34,8 @@
 #include "cookies.h"
 #include "http.h"
 #include "mp_msg.h"
+#include "talloc.h"
+#include "osdep/unicode.h"
 
 #define MAX_COOKIES 20
 
@@ -115,7 +117,7 @@ static char *load_file(const char *filename, off_t * length)
 
     mp_msg(MSGT_NETWORK, MSGL_V, "Loading cookie file: %s\n", filename);
 
-    fd = open(filename, O_RDONLY);
+    fd = mp_open(filename, O_RDONLY, 0);
     if (fd < 0) {
 	mp_msg(MSGT_NETWORK, MSGL_V, "Could not open");
 	return NULL;
@@ -182,8 +184,9 @@ static struct cookie_list_type *load_cookies_from(const char *filename,
 /* Attempt to load cookies.txt from various locations. Returns a pointer to the linked list contain the cookies. */
 static struct cookie_list_type *load_cookies(void)
 {
-    DIR *dir;
-    struct dirent *ent;
+    void *tmpmem = talloc_new(NULL);
+    MP_DIR *dir;
+    char *ent;
     struct cookie_list_type *list = NULL;
     char *buf;
 
@@ -199,28 +202,30 @@ static struct cookie_list_type *load_cookies(void)
 
     buf = malloc(strlen(homedir) + sizeof("/.mozilla/default") + 1);
     sprintf(buf, "%s/.mozilla/default", homedir);
-    dir = opendir(buf);
+    dir = mp_opendir(buf);
     free(buf);
 
     if (dir) {
-	while ((ent = readdir(dir)) != NULL) {
-	    if ((ent->d_name)[0] != '.') {
+	while ((ent = mp_readdir(dir, tmpmem)) != NULL) {
+	    if (ent[0] != '.') {
 		buf = malloc(strlen(getenv("HOME")) +
                              sizeof("/.mozilla/default/") +
-                             strlen(ent->d_name) + sizeof("cookies.txt") + 1);
+                             strlen(ent) + sizeof("cookies.txt") + 1);
 		sprintf(buf, "%s/.mozilla/default/%s/cookies.txt",
-			 getenv("HOME"), ent->d_name);
+			 getenv("HOME"), ent);
 		list = load_cookies_from(buf, list);
 		free(buf);
 	    }
 	}
-	closedir(dir);
+	mp_closedir(dir);
     }
 
     buf = malloc(strlen(homedir) + sizeof("/.netscape/cookies.txt") + 1);
     sprintf(buf, "%s/.netscape/cookies.txt", homedir);
     list = load_cookies_from(buf, list);
     free(buf);
+
+    talloc_free(tmpmem);
 
     return list;
 }

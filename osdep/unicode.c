@@ -19,6 +19,8 @@
  */
 
 #include <stdlib.h>
+#include <stdio.h>
+#include <dirent.h>
 #include "talloc.h"
 #include "osdep/unicode.h"
 
@@ -32,6 +34,29 @@
 int mp_open(const char *pathname, int flags, int mode)
 {
     return open(pathname, flags, mode);
+}
+
+FILE *mp_fopen(const char *path, const char *mode)
+{
+    return fopen(path, mode);
+}
+
+MP_DIR *mp_opendir(const char *name)
+{
+    return (MP_DIR *)opendir(name);
+}
+
+char *mp_readdir(MP_DIR *dirp, void *talloc_ctx)
+{
+    struct dirent *ent = readdir((DIR *)dirp);
+    if (!ent)
+        return NULL;
+    return talloc_strdup(talloc_ctx, ent->d_name);
+}
+
+int mp_closedir(MP_DIR *dirp)
+{
+    return closedir((DIR *)dirp);
 }
 
 void mp_get_converted_argv(int *argc, char ***argv)
@@ -74,6 +99,36 @@ int mp_open(const char *pathname, int flags, int mode)
     int res = _wopen(wpath, flags, mode);
     talloc_free(wpath);
     return res;
+}
+
+FILE *mp_fopen(const char *pathname, const char *mode)
+{
+    wchar_t *wpath = to_utf16(NULL, pathname);
+    wchar_t *wmode = to_utf16(wpath, mode);
+    FILE *res = _wfopen(wpath, wmode);
+    talloc_free(wpath);
+    return res;
+}
+
+MP_DIR *mp_opendir(const char *pathname)
+{
+    wchar_t *wpath = to_utf16(NULL, pathname);
+    _WDIR *res = _wopendir(wpath);
+    talloc_free(wpath);
+    return (MP_DIR *)res;
+}
+
+char *mp_readdir(MP_DIR *dirp, void *talloc_ctx)
+{
+    struct _wdirent *ent = _wreaddir((_WDIR *)dirp);
+    if (!ent)
+        return NULL;
+    return to_utf8(talloc_ctx, ent->d_name);
+}
+
+int mp_closedir(MP_DIR *dirp)
+{
+    return _wclosedir((_WDIR *)dirp);
 }
 
 static char** win32_argv_utf8;

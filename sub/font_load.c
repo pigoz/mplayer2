@@ -28,12 +28,13 @@
 #include "font_load.h"
 #include "mp_msg.h"
 #include "libavutil/attributes.h"
+#include "osdep/unicode.h"
 
 raw_file* load_raw(char *name,int verbose){
     int bpp;
     raw_file* raw=malloc(sizeof(raw_file));
     unsigned char head[32];
-    FILE *f=fopen(name,"rb");
+    FILE *f=mp_fopen(name,"rb");
     if(!f) goto err_out;                        // can't open
     if(fread(head,32,1,f)<1) goto err_out;        // too small
     if(memcmp(head,"mhwanh",6)) goto err_out;        // not raw file
@@ -83,7 +84,7 @@ int first=1;
 desc=malloc(sizeof(font_desc_t));if(!desc) goto fail_out;
 memset(desc,0,sizeof(font_desc_t));
 
-f=fopen(fname,"rt");if(!f){ mp_msg(MSGT_OSD, MSGL_V, "font: can't open file: %s\n",fname); goto fail_out;}
+f=mp_fopen(fname,"rt");if(!f){ mp_msg(MSGT_OSD, MSGL_V, "font: can't open file: %s\n",fname); goto fail_out;}
 
 i = strlen (fname) - 9;
 if ((dn = malloc(i+1))){

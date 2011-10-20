@@ -10,6 +10,7 @@
 #include "mpcommon.h"
 #include "sub/find_subfiles.h"
 #include "sub/sub.h"
+#include "osdep/unicode.h"
 
 static struct bstr strip_ext(struct bstr str)
 {
@@ -99,7 +100,7 @@ static void append_dir_subtitles(struct MPOpts *opts,
     // 2 = any sub file containing movie name
     // 3 = sub file containing movie name and the lang extension
     char *path0 = bstrdup0(tmpmem, path);
-    DIR *d = opendir(path0);
+    DIR *d = mp_opendir(path0);
     if (!d)
         goto out;
     mp_msg(MSGT_SUBREADER, MSGL_INFO, "Load subtitles in %.*s\n", BSTR_P(path));
@@ -121,7 +122,7 @@ static void append_dir_subtitles(struct MPOpts *opts,
                                             (int)tmp_fname_noext.len,
                                             de->d_name);
             char *idx = mp_path_join(tmpmem2, path, bstr(idxname));
-            f = fopen(idx, "rt");
+            f = mp_fopen(idx, "rt");
             if (f) {
                 fclose(f);
                 goto next_sub;
@@ -184,7 +185,7 @@ static void append_dir_subtitles(struct MPOpts *opts,
                 prio++;
 #endif
             char *subpath = mp_path_join(*slist, path, dename);
-            if ((f = fopen(subpath, "rt"))) {
+            if ((f = mp_fopen(subpath, "rt"))) {
                 MP_GROW_ARRAY(*slist, *nsub);
                 struct subfn *sub = *slist + (*nsub)++;
 

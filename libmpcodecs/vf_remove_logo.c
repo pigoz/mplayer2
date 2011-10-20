@@ -86,6 +86,8 @@
 #include <ctype.h>
 #include <inttypes.h>
 
+#include "osdep/unicode.h"
+
 #include "config.h"
 #include "mp_msg.h"
 #include "libvo/fastmemcpy.h"
@@ -538,7 +540,7 @@ static pgm_structure * load_pgm(const char * file_name)
   char * end_position;
   int image_size; /* width * height */
 
-  if((input = fopen(file_name, "rb")) == NULL) REMOVE_LOGO_LOAD_PGM_ERROR_MESSAGE("[vf]remove-logo: Unable to open file. File not found or insufficient permissions.\n");
+  if((input = mp_fopen(file_name, "rb")) == NULL) REMOVE_LOGO_LOAD_PGM_ERROR_MESSAGE("[vf]remove-logo: Unable to open file. File not found or insufficient permissions.\n");
 
   /* Parse the PGM header. */
   if (fgetc(input) != 'P') REMOVE_LOGO_LOAD_PGM_ERROR_MESSAGE("[vf]remove-logo: File is not a valid PGM or PPM file.\n");

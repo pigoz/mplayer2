@@ -20,9 +20,23 @@
 #ifndef MPLAYER_UNICODE_H
 #define MPLAYER_UNICODE_H
 
+#include <stdio.h>
+
 #include "config.h"
 
+typedef struct MP_DIR MP_DIR;
+
 int mp_open(const char *pathname, int flags, int mode);
+FILE *mp_fopen(const char *path, const char *mode);
+MP_DIR *mp_opendir(const char *name);
+// Like readdir(). Return dirent->d_name as a talloc'ed null terminated string
+// (allocated under talloc_ctx). If the end of the directory stream is reached
+// or an error happened, return NULL.
+// Note that the other fields of dirent are useless if you take portability in
+// account.
+char *mp_readdir(MP_DIR *dirp, void *talloc_ctx);
+int mp_closedir(MP_DIR *dirp);
+
 void mp_get_converted_argv(int *argc, char ***argv);
 
 #endif /* MPLAYER_UNICODE_H */

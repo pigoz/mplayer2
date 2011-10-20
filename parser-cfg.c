@@ -29,6 +29,7 @@
 #include "mp_msg.h"
 #include "m_option.h"
 #include "m_config.h"
+#include "osdep/unicode.h"
 
 /// Maximal include depth.
 #define MAX_RECURSION_DEPTH 8
@@ -82,7 +83,7 @@ int m_config_parse_config_file(m_config_t *config, const char *conffile)
 
         mp_msg(MSGT_CFGPARSER, MSGL_V, "\n");
 
-    if ((fp = fopen(conffile, "r")) == NULL) {
+    if ((fp = mp_fopen(conffile, "r")) == NULL) {
         mp_msg(MSGT_CFGPARSER, MSGL_V, ": %s\n", strerror(errno));
         free(line);
         ret = 0;

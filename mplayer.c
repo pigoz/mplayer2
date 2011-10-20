@@ -917,7 +917,7 @@ static void parse_cfgfiles(struct MPContext *mpctx, m_config_t *conf)
         if ((conffile = get_path("config")) == NULL)
             mp_tmsg(MSGT_CPLAYER, MSGL_ERR, "get_path(\"config\") problem\n");
         else {
-            if ((conffile_fd = open(conffile, O_CREAT | O_EXCL | O_WRONLY,
+            if ((conffile_fd = mp_open(conffile, O_CREAT | O_EXCL | O_WRONLY,
                         0666)) != -1) {
                 mp_tmsg(MSGT_CPLAYER, MSGL_INFO,
                         "Creating config file: %s\n", conffile);
@@ -4406,7 +4406,7 @@ play_next_file:
     if (edl_output_filename) {
         if (edl_fd)
             fclose(edl_fd);
-        if ((edl_fd = fopen(edl_output_filename, "w")) == NULL) {
+        if ((edl_fd = mp_fopen(edl_output_filename, "w")) == NULL) {
             mp_tmsg(MSGT_CPLAYER, MSGL_ERR,
                     "Can't open EDL file [%s] for writing.\n",
                     filename_recode(edl_output_filename));
@@ -4484,7 +4484,7 @@ play_next_file:
         current_module = "dumpstream";
         stream_reset(mpctx->stream);
         stream_seek(mpctx->stream, mpctx->stream->start_pos);
-        f = fopen(opts->stream_dump_name, "wb");
+        f = mp_fopen(opts->stream_dump_name, "wb");
         if (!f) {
             mp_tmsg(MSGT_CPLAYER, MSGL_FATAL, "Cannot open dump file.\n");
             exit_player(mpctx, EXIT_ERROR);
@@ -4743,7 +4743,7 @@ goto_enable_cache:
             mpctx->d_sub->id = -2;
         }
         // let's dump it!
-        f = fopen(opts->stream_dump_name, "wb");
+        f = mp_fopen(opts->stream_dump_name, "wb");
         if (!f) {
             mp_tmsg(MSGT_CPLAYER, MSGL_FATAL, "Cannot open dump file.\n");
             exit_player(mpctx, EXIT_ERROR);

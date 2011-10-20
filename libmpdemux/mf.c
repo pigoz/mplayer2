@@ -35,6 +35,7 @@
 #include "osdep/glob.h"
 #endif
 #include "osdep/strsep.h"
+#include "osdep/unicode.h"
 
 #include "mp_msg.h"
 #include "stream/stream.h"
@@ -60,7 +61,7 @@ mf_t* open_mf(char * filename){
 
  if( filename[0] == '@' )
   {
-   FILE *lst_f=fopen(filename + 1,"r");
+   FILE *lst_f=mp_fopen(filename + 1,"r");
    if ( lst_f )
     {
      fname=malloc(PATH_MAX);

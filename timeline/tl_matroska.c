@@ -32,6 +32,7 @@
 #include "bstr.h"
 #include "mpcommon.h"
 #include "stream/stream.h"
+#include "osdep/unicode.h"
 
 
 static char **find_files(const char *original_file, const char *suffix)
@@ -41,26 +42,26 @@ static char **find_files(const char *original_file, const char *suffix)
     struct bstr directory = mp_dirname(original_file);
     char **results = talloc_size(NULL, 0);
     char *dir_zero = bstrdup0(tmpmem, directory);
-    DIR *dp = opendir(dir_zero);
+    MP_DIR *dp = mp_opendir(dir_zero);
     if (!dp) {
         talloc_free(tmpmem);
         return results;
     }
-    struct dirent *ep;
+    char *ep;
     char ***names_by_matchlen = talloc_zero_array(tmpmem, char **,
                                                   strlen(basename) + 1);
     int num_results = 0;
-    while ((ep = readdir(dp))) {
-        int suffix_offset = strlen(ep->d_name) - strlen(suffix);
+    while ((ep = mp_readdir(dp, tmpmem))) {
+        int suffix_offset = strlen(ep) - strlen(suffix);
         // name must end with suffix
-        if (suffix_offset < 0 || strcmp(ep->d_name + suffix_offset, suffix))
+        if (suffix_offset < 0 || strcmp(ep + suffix_offset, suffix))
             continue;
         // don't list the original name
-        if (!strcmp(ep->d_name, basename))
+        if (!strcmp(ep, basename))
             continue;
 
-        char *name = mp_path_join(results, directory, bstr(ep->d_name));
-        char *s1 = ep->d_name;
+        char *name = mp_path_join(results, directory, bstr(ep));
+        char *s1 = ep;
         char *s2 = basename;
         int matchlen = 0;
         while (*s1 && *s1++ == *s2++)
@@ -72,7 +73,7 @@ static char **find_files(const char *original_file, const char *suffix)
         names_by_matchlen[matchlen][oldcount] = name;
         num_results++;
     }
-    closedir(dp);
+    mp_closedir(dp);
     results = talloc_realloc(NULL, results, char *, num_results);
     char **resptr = results;
     for (int i = strlen(basename); i >= 0; i--) {

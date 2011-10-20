@@ -35,6 +35,7 @@
 #include "mp_fifo.h"
 #include "keycodes.h"
 #include "osdep/timer.h"
+#include "osdep/unicode.h"
 #include "libavutil/avstring.h"
 #include "mp_msg.h"
 #include "m_config.h"
@@ -1788,7 +1789,7 @@ struct input_ctx *mp_input_init(struct input_conf *input_conf)
             mode |= O_RDWR;
         else
             mode |= O_RDONLY;
-        int in_file_fd = open(input_conf->in_file, mode);
+        int in_file_fd = mp_open(input_conf->in_file, mode, 0);
         if (in_file_fd >= 0)
             mp_input_add_cmd_fd(ictx, in_file_fd, 1, NULL, close);
         else
