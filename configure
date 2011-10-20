@@ -470,6 +470,7 @@ Miscellaneous options:
   --ranlib=RANLIB        ranlib to build MPlayer [ranlib]
   --windres=WINDRES      windres to build MPlayer [windres]
   --target=PLATFORM      target platform (i386-linux, arm-linux, etc)
+  --with-pkg-config      pkg-config to build MPlayer [pkg-config]
   --enable-static        build a statically linked binary
   --with-install=PATH    path to a custom install program
 
@@ -539,6 +540,7 @@ _altivec=auto
 _install=install
 _ranlib=ranlib
 _windres=windres
+_pkg_config=pkg-config
 _cc=cc
 _ar=ar
 test "$CC" && _cc="$CC"
@@ -769,6 +771,9 @@ for ac_option do
 
   --target=*)
     _target=$(echo $ac_option | cut -d '=' -f 2)
+    ;;
+  --with-pkg-config=*)
+    _pkg_config=$(echo $ac_option | cut -d '=' -f 2)
     ;;
   --cc=*)
     _cc=$(echo $ac_option | cut -d '=' -f 2)
@@ -3596,7 +3601,6 @@ echores "$_apple_ir"
 fi #if linux
 
 echocheck "pkg-config"
-_pkg_config=pkg-config
 if $($_pkg_config --version > /dev/null 2>&1); then
   if test "$_ld_static"; then
     _pkg_config="$_pkg_config --static"
