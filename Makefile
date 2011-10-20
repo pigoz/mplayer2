@@ -407,6 +407,7 @@ SRCS_COMMON = asxparser.c \
               osdep/numcores.c \
               osdep/$(GETCH) \
               osdep/$(TIMER) \
+              osdep/unicode.c \
               stream/open.c \
               stream/stream.c \
               stream/stream_cue.c \

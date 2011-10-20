@@ -24,6 +24,8 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#include "osdep/unicode.h"
+
 #include "mp_msg.h"
 #include "stream.h"
 #include "m_option.h"
@@ -165,7 +167,7 @@ static int open_f(stream_t *stream,int mode, void* opts, int* file_format) {
 #ifndef __MINGW32__
       openmode |= S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH;
 #endif
-      f=open(filename,m, openmode);
+      f=mp_open(filename,m, openmode);
     if(f<0) {
       mp_tmsg(MSGT_OPEN,MSGL_ERR,"File not found: '%s'\n",filename);
       m_struct_free(&stream_opts,opts);

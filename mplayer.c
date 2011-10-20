@@ -97,6 +97,7 @@
 
 #include "osdep/getch2.h"
 #include "osdep/timer.h"
+#include "osdep/unicode.h"
 
 #include "input/input.h"
 
@@ -3969,6 +3970,8 @@ int main(int argc, char *argv[])
     if (argc > 1 && (!strcmp(argv[1], "-leak-report")
                      || !strcmp(argv[1], "--leak-report")))
         talloc_enable_leak_report();
+
+    mp_get_converted_argv(&argc, &argv);
 
     char *mem_ptr;
 
