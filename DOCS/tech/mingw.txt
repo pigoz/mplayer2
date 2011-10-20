@@ -1,0 +1,24 @@
+Cross compiling from Linux to Windows/mingw32
+=============================================
+
+First install a mingw environment on your system.
+One way is using the mingw-cross-env script from http://mingw-cross-env.nongnu.org/
+
+Make sure the cross compiler toolchain (e.g. i686-pc-mingw32-gcc) is in your $PATH.
+
+Then run this in the mplayer source directory:
+
+./configure --enable-cross-compile --target=i686-mingw32 --with-pkg-config=i686-pc-mingw32-pkg-config --cc=i686-pc-mingw32-gcc --windres=i686-pc-mingw32-windres --ranlib=i686-pc-mingw32-ranlib --with-freetype-config=/path/to/mingw/usr/i686-pc-mingw32/bin/freetype-config --disable-pnm --disable-win32dll --disable-unrarexec
+
+"make" should then produce a mplayer.exe.
+
+Note that --target does not specify a cross compilation prefix. The configure
+script will attempt to parse it, and can fail silently if it contains unexpected
+strings. As of this writing, there is no way to specify a cross compilation
+prefix.
+
+Specifying the full path to freetype-config is needed to avoid using the host's
+freetype installation, as it's not prefixed.
+
+libass and ffmpeg are included in mingw-cross-env and should be no problem. The
+cross pkg-config should find them if they are installed.
