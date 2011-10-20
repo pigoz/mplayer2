@@ -3490,19 +3490,6 @@ fi
 echores "$_glob"
 
 
-echocheck "setenv()"
-_setenv=no
-statement_check stdlib.h 'setenv("", "", 0)' && _setenv=yes
-if test "$_setenv" = yes ; then
-  def_setenv='#define HAVE_SETENV 1'
-  need_setenv=no
-else
-  def_setenv='#undef HAVE_SETENV'
-  need_setenv=yes
-fi
-echores "$_setenv"
-
-
 echocheck "setmode()"
 _setmode=no
 def_setmode='#define HAVE_SETMODE 0'
@@ -6658,7 +6645,6 @@ MPLAYER  = $_mplayer
 NEED_GETTIMEOFDAY = $need_gettimeofday
 NEED_GLOB         = $need_glob
 NEED_MMAP         = $need_mmap
-NEED_SETENV       = $need_setenv
 NEED_SHMEM        = $need_shmem
 NEED_STRSEP       = $need_strsep
 NEED_SWAB         = $need_swab
@@ -6906,7 +6892,6 @@ $def_memalign
 $def_nanosleep
 $def_posix_select
 $def_select
-$def_setenv
 $def_setmode
 $def_shm
 $def_strsep

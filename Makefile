@@ -121,7 +121,6 @@ SRCS_COMMON-$(NATIVE_RTSP)           += stream/stream_rtsp.c \
 SRCS_COMMON-$(NEED_GETTIMEOFDAY)     += osdep/gettimeofday.c
 SRCS_COMMON-$(NEED_GLOB)             += osdep/glob-win.c
 SRCS_COMMON-$(NEED_MMAP)             += osdep/mmap-os2.c
-SRCS_COMMON-$(NEED_SETENV)           += osdep/setenv.c
 SRCS_COMMON-$(NEED_SHMEM)            += osdep/shmem.c
 SRCS_COMMON-$(NEED_STRSEP)           += osdep/strsep.c
 SRCS_COMMON-$(NEED_SWAB)             += osdep/swab.c
