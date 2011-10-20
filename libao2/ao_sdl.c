@@ -140,11 +140,6 @@ static int init(int rate,int channels,int format,int flags){
 
 	mp_tmsg(MSGT_AO,MSGL_INFO,"[AO SDL] Samplerate: %iHz Channels: %s Format %s\n", rate, (channels > 1) ? "Stereo" : "Mono", af_fmt2str_short(format));
 
-	if(ao_subdevice) {
-		setenv("SDL_AUDIODRIVER", ao_subdevice, 1);
-		mp_tmsg(MSGT_AO,MSGL_INFO,"[AO SDL] using %s audio driver.\n", ao_subdevice);
-	}
-
 	ao_data.channels=channels;
 	ao_data.samplerate=rate;
 	ao_data.format=format;
