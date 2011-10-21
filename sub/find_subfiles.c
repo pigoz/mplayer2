@@ -100,14 +100,18 @@ static void append_dir_subtitles(struct MPOpts *opts,
     // 2 = any sub file containing movie name
     // 3 = sub file containing movie name and the lang extension
     char *path0 = bstrdup0(tmpmem, path);
-    DIR *d = mp_opendir(path0);
+    MP_DIR *d = mp_opendir(path0);
     if (!d)
         goto out;
     mp_msg(MSGT_SUBREADER, MSGL_INFO, "Load subtitles in %.*s\n", BSTR_P(path));
-    struct dirent *de;
-    while ((de = readdir(d))) {
-        struct bstr dename = bstr(de->d_name);
+    while (1) {
         void *tmpmem2 = talloc_new(tmpmem);
+        struct bstr dename = bstr(mp_readdir(d, tmpmem2));
+
+        if (!dename.len) {
+            talloc_free(tmpmem2);
+            break;
+        }
 
         // retrieve various parts of the filename
         struct bstr tmp_fname_noext = bstrdup(tmpmem2, strip_ext(dename));
@@ -120,7 +124,7 @@ static void append_dir_subtitles(struct MPOpts *opts,
         if (bstrcasecmp(tmp_fname_ext, bstr("sub")) == 0) {
             char *idxname = talloc_asprintf(tmpmem2, "%.*s.idx",
                                             (int)tmp_fname_noext.len,
-                                            de->d_name);
+                                            dename.start);
             char *idx = mp_path_join(tmpmem2, path, bstr(idxname));
             f = mp_fopen(idx, "rt");
             if (f) {
@@ -177,7 +181,7 @@ static void append_dir_subtitles(struct MPOpts *opts,
         }
 
         mp_msg(MSGT_SUBREADER, MSGL_DBG2, "Potential sub file: "
-               "\"%s\"  Priority: %d\n", de->d_name, prio);
+               "\"%s\"  Priority: %d\n", dename.start, prio);
         if (prio) {
             prio += prio;
 #ifdef CONFIG_ICONV
@@ -199,7 +203,7 @@ static void append_dir_subtitles(struct MPOpts *opts,
     next_sub:
         talloc_free(tmpmem2);
     }
-    closedir(d);
+    mp_closedir(d);
 
  out:
     talloc_free(tmpmem);
