@@ -1067,7 +1067,7 @@ static demuxer_t *demux_open_ts(demuxer_t * demuxer)
 	}
 
 
-	mp_msg(MSGT_DEMUXER,MSGL_V, "Opened TS demuxer, audio: %x(pid %d), video: %x(pid %d)...POS=%"PRIu64", PROBE=%"PRIu64"\n", params.atype, demuxer->audio->id, params.vtype, demuxer->video->id, (uint64_t) start_pos, ts_probe);
+	mp_msg(MSGT_DEMUXER,MSGL_V, "Opened TS demuxer, audio: %x(pid %d), video: %x(pid %d)...POS=%"PRIu64", PROBE=%"PRIu64"\n", params.atype, demuxer->audio->id, params.vtype, demuxer->video->id, (uint64_t) start_pos, (uint64_t)ts_probe);
 
 
 	start_pos = start_pos <= priv->ts.packet_size ?

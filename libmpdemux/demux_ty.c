@@ -154,7 +154,8 @@ static int ty_tmf_filetoparts( demuxer_t *demux, TiVoInfo *tivo )
            "tmf_filetoparts(): size %"PRId64"\n"
            "tmf_filetoparts(): startOffset %"PRId64"\n",
            parts, tivo->tmfparts[ parts ].chunks,
-           tivo->tmfparts[ parts ].fileSize, tivo->tmfparts[ parts ].startOffset
+           (uint64_t)tivo->tmfparts[ parts ].fileSize,
+           (uint64_t)tivo->tmfparts[ parts ].startOffset
          );
          parts++;
       }
@@ -431,7 +432,8 @@ static int demux_ty_fill_buffer( demuxer_t *demux, demux_stream_t *dsds )
                      tivo->size = numberParts * TIVO_PART_LENGTH;
                      tivo->size += size;
                      mp_msg( MSGT_DEMUX, MSGL_DBG3,
-                        "ty:Header Calc Stream Size %"PRId64"\n", tivo->size );
+                        "ty:Header Calc Stream Size %"PRId64"\n",
+                        (uint64_t)tivo->size );
                }
          }
 
@@ -493,8 +495,8 @@ static int demux_ty_fill_buffer( demuxer_t *demux, demux_stream_t *dsds )
    } while (AV_RB32(chunk) == TIVO_PES_FILEID);
 
    mp_msg( MSGT_DEMUX, MSGL_DBG3,
-      "\nty:actual current offset %"PRIx64"\n", stream_tell( demux->stream ) -
-      CHUNKSIZE );
+      "\nty:actual current offset %"PRIx64"\n",
+      (uint64_t)(stream_tell( demux->stream ) - CHUNKSIZE) );
 
 
    // Let's make a Video Demux Stream for MPlayer

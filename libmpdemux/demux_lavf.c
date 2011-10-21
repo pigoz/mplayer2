@@ -92,7 +92,7 @@ static int mp_read(void *opaque, uint8_t *buf, int size)
 
     mp_msg(MSGT_HEADER, MSGL_DBG2,
            "%d=mp_read(%p, %p, %d), pos: %"PRId64", eof:%d\n",
-           ret, stream, buf, size, stream_tell(stream), stream->eof);
+           ret, stream, buf, size, (uint64_t)stream_tell(stream), stream->eof);
     return ret;
 }
 

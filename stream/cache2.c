@@ -367,6 +367,7 @@ void cache_uninit(stream_t *s) {
   s->cache_data = NULL;
 }
 
+#if FORKED_CACHE
 static void exit_sighandler(int x){
   // close stream
   exit(0);
@@ -374,6 +375,7 @@ static void exit_sighandler(int x){
 
 static void dummy_sighandler(int x) {
 }
+#endif
 
 /**
  * Main loop of the cache process or thread.
@@ -553,7 +555,7 @@ int cache_stream_seek_long(stream_t *stream,off_t pos){
   s=stream->cache_data;
 //  s->seek_lock=1;
 
-  mp_msg(MSGT_CACHE,MSGL_DBG2,"CACHE2_SEEK: 0x%"PRIX64" <= 0x%"PRIX64" (0x%"PRIX64") <= 0x%"PRIX64"  \n",s->min_filepos,pos,s->read_filepos,s->max_filepos);
+  mp_msg(MSGT_CACHE,MSGL_DBG2,"CACHE2_SEEK: 0x%"PRIX64" <= 0x%"PRIX64" (0x%"PRIX64") <= 0x%"PRIX64"  \n",(uint64_t)s->min_filepos,(uint64_t)pos,(uint64_t)s->read_filepos,(uint64_t)s->max_filepos);
 
   newpos=pos/s->sector_size; newpos*=s->sector_size; // align
   stream->pos=s->read_filepos=newpos;

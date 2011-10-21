@@ -60,10 +60,19 @@ typedef void TALLOC_CTX;
  * the parameter containing the format, and a2 the index of the first
  * argument. Note that some gcc 2.x versions don't handle this
  * properly **/
-#define PRINTF_ATTRIBUTE(a1, a2) __attribute__ ((format (__printf__, a1, a2)))
+
+#ifdef __MINGW32__
+// Hack to make mingw use C99 format specifiers, instead of MS VC CRT ones.
+#define ta_printf_format_args gnu_printf
+#else
+#define ta_printf_format_args __printf__
+#endif
+
+#define PRINTF_ATTRIBUTE(a1, a2) __attribute__ ((format (ta_printf_format_args, a1, a2)))
 #else
 #define PRINTF_ATTRIBUTE(a1, a2)
 #endif
+
 #endif
 
 /* try to make talloc_set_destructor() and talloc_steal() type safe,

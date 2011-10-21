@@ -232,7 +232,8 @@ while(1){
       s->bIndexSubType = stream_read_char(demuxer->stream);
       s->bIndexType = stream_read_char(demuxer->stream);
       s->nEntriesInUse = stream_read_dword_le(demuxer->stream);
-      *(uint32_t *)s->dwChunkId = stream_read_dword_le(demuxer->stream);
+      uint32_t chunk_id = stream_read_dword_le(demuxer->stream);
+      memcpy(&s->dwChunkId, &chunk_id, 4);
       stream_read(demuxer->stream, (char *)s->dwReserved, 3*4);
       memset(s->dwReserved, 0, 3*4);
 
