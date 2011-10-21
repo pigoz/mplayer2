@@ -908,11 +908,7 @@ static void parse_cfgfiles(struct MPContext *mpctx, m_config_t *conf)
     if ((conffile = get_path("")) == NULL)
         mp_tmsg(MSGT_CPLAYER, MSGL_WARN, "Cannot find HOME directory.\n");
     else {
-#ifdef __MINGW32__
-        mkdir(conffile);
-#else
-        mkdir(conffile, 0777);
-#endif
+        mp_mkdir(conffile, 0777);
         free(conffile);
         if ((conffile = get_path("config")) == NULL)
             mp_tmsg(MSGT_CPLAYER, MSGL_ERR, "get_path(\"config\") problem\n");
@@ -1001,8 +997,7 @@ static void load_per_output_config(m_config_t *conf, char *cfg, char *out)
  */
 static int try_load_config(m_config_t *conf, const char *file)
 {
-    struct stat st;
-    if (stat(file, &st))
+    if (!mp_file_exists(file))
         return 0;
     mp_tmsg(MSGT_CPLAYER, MSGL_INFO, "Loading config '%s'\n", file);
     m_config_parse_config_file(conf, file);

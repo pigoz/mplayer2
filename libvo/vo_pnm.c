@@ -35,6 +35,7 @@
 /* Local Includes */
 
 #include "config.h"
+#include "osdep/unicode.h"
 #include "subopt-helper.h"
 #include "mp_msg.h"
 #include "video_out.h"
@@ -182,67 +183,8 @@ static int preinit(const char *arg)
 
 /* ------------------------------------------------------------------------- */
 
-/** \brief Create a directory.
- *
- *  This function creates a directory. If it already exists, it tests if
- *  it's a directory and not something else, and if it is, it tests whether
- *  the directory is writable or not.
- *
- * \param buf       Pointer to directory name.
- * \param verbose   Verbose on success. If verbose is non-zero, it will print
- *                  a message if it was successful in creating the directory.
- *
- * \return nothing  In case anything fails, the player will exit. If it
- *                  returns, everything went well.
- */
-
 static void pnm_mkdir(char *buf, int verbose) {
-    struct stat stat_p;
-
-/* Silly MING32 bug workaround */
-#ifndef __MINGW32__
-    if ( mkdir(buf, 0755) < 0 ) {
-#else
-    if ( mkdir(buf) < 0 ) {
-#endif
-        switch (errno) { /* use switch in case other errors need to be caught
-                            and handled in the future */
-            case EEXIST:
-                if ( stat(buf, &stat_p ) < 0 ) {
-                    mp_msg(MSGT_VO, MSGL_ERR, "%s: %s: %s\n", info.short_name,
-                           _("This error has occurred"), strerror(errno) );
-                    mp_msg(MSGT_VO, MSGL_ERR, "%s: %s %s\n", info.short_name,
-                           _("Unable to access"), buf);
-                    exit_player_bad(_("Fatal error"));
-                }
-                if ( !S_ISDIR(stat_p.st_mode) ) {
-                    mp_msg(MSGT_VO, MSGL_ERR, "%s: %s %s\n", info.short_name,
-                           buf, _("already exists, but is not a directory."));
-                    exit_player_bad(_("Fatal error"));
-                }
-                if ( !(stat_p.st_mode & S_IWUSR) ) {
-                    mp_msg(MSGT_VO, MSGL_ERR, "%s: %s - %s\n", info.short_name,
-                           buf, _("Output directory already exists, but is not writable."));
-                    exit_player_bad(_("Fatal error"));
-                }
-
-                if (strcmp(buf, ".") != 0) {
-                mp_msg(MSGT_VO, MSGL_INFO, "%s: %s - %s\n", info.short_name,
-                       buf, _("Output directory already exists and is writable."));
-                }
-                break;
-
-            default:
-                mp_msg(MSGT_VO, MSGL_ERR, "%s: %s: %s\n", info.short_name,
-                       _("This error has occurred"), strerror(errno) );
-                mp_msg(MSGT_VO, MSGL_ERR, "%s: %s - %s\n", info.short_name,
-                       buf, _("Unable to create output directory."));
-                exit_player_bad(_("Fatal error"));
-        } /* end switch */
-    } else if ( verbose ) {
-        mp_msg(MSGT_VO, MSGL_INFO, "%s: %s - %s\n", info.short_name,
-               buf, _("Output directory successfully created."));
-    } /* end if */
+    mp_mkdir(buf, 0755);
 }
 
 /* ------------------------------------------------------------------------- */

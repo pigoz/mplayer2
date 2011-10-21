@@ -37,10 +37,6 @@
 #include <string.h>
 #include <limits.h>
 #if defined(__MINGW32__) || defined(__CYGWIN__)
-#ifdef __MINGW32__
-#include <path.h>
-#define mkdir(a,b) mkdir(a)
-#endif
 #include <windows.h>
 #if HAVE_WINSOCK2_H
 #include <winsock2.h>
@@ -69,6 +65,7 @@
 #endif
 
 #include "osdep/osdep.h"
+#include "osdep/unicode.h"
 
 #include "cdd.h"
 #include "mpcommon.h"
@@ -472,7 +469,6 @@ static int cddb_read_cache(cddb_data_t *cddb_data)
 static int cddb_write_cache(cddb_data_t *cddb_data)
 {
     // We have the file, save it for cache.
-    struct stat file_stat;
     char file_name[100];
     int file_fd, ret;
     int wrote = 0;
@@ -481,15 +477,10 @@ static int cddb_write_cache(cddb_data_t *cddb_data)
         return -1;
 
     // Check if the CDDB cache dir exist
-    ret = stat(cddb_data->cache_dir, &file_stat);
-    if (ret < 0) {
+    if (!mp_file_exists(cddb_data->cache_dir)) {
         // Directory not present, create it.
-        ret = mkdir(cddb_data->cache_dir, 0755);
-#ifdef __MINGW32__
-        if (ret < 0 && errno != EEXIST) {
-#else
+        ret = mp_mkdir(cddb_data->cache_dir, 0755);
         if (ret < 0) {
-#endif
             perror("mkdir");
             mp_tmsg(MSGT_DEMUX, MSGL_ERR, "Failed to create directory %s.\n",
                     cddb_data->cache_dir);
@@ -499,7 +490,8 @@ static int cddb_write_cache(cddb_data_t *cddb_data)
 
     sprintf(file_name, "%s%08lx", cddb_data->cache_dir, cddb_data->disc_id);
 
-    file_fd = creat(file_name, S_IRUSR | S_IWUSR);
+    file_fd = mp_open(file_name,  O_CREAT | O_WRONLY | O_TRUNC,
+                      S_IRUSR | S_IWUSR);
     if (file_fd < 0) {
         perror("create");
         return -1;

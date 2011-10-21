@@ -36,6 +36,10 @@ MP_DIR *mp_opendir(const char *name);
 // account.
 char *mp_readdir(MP_DIR *dirp, void *talloc_ctx);
 int mp_closedir(MP_DIR *dirp);
+// The mode parameter is ignored on Windows.
+int mp_mkdir(const char *pathname, int mode);
+// Return 1 if the file or directory exists, 0 otherwise.
+int mp_file_exists(const char *pathname);
 
 void mp_get_converted_argv(int *argc, char ***argv);
 

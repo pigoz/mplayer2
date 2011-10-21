@@ -8,7 +8,7 @@ Make sure the cross compiler toolchain (e.g. i686-pc-mingw32-gcc) is in your $PA
 
 Then run this in the mplayer source directory:
 
-./configure --enable-cross-compile --target=i686-mingw32 --with-pkg-config=i686-pc-mingw32-pkg-config --cc=i686-pc-mingw32-gcc --windres=i686-pc-mingw32-windres --ranlib=i686-pc-mingw32-ranlib --with-freetype-config=/path/to/mingw/usr/i686-pc-mingw32/bin/freetype-config --disable-pnm --disable-win32dll --disable-unrarexec
+./configure --enable-cross-compile --target=i686-mingw32 --with-pkg-config=i686-pc-mingw32-pkg-config --cc=i686-pc-mingw32-gcc --windres=i686-pc-mingw32-windres --ranlib=i686-pc-mingw32-ranlib --with-freetype-config=/path/to/mingw/usr/i686-pc-mingw32/bin/freetype-config --disable-unrarexec
 
 "make" should then produce a mplayer.exe.
 
