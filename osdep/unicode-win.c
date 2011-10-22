@@ -90,6 +90,64 @@ int mp_stat(const char *path, struct stat *buf)
     return res;
 }
 
+int mp_fprintf(FILE *stream, const char *format, ...)
+{
+    va_list args;
+    int done = 0;
+
+    va_start(args, format);
+
+    if (stream == stdout || stream == stderr)
+    {
+        HANDLE *wstream = GetStdHandle(stream == stdout ?
+                                       STD_OUTPUT_HANDLE : STD_ERROR_HANDLE);
+        if (wstream != INVALID_HANDLE_VALUE)
+        {
+            // figure out whether we're writing to a console
+            unsigned int filetype = GetFileType(wstream);
+            if (!((filetype == FILE_TYPE_UNKNOWN) &&
+                (GetLastError() != ERROR_SUCCESS)))
+            {
+                int isConsole;
+                filetype &= ~(FILE_TYPE_REMOTE);
+                if (filetype == FILE_TYPE_CHAR)
+                {
+                    int ret = GetConsoleMode(wstream, NULL);
+                    if (!ret && (GetLastError() == ERROR_INVALID_HANDLE))
+                        isConsole = 0;
+                    else
+                        isConsole = 1;
+                }
+                else
+                    isConsole = 0;
+
+                if (isConsole)
+                {
+                    int nchars = vsnprintf(NULL, 0, format, args) + 1;
+                    char *buf = talloc_array(NULL, char, nchars);
+                    if (buf)
+                    {
+                        vsnprintf(buf, nchars, format, args);
+                        wchar_t *out = mp_from_utf8(NULL, buf);
+                        size_t nchars = wcslen(out);
+                        talloc_free(buf);
+                        done = WriteConsoleW(wstream, out, nchars, NULL, NULL);
+                        talloc_free(out);
+                    }
+                }
+                else
+                    done = vfprintf(stream, format, args);
+            }
+        }
+    }
+    else
+        done = vfprintf(stream, format, args);
+
+    va_end(args);
+
+    return done;
+}
+
 // On MinGW programs are directly linked to MSVCRT. This means calls like
 // open, fopen etc. always use a legacy codepage. Override the MSVCRT functions
 // with custom wrappers, that assume UTF-8 and use "proper" API calls like

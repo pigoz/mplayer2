@@ -23,6 +23,7 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <stdio.h>
 
 #ifdef _WIN32
 #include <wchar.h>
@@ -33,8 +34,10 @@ char *mp_to_utf8(void *talloc_ctx, const wchar_t *s);
 #ifdef __MINGW32__
 void mp_get_converted_argv(int *argc, char ***argv);
 int mp_stat(const char *path, struct stat *buf);
+int mp_fprintf(FILE *stream, const char *format, ...);
 #else
 #define mp_stat stat
+#define mp_fprintf fprintf
 #endif
 
 #endif
