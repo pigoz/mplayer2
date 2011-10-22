@@ -494,14 +494,14 @@ static void autodetectGlExtensions(struct vo *vo)
     if (is_ati && strncmp(version, "2.1.", 4) == 0) {
         int ver = atoi(version + 4);
         mp_msg(MSGT_VO, MSGL_V, "[gl] Detected ATI driver version: %i\n", ver);
-        ati_broken_pbo = ver && ver < 8395;
+        ati_broken_pbo = ver && ver < 8562;
     }
     if (p->ati_hack == -1)
         p->ati_hack = ati_broken_pbo;
     if (p->force_pbo == -1) {
         p->force_pbo = 0;
         if (extensions && strstr(extensions, "_pixel_buffer_object"))
-            p->force_pbo = is_ati;
+            p->force_pbo = is_ati && !ati_broken_pbo;
     }
     if (p->use_rectangle == -1) {
         p->use_rectangle = 0;
