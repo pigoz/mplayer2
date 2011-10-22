@@ -43,4 +43,6 @@ int mp_file_exists(const char *pathname);
 
 void mp_get_converted_argv(int *argc, char ***argv);
 
+int mp_fprintf(FILE *stream, const char *format, ...);
+
 #endif /* MPLAYER_UNICODE_H */
