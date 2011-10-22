@@ -188,7 +188,7 @@ check4proxies( URL_t *url ) {
 }
 
 int
-http_send_request( URL_t *url, off_t pos ) {
+http_send_request( URL_t *url, int64_t pos ) {
 	HTTP_header_t *http_hdr;
 	URL_t *server_url;
 	char str[256];
@@ -380,7 +380,7 @@ http_authenticate(HTTP_header_t *http_hdr, URL_t *url, int *auth_retry) {
 }
 
 int
-http_seek( stream_t *stream, off_t pos ) {
+http_seek( stream_t *stream, int64_t pos ) {
 	HTTP_header_t *http_hdr = NULL;
 	int fd;
 	if( stream==NULL ) return 0;
@@ -476,7 +476,7 @@ nop_streaming_read( int fd, char *buffer, int size, streaming_ctrl_t *stream_ctr
 }
 
 int
-nop_streaming_seek( int fd, off_t pos, streaming_ctrl_t *stream_ctrl ) {
+nop_streaming_seek( int fd, int64_t pos, streaming_ctrl_t *stream_ctrl ) {
 	return -1;
 }
 

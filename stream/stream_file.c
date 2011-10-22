@@ -24,6 +24,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#include "osdep/osdep.h"
 #include "osdep/unicode.h"
 
 #include "mp_msg.h"
@@ -70,16 +71,16 @@ static int write_buffer(stream_t *s, char* buffer, int len) {
   return len;
 }
 
-static int seek(stream_t *s,off_t newpos) {
+static int seek(stream_t *s,int64_t newpos) {
   s->pos = newpos;
-  if(lseek(s->fd,s->pos,SEEK_SET)<0) {
+  if(mp_lseek(s->fd,s->pos,SEEK_SET)<0) {
     s->eof=1;
     return 0;
   }
   return 1;
 }
 
-static int seek_forward(stream_t *s,off_t newpos) {
+static int seek_forward(stream_t *s,int64_t newpos) {
   if(newpos<s->pos){
     mp_msg(MSGT_STREAM,MSGL_INFO,"Cannot seek backward in linear streams!\n");
     return 0;
@@ -97,12 +98,12 @@ static int seek_forward(stream_t *s,off_t newpos) {
 static int control(stream_t *s, int cmd, void *arg) {
   switch(cmd) {
     case STREAM_CTRL_GET_SIZE: {
-      off_t size;
+      int64_t size;
 
-      size = lseek(s->fd, 0, SEEK_END);
-      lseek(s->fd, s->pos, SEEK_SET);
-      if(size != (off_t)-1) {
-        *((off_t*)arg) = size;
+      size = mp_lseek(s->fd, 0, SEEK_END);
+      mp_lseek(s->fd, s->pos, SEEK_SET);
+      if(size != (int64_t)-1) {
+        *((int64_t*)arg) = size;
         return 1;
       }
     }
@@ -113,7 +114,7 @@ static int control(stream_t *s, int cmd, void *arg) {
 static int open_f(stream_t *stream,int mode, void* opts, int* file_format) {
   int f;
   mode_t m = 0;
-  off_t len;
+  int64_t len;
   unsigned char *filename;
   struct stream_priv_s* p = (struct stream_priv_s*)opts;
 
@@ -175,7 +176,7 @@ static int open_f(stream_t *stream,int mode, void* opts, int* file_format) {
     }
   }
 
-  len=lseek(f,0,SEEK_END); lseek(f,0,SEEK_SET);
+  len=mp_lseek(f,0,SEEK_END); mp_lseek(f,0,SEEK_SET);
 #ifdef __MINGW32__
   // seeks on stdin incorrectly succeed on MinGW
   if(f==0)

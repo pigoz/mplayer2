@@ -273,7 +273,7 @@ static void demux_seek_y4m(demuxer_t *demuxer, float rel_seek_secs, float audio_
     y4m_priv_t* priv = demuxer->priv;
     int rel_seek_frames = sh->fps*rel_seek_secs;
     int size = 3*sh->disp_w*sh->disp_h/2;
-    off_t curr_pos = stream_tell(demuxer->stream);
+    int64_t curr_pos = stream_tell(demuxer->stream);
 
     if (priv->framenum + rel_seek_frames < 0) rel_seek_frames = -priv->framenum;
 

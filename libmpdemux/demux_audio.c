@@ -52,8 +52,8 @@ typedef struct da_priv {
 
 //! Used to describe a potential (chain of) MP3 headers we found
 typedef struct mp3_hdr {
-  off_t frame_pos; // start of first frame in this "chain" of headers
-  off_t next_frame_pos; // here we expect the next header with same parameters
+  int64_t frame_pos; // start of first frame in this "chain" of headers
+  int64_t next_frame_pos; // here we expect the next header with same parameters
   int mp3_chans;
   int mp3_freq;
   int mpa_spf;
@@ -98,7 +98,7 @@ static void free_mp3_hdrs(mp3_hdr_t **list) {
  *
  * parameters marked by (*) must be the same for all headers in the same chain
  */
-static mp3_hdr_t *add_mp3_hdr(mp3_hdr_t **list, off_t st_pos,
+static mp3_hdr_t *add_mp3_hdr(mp3_hdr_t **list, int64_t st_pos,
                                int mp3_chans, int mp3_freq, int mpa_spf,
                                int mpa_layer, int mpa_br, int mp3_flen) {
   mp3_hdr_t *tmp;
@@ -261,7 +261,7 @@ static int demux_audio_open(demuxer_t* demuxer) {
   sh_audio_t* sh_audio;
   uint8_t hdr[HDR_SIZE];
   int frmt = 0, n = 0, step;
-  off_t st_pos = 0, next_frame_pos = 0;
+  int64_t st_pos = 0, next_frame_pos = 0;
   // mp3_hdrs list is sorted first by next_frame_pos and then by frame_pos
   mp3_hdr_t *mp3_hdrs = NULL, *mp3_found = NULL;
   da_priv_t* priv;

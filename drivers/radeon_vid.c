@@ -1295,7 +1295,7 @@ static void radeon_param_buff_fill( void )
     radeon_param_buff_len = len;
 }
 
-static ssize_t radeon_vid_read(struct file *file, char *buf, size_t count, loff_t *ppos)
+static ssize_t radeon_vid_read(struct file *file, char *buf, size_t count, int64_t *ppos)
 {
     uint32_t size;
     if(!radeon_param_buff) return -ESPIPE;
@@ -1316,7 +1316,7 @@ static ssize_t radeon_vid_read(struct file *file, char *buf, size_t count, loff_
 			    ,RTFSaturation(ovSaturation),RTFHue(ovHue),ov_trans_idx); }
 
 
-static ssize_t radeon_vid_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
+static ssize_t radeon_vid_write(struct file *file, const char *buf, size_t count, int64_t *ppos)
 {
 #ifdef RAGE128
     if(memcmp(buf,PARAM_BRIGHTNESS,min(count,strlen(PARAM_BRIGHTNESS))) == 0)

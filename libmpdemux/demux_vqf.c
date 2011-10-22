@@ -188,7 +188,7 @@ static demuxer_t* demux_open_vqf(demuxer_t* demuxer) {
 static int demux_vqf_fill_buffer(demuxer_t* demuxer, demux_stream_t *ds) {
   sh_audio_t* sh_audio = demuxer->audio->sh;
   int l = sh_audio->wf->nAvgBytesPerSec;
-  off_t spos = stream_tell(demuxer->stream);
+  int64_t spos = stream_tell(demuxer->stream);
   demux_packet_t*  dp;
 
   if(stream_eof(demuxer->stream))
@@ -209,7 +209,7 @@ static void demux_seek_vqf(demuxer_t *demuxer,float rel_seek_secs,float audio_de
 #if 0
   stream_t* s = demuxer->stream;
   sh_audio_t* sh_audio = demuxer->audio->sh;
-  off_t base,pos;
+  int64_t base,pos;
 
   base = (flags & SEEK_ABSOLUTE) ? demuxer->movi_start : stream_tell(s);
   if(flags & SEEK_FACTOR)

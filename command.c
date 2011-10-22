@@ -348,11 +348,11 @@ static int mp_property_stream_pos(m_option_t *prop, int action, void *arg,
         return M_PROPERTY_ERROR;
     switch (action) {
     case M_PROPERTY_GET:
-        *(off_t *) arg = stream_tell(mpctx->demuxer->stream);
+        *(int64_t *) arg = stream_tell(mpctx->demuxer->stream);
         return M_PROPERTY_OK;
     case M_PROPERTY_SET:
-        M_PROPERTY_CLAMP(prop, *(off_t *) arg);
-        stream_seek(mpctx->demuxer->stream, *(off_t *) arg);
+        M_PROPERTY_CLAMP(prop, *(int64_t *) arg);
+        stream_seek(mpctx->demuxer->stream, *(int64_t *) arg);
         return M_PROPERTY_OK;
     }
     return M_PROPERTY_NOT_IMPLEMENTED;
@@ -366,7 +366,7 @@ static int mp_property_stream_start(m_option_t *prop, int action,
         return M_PROPERTY_UNAVAILABLE;
     switch (action) {
     case M_PROPERTY_GET:
-        *(off_t *) arg = mpctx->demuxer->stream->start_pos;
+        *(int64_t *) arg = mpctx->demuxer->stream->start_pos;
         return M_PROPERTY_OK;
     }
     return M_PROPERTY_NOT_IMPLEMENTED;
@@ -380,7 +380,7 @@ static int mp_property_stream_end(m_option_t *prop, int action, void *arg,
         return M_PROPERTY_UNAVAILABLE;
     switch (action) {
     case M_PROPERTY_GET:
-        *(off_t *) arg = mpctx->demuxer->stream->end_pos;
+        *(int64_t *) arg = mpctx->demuxer->stream->end_pos;
         return M_PROPERTY_OK;
     }
     return M_PROPERTY_NOT_IMPLEMENTED;
@@ -394,7 +394,7 @@ static int mp_property_stream_length(m_option_t *prop, int action,
         return M_PROPERTY_UNAVAILABLE;
     switch (action) {
     case M_PROPERTY_GET:
-        *(off_t *) arg =
+        *(int64_t *) arg =
             mpctx->demuxer->stream->end_pos - mpctx->demuxer->stream->start_pos;
         return M_PROPERTY_OK;
     }
@@ -2865,7 +2865,7 @@ void run_command(MPContext *mpctx, mp_cmd_t *cmd)
         void *arg = NULL;
         int r, i;
         double d;
-        off_t o;
+        int64_t o;
         if (cmd->args[1].v.f) {
             m_option_t *prop;
             if ((r = mp_property_do(cmd->args[0].v.s,

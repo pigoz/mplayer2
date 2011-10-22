@@ -152,7 +152,7 @@ static ssize_t read_callback(void *ash, void *buf, size_t count)
 
 /* Arbitrary input seeking is not supported with this MPlayer API(?).
    That also means that we won't read any ID3v1 tags. */
-static off_t seek_callback(void *sh, off_t pos, int whence)
+static int64_t seek_callback(void *sh, int64_t pos, int whence)
 {
     return -1;
 }

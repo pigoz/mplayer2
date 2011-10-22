@@ -46,5 +46,21 @@
 #define GetCurrentProcess() getpid()
 #endif /* __OS2__ */
 
+#ifdef __MINGW32__
+
+#include <io.h>
+
+#define mp_lseek lseek64
+
+#else
+
+#include <sys/types.h>
+#include <unistd.h>
+
+// assumes LFS
+#define mp_lseek lseek
+
+#endif
+
 #endif /* MPLAYER_OSDEP_H */
 

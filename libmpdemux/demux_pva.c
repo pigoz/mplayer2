@@ -50,7 +50,7 @@
 #define MAINAUDIOSTREAM 0x02
 
 typedef struct {
-	off_t offset;
+	int64_t offset;
 	long size;
 	uint8_t type;
 	uint8_t is_packet_start;
@@ -198,7 +198,7 @@ static int pva_get_payload(demuxer_t *d, pva_payload_t *payload)
 {
 	uint8_t flags,pes_head_len;
 	uint16_t pack_size;
-	off_t pva_payload_start;
+	int64_t pva_payload_start;
 	unsigned char buffer[256];
 #ifndef PVA_NEW_PREBYTES_CODE
 	demux_packet_t * dp; 	//hack to deliver the preBytes (see PVA doc)
@@ -476,7 +476,7 @@ static int demux_pva_fill_buffer (demuxer_t * demux, demux_stream_t *ds)
 static void demux_seek_pva(demuxer_t * demuxer,float rel_seek_secs,float audio_delay,int flags)
 {
 	int total_bitrate=0;
-	off_t dest_offset;
+	int64_t dest_offset;
 	pva_priv_t * priv=demuxer->priv;
 
 	total_bitrate=((sh_audio_t *)demuxer->audio->sh)->i_bps + ((sh_video_t *)demuxer->video->sh)->i_bps;

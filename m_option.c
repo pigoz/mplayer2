@@ -437,7 +437,7 @@ const m_option_type_t m_option_type_float = {
 
 ///////////// Position
 #undef VAL
-#define VAL(x) (*(off_t *)(x))
+#define VAL(x) (*(int64_t *)(x))
 
 static int parse_position(const m_option_t *opt, struct bstr name,
                           struct bstr param, bool ambiguous_param, void *dst)
@@ -445,7 +445,7 @@ static int parse_position(const m_option_t *opt, struct bstr name,
     long long tmp;
     int r = parse_longlong(opt, name, param, false, &tmp);
     if (r >= 0 && dst)
-        *(off_t *)dst = tmp;
+        *(int64_t *)dst = tmp;
     return r;
 }
 
@@ -456,8 +456,8 @@ static char *print_position(const m_option_t *opt, const void *val)
 
 const m_option_type_t m_option_type_position = {
     "Position",
-    "Integer (off_t)",
-    sizeof(off_t),
+    "Integer (int64_t)",
+    sizeof(int64_t),
     0,
     parse_position,
     print_position,

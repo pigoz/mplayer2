@@ -81,9 +81,9 @@ extern const m_option_t cdda_opts[];
 
 extern int ts_prog;
 extern int ts_keep_broken;
-extern off_t ts_probe;
+extern int64_t ts_probe;
 extern int audio_substream_id;
-extern off_t ps_probe;
+extern int64_t ps_probe;
 
 extern int sws_flags;
 extern char* pp_help;

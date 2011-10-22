@@ -45,7 +45,7 @@
 typedef struct roq_chunk_t
 {
   int chunk_type;
-  off_t chunk_offset;
+  int64_t chunk_offset;
   int chunk_size;
 
   float video_chunk_number;  // in the case of a video chunk

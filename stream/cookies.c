@@ -31,6 +31,7 @@
 #include <inttypes.h>
 #include <limits.h>
 
+#include "osdep/osdep.h"
 #include "cookies.h"
 #include "http.h"
 #include "mp_msg.h"
@@ -110,7 +111,7 @@ static int parse_line(char **ptr, char *cols[6])
 }
 
 /* Loads a file into RAM */
-static char *load_file(const char *filename, off_t * length)
+static char *load_file(const char *filename, int64_t * length)
 {
     int fd;
     char *buffer;
@@ -135,7 +136,7 @@ static char *load_file(const char *filename, off_t * length)
 	return NULL;
     }
 
-    lseek(fd, 0, SEEK_SET);
+    mp_lseek(fd, 0, SEEK_SET);
 
     if (!(buffer = malloc(*length + 1))) {
 	mp_msg(MSGT_NETWORK, MSGL_V, "Could not malloc.");
@@ -158,7 +159,7 @@ static struct cookie_list_type *load_cookies_from(const char *filename,
 						  *list)
 {
     char *ptr;
-    off_t length;
+    int64_t length;
 
     ptr = load_file(filename, &length);
     if (!ptr)

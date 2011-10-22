@@ -39,7 +39,7 @@ static int write_buffer(stream_t *s, char *buffer, int len)
     return (r <= 0) ? -1 : r;
 }
 
-static int seek(stream_t *s, off_t newpos)
+static int seek(stream_t *s, int64_t newpos)
 {
     s->pos = newpos;
     if (url_seek(s->priv, s->pos, SEEK_SET) < 0) {
@@ -57,7 +57,7 @@ static int control(stream_t *s, int cmd, void *arg)
     case STREAM_CTRL_GET_SIZE:
         size = url_filesize(s->priv);
         if(size >= 0) {
-            *(off_t *)arg = size;
+            *(int64_t *)arg = size;
             return 1;
         }
         break;

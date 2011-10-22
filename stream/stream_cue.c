@@ -29,6 +29,7 @@
 
 #include "config.h"
 #include "mp_msg.h"
+#include "osdep/osdep.h"
 
 #include "stream.h"
 
@@ -478,7 +479,7 @@ static int cue_vcd_get_track_end (int track){
   return VCD_SECTOR_DATA * sector;
 }
 
-static int seek(stream_t *s,off_t newpos) {
+static int seek(stream_t *s,int64_t newpos) {
   s->pos=newpos;
   cue_set_msf(s->pos/VCD_SECTOR_DATA);
   return 1;
@@ -527,7 +528,7 @@ static int cue_vcd_read(stream_t *stream, char *mem, int size) {
   if(position >= tracks[track+1].start_offset)
     return 0;
 
-  if(lseek(fd_bin, position+VCD_SECTOR_OFFS, SEEK_SET) == -1) {
+  if(mp_lseek(fd_bin, position+VCD_SECTOR_OFFS, SEEK_SET) == -1) {
     mp_tmsg(MSGT_OPEN,MSGL_ERR, "[bincue] unexpected end of bin file\n");
     return 0;
   }

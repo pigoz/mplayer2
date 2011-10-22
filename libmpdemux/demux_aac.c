@@ -75,7 +75,7 @@ static void demux_close_aac(demuxer_t *demuxer)
 static int demux_aac_probe(demuxer_t *demuxer)
 {
 	int cnt = 0, c, len, srate, num;
-	off_t init, probed;
+	int64_t init, probed;
 	aac_priv_t *priv;
 
 	if(! demux_aac_init(demuxer))

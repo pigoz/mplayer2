@@ -34,7 +34,7 @@ struct rtp_rtsp_session_t {
 };
 
 struct rtp_rtsp_session_t *rtp_setup_and_play (rtsp_t* rtsp_session);
-off_t rtp_read (struct rtp_rtsp_session_t* st, char *buf, off_t length);
+int64_t rtp_read (struct rtp_rtsp_session_t* st, char *buf, int64_t length);
 void rtp_session_free (struct rtp_rtsp_session_t *st);
 void rtcp_send_rr (rtsp_t *s, struct rtp_rtsp_session_t *st);
 

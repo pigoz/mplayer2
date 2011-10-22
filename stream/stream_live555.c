@@ -23,13 +23,14 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "osdep/osdep.h"
 #include "stream.h"
 #include "network.h"
 #include "libmpdemux/demuxer.h"
 
 extern int network_bandwidth;
 
-static int _rtsp_streaming_seek(int fd, off_t pos, streaming_ctrl_t* streaming_ctrl) {
+static int _rtsp_streaming_seek(int fd, int64_t pos, streaming_ctrl_t* streaming_ctrl) {
   return -1; // For now, we don't handle RTSP stream seeking
 }
 
@@ -72,7 +73,7 @@ fail:
 static int open_live_sdp(stream_t *stream,int mode, void* opts, int* file_format) {
   int f;
   char *filename = stream->url;
-  off_t len;
+  int64_t len;
   char* sdpDescription;
   ssize_t numBytesRead;
 
@@ -84,7 +85,7 @@ static int open_live_sdp(stream_t *stream,int mode, void* opts, int* file_format
       return STREAM_ERROR;
     }
 
-    len=lseek(f,0,SEEK_END);
+    len=mp_lseek(f,0,SEEK_END);
     lseek(f,0,SEEK_SET);
     if(len == -1)
       return STREAM_ERROR;

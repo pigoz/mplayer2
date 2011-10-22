@@ -27,6 +27,7 @@
 
 #include "mp_msg.h"
 
+#include "osdep/osdep.h"
 #include "stream/stream.h"
 #include "demuxer.h"
 #include "stheader.h"
@@ -253,7 +254,7 @@ static demuxer_t* demux_open_gif(demuxer_t* demuxer)
   // unable to use mplayer's cache, and without this lseek libgif will
   // not read from the beginning of the file and the command will fail.
   // with this hack enabled, you will lose the ability to stream a GIF.
-  lseek(demuxer->stream->fd, 0, SEEK_SET);
+  mp_lseek(demuxer->stream->fd, 0, SEEK_SET);
   gif = DGifOpenFileHandle(demuxer->stream->fd);
 #else
   gif = DGifOpen(demuxer->stream, my_read_gif);

@@ -78,9 +78,9 @@ extern int sub_justify;
 
 typedef struct
 {
-   off_t startOffset;
-   off_t fileSize;
-   int   chunks;
+   int64_t startOffset;
+   int64_t fileSize;
+   int     chunks;
 } tmf_fileParts;
 
 #define MAX_TMF_PARTS 16
@@ -95,10 +95,10 @@ typedef struct
 
    int             tivoType;           // 1 = SA, 2 = DTiVo
 
-   int64_t        lastAudioPTS;
-   int64_t        lastVideoPTS;
+   int64_t         lastAudioPTS;
+   int64_t         lastVideoPTS;
 
-   off_t           size;
+   int64_t         size;
    int             readHeader;
 
    int             tmf;
@@ -124,7 +124,7 @@ static int ty_tmf_filetoparts( demuxer_t *demux, TiVoInfo *tivo )
       char    *extension;
       char    *sizestr;
       int     size;
-      off_t   skip;
+      int64_t   skip;
       if (stream_read(demux->stream, header, 512) < 512)
       {
          mp_msg( MSGT_DEMUX, MSGL_DBG3, "Read bad\n" );
@@ -174,7 +174,7 @@ static int ty_tmf_filetoparts( demuxer_t *demux, TiVoInfo *tivo )
 
 
 // ===========================================================================
-static off_t tmf_filetooffset(TiVoInfo *tivo, int chunk)
+static int64_t tmf_filetooffset(TiVoInfo *tivo, int chunk)
 {
   int i;
   for (i = 0; i < tivo->tmf_totalparts; i++) {
@@ -190,7 +190,7 @@ static off_t tmf_filetooffset(TiVoInfo *tivo, int chunk)
 static int tmf_load_chunk( demuxer_t *demux, TiVoInfo *tivo,
    unsigned char *buff, int readChunk )
 {
-   off_t fileoffset;
+   int64_t fileoffset;
    int    count;
 
    mp_msg( MSGT_DEMUX, MSGL_DBG3, "\ntmf_load_chunk() begin %d\n",
@@ -287,7 +287,7 @@ static void demux_ty_AddToAudioBuffer( TiVoInfo *tivo, unsigned char *buffer,
 }
 
 static void demux_ty_CopyToDemuxPacket( demux_stream_t *ds,
-       unsigned char *buffer, int size, off_t pos, int64_t pts )
+       unsigned char *buffer, int size, int64_t pos, int64_t pts )
 {
    demux_packet_t *dp = new_demux_packet( size );
    memcpy( dp->buffer, buffer, size );
@@ -377,7 +377,7 @@ static int demux_ty_fill_buffer( demuxer_t *demux, demux_stream_t *dsds )
       // extract program did the "right thing"
       if ( tivo->readHeader == 0 )
       {
-         off_t filePos;
+         int64_t filePos;
          tivo->readHeader = 1;
 
          filePos = demux->filepos;
@@ -395,13 +395,13 @@ static int demux_ty_fill_buffer( demuxer_t *demux, demux_stream_t *dsds )
 
          if ( readSize == CHUNKSIZE && AV_RB32(chunk) == TIVO_PES_FILEID )
          {
-               off_t numberParts;
+               int64_t numberParts;
 
                readSize = 0;
 
                if ( tivo->tmf != 1 )
                {
-                  off_t offset;
+                  int64_t offset;
 
                   numberParts = demux->stream->end_pos / TIVO_PART_LENGTH;
                   offset = numberParts * TIVO_PART_LENGTH;
@@ -747,8 +747,8 @@ static void demux_seek_ty( demuxer_t *demuxer, float rel_seek_secs, float audio_
    demux_stream_t *d_video = demuxer->video;
    sh_audio_t     *sh_audio = d_audio->sh;
    sh_video_t     *sh_video = d_video->sh;
-   off_t          newpos;
-   off_t          res;
+   int64_t        newpos;
+   int64_t        res;
    TiVoInfo       *tivo = demuxer->priv;
 
    mp_msg( MSGT_DEMUX, MSGL_DBG3, "ty:Seeking to %7.1f\n", rel_seek_secs );

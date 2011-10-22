@@ -284,8 +284,8 @@ static int drop_frame_cnt; // total number of dropped frames
 static int output_quality;
 
 // seek:
-static off_t seek_to_byte;
-static off_t step_sec;
+static int64_t seek_to_byte;
+static int64_t step_sec;
 
 static m_time_size_t end_at = { .type = END_AT_NONE, .pos = 0 };
 
@@ -3434,7 +3434,7 @@ int get_percent_pos(struct MPContext *mpctx)
         ;
     else {
         int len = (demuxer->movi_end - demuxer->movi_start) / 100;
-        off_t pos = demuxer->filepos > 0 ?
+        int64_t pos = demuxer->filepos > 0 ?
                     demuxer->filepos : stream_tell(demuxer->stream);
         if (len > 0)
             ans = (pos - demuxer->movi_start) / len;

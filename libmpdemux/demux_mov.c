@@ -84,14 +84,14 @@
 typedef struct {
     unsigned int pts; // duration
     unsigned int size;
-    off_t pos;
+    int64_t pos;
 } mov_sample_t;
 
 typedef struct {
     unsigned int sample; // number of the first sample in the chunk
     unsigned int size;   // number of samples in the chunk
     int desc;            // for multiple codecs mode - not used
-    off_t pos;
+    int64_t pos;
 } mov_chunk_t;
 
 typedef struct {
@@ -126,7 +126,7 @@ typedef struct {
 typedef struct {
     int id;
     int type;
-    off_t pos;
+    int64_t pos;
     //
     unsigned int media_handler;
     unsigned int data_handler;
@@ -266,7 +266,7 @@ static void mov_build_index(mov_track_t* trak,int timescale){
     // calc sample offsets
     s=0;
     for(j=0;j<trak->chunks_size;j++){
-	off_t pos=trak->chunks[j].pos;
+	int64_t pos=trak->chunks[j].pos;
 	for(i=0;i<trak->chunks[j].size;i++){
 	    if (s >= trak->samples_size)
 		break;
@@ -319,10 +319,10 @@ static void mov_build_index(mov_track_t* trak,int timescale){
 #define MOV_MAX_SUBLEN 1024
 
 typedef struct {
-    off_t moov_start;
-    off_t moov_end;
-    off_t mdat_start;
-    off_t mdat_end;
+    int64_t moov_start;
+    int64_t moov_end;
+    int64_t mdat_start;
+    int64_t mdat_end;
     int track_db;
     mov_track_t* tracks[MOV_MAX_TRACKS];
     int timescale; // movie timescale
@@ -346,7 +346,7 @@ static int mov_check_file(demuxer_t* demuxer){
     while(1){
 	int i;
 	int skipped=8;
-	off_t len=stream_read_dword(demuxer->stream);
+	int64_t len=stream_read_dword(demuxer->stream);
 	unsigned int id=stream_read_dword(demuxer->stream);
 	if(stream_eof(demuxer->stream)) break; // EOF
 	if (len == 1) /* real size is 64bits - cjb */
@@ -435,8 +435,8 @@ static int mov_check_file(demuxer_t* demuxer){
 	case MOV_FOURCC('m','o','o','v'):
 //	case MOV_FOURCC('c','m','o','v'):
 	  mp_msg(MSGT_DEMUX,MSGL_V,"MOV: Movie header found!\n");
-	  priv->moov_start=(off_t)stream_tell(demuxer->stream);
-	  priv->moov_end=(off_t)priv->moov_start+len-skipped;
+	  priv->moov_start=(int64_t)stream_tell(demuxer->stream);
+	  priv->moov_end=(int64_t)priv->moov_start+len-skipped;
 	  mp_msg(MSGT_DEMUX,MSGL_DBG2,"MOV: Movie header: start: %"PRIx64" end: %"PRIx64"\n",
 	    (int64_t)priv->moov_start, (int64_t)priv->moov_end);
 	  skipped+=8;
@@ -594,7 +594,7 @@ static void init_vobsub(sh_sub_t *sh, mov_track_t *trak) {
 }
 
 static int lschunks_intrak(demuxer_t* demuxer, int level, unsigned int id,
-                           off_t pos, off_t len, mov_track_t* trak);
+                           int64_t pos, int64_t len, mov_track_t* trak);
 
 static int gen_sh_audio(sh_audio_t* sh, mov_track_t* trak, int timescale) {
 #if 0
@@ -1281,12 +1281,12 @@ static int gen_sh_video(sh_video_t* sh, mov_track_t* trak, int timescale) {
     return 1;
 }
 
-static void lschunks(demuxer_t* demuxer,int level,off_t endpos,mov_track_t* trak){
+static void lschunks(demuxer_t* demuxer,int level,int64_t endpos,mov_track_t* trak){
     mov_priv_t* priv=demuxer->priv;
 //    printf("lschunks (level=%d,endpos=%x)\n", level, endpos);
     while(1){
-	off_t pos;
-	off_t len;
+	int64_t pos;
+	int64_t len;
 	unsigned int id;
 	//
 	pos=stream_tell(demuxer->stream);
@@ -1494,8 +1494,8 @@ static void lschunks(demuxer_t* demuxer,int level,off_t endpos,mov_track_t* trak
 	case MOV_FOURCC('u','d','t','a'):
 	{
 	    unsigned int udta_id;
-	    off_t udta_len;
-	    off_t udta_size = len;
+	    int64_t udta_len;
+	    int64_t udta_size = len;
 
 	    mp_msg(MSGT_DEMUX, MSGL_DBG2, "mov: user data record found\n");
 	    mp_msg(MSGT_DEMUX, MSGL_V, "Quicktime Clip Info:\n");
@@ -1525,7 +1525,7 @@ static void lschunks(demuxer_t* demuxer,int level,off_t endpos,mov_track_t* trak
 		    case MOV_FOURCC(0xa9,'a','u','t'):
 		    case MOV_FOURCC(0xa9,'s','w','r'):
 		    {
-			off_t text_len = stream_read_word(demuxer->stream);
+			int64_t text_len = stream_read_word(demuxer->stream);
 			char text[text_len+2+1];
 			stream_read(demuxer->stream, (char *)&text, text_len+2);
 			text[text_len+2] = 0x0;
@@ -1618,7 +1618,7 @@ static void lschunks(demuxer_t* demuxer,int level,off_t endpos,mov_track_t* trak
 }
 
 static int lschunks_intrak(demuxer_t* demuxer, int level, unsigned int id,
-                           off_t pos, off_t len, mov_track_t* trak)
+                           int64_t pos, int64_t len, mov_track_t* trak)
 {
   switch(id) {
     case MOV_FOURCC('m','d','a','t'): {
@@ -1731,8 +1731,8 @@ static int lschunks_intrak(demuxer_t* demuxer, int level, unsigned int id,
       mp_msg(MSGT_DEMUX, MSGL_V, "MOV: %*sDescription list! (cnt:%d)\n",
              level, "", count);
       for (i = 0; i < count; i++) {
-        off_t pos = stream_tell(demuxer->stream);
-        off_t len = stream_read_dword(demuxer->stream);
+        int64_t pos = stream_tell(demuxer->stream);
+        int64_t len = stream_read_dword(demuxer->stream);
         unsigned int fourcc = stream_read_dword_le(demuxer->stream);
         /* some files created with Broadcast 2000 (e.g. ilacetest.mov)
            contain raw I420 video but have a yv12 fourcc */
@@ -2115,7 +2115,7 @@ static int demux_mov_fill_buffer(demuxer_t *demuxer,demux_stream_t* ds){
     mov_track_t* trak=NULL;
     float pts;
     int x;
-    off_t pos;
+    int64_t pos;
 
     if (ds->eof) return 0;
     trak = stream_track(priv, ds);
@@ -2216,7 +2216,7 @@ if(trak->pos==0 && trak->stream_header_len>0){
       if (samplenr < 0)
         vo_sub = NULL;
       else if (samplenr != priv->current_sub) {
-        off_t pos = trak->samples[samplenr].pos;
+        int64_t pos = trak->samples[samplenr].pos;
         int len = trak->samples[samplenr].size;
         double subpts = (double)trak->samples[samplenr].pts / (double)trak->timescale;
         stream_seek(demuxer->stream, pos);
@@ -2322,7 +2322,7 @@ static int demux_mov_control(demuxer_t *demuxer, int cmd, void *arg){
 
     case DEMUXER_CTRL_GET_PERCENT_POS:
       {
-        off_t pos = track->pos;
+        int64_t pos = track->pos;
         if (track->durmap_size >= 1)
           pos *= track->durmap[0].dur;
         *((int *)arg) = (int)(100 * pos / track->length);
