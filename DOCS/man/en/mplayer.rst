@@ -793,7 +793,7 @@ PLAYER OPTIONS
 --mouse-movements
     Permit MPlayer to receive pointer events reported by the video output
     driver. Necessary to select the buttons in DVD menus. Supported for
-    X11-based VOs (x11, xv, etc) and the gl, gl2, direct3d and corevideo VOs.
+    X11-based VOs (x11, xv, etc) and the gl, direct3d and corevideo VOs.
 
 --mouseinput, --no-mouseinput
     Enabled by default. Disable mouse button press/release input
@@ -2543,8 +2543,7 @@ VIDEO OUTPUT OPTIONS
     then the x and y coordinates are relative to the top-left corner of the
     window rather than the screen. The coordinates are relative to the screen
     given with ``--xineramascreen`` for the video output drivers that fully
-    support ``--xineramascreen`` (direct3d, gl, gl2, vdpau, x11, xv,
-    corevideo).
+    support ``--xineramascreen`` (direct3d, gl, vdpau, x11, xv, corevideo).
 
     *NOTE*: May not be supported by some of the older VO drivers.
 
@@ -2607,7 +2606,7 @@ VIDEO OUTPUT OPTIONS
 --ontop
     Makes the player window stay on top of other windows. Supported by video
     output drivers which use X11, except SDL, as well as directx, corevideo,
-    quartz, ggi and gl2.
+    quartz and ggi.
 
 --panscan=<0.0-1.0>
     Enables pan-and-scan functionality (cropping the sides of e.g. a 16:9
@@ -2692,8 +2691,8 @@ VIDEO OUTPUT OPTIONS
     This option is not suitable to only set the startup screen (because it
     will always display on the given screen in fullscreen mode),
     ``--geometry`` is the best that is available for that purpose currently.
-    Supported by at least the direct3d, gl, gl2, x11, xv and corevideo video
-    output drivers.
+    Supported by at least the direct3d, gl, x11, xv and corevideo video output
+    drivers.
 
 
 VIDEO OUTPUT DRIVERS
@@ -3185,31 +3184,6 @@ gl
     (no)aspect
         Enable or disable aspect scaling and pan-and-scan support (default:
         enabled). Disabling might increase speed.
-
-gl2
-    Variant of the OpenGL video output driver. Supports videos larger than the
-    maximum texture size but lacks many of the advanced features and
-    optimizations of the gl driver and is unlikely to be extended further.
-
-    (no)glfinish
-        same as gl (default: enabled)
-    yuv=<n>
-        Select the type of YUV to RGB conversion. If set to anything except 0
-        OSD will be disabled and brightness, contrast and gamma setting is
-        only available via the global X server settings. Apart from this the
-        values have the same meaning as for ``--vo=gl``.
-
-matrixview
-    OpenGL-based renderer creating a Matrix-like running-text effect.
-
-    cols=<n>
-        Number of text columns to display. Very low values (< 16) will
-        probably fail due to scaler limitations. Values not divisible by 16
-        may cause issues as well.
-    rows=<n>
-        Number of text rows to display. Very low values (< 16) will probably
-        fail due to scaler limitations. Values not divisible by 16 may cause
-        issues as well.
 
 null
     Produces no video output. Useful for benchmarking.
