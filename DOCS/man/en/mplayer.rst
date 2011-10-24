@@ -3181,9 +3181,6 @@ gl
         Enable or disable support for OSD rendering via OpenGL (default:
         enabled). This option is for testing; to disable the OSD use
         ``--osdlevel=0`` instead.
-    (no)aspect
-        Enable or disable aspect scaling and pan-and-scan support (default:
-        enabled). Disabling might increase speed.
 
 null
     Produces no video output. Useful for benchmarking.
