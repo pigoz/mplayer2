@@ -761,35 +761,6 @@ PLAYER OPTIONS
 --loop=<number>
     Loops movie playback <number> times. 0 means forever.
 
---menu
-    (OSD menu only)
-    Turn on OSD menu support.
-
---menu-cfg=<filename>
-    (OSD menu only)
-    Use an alternative menu.conf.
-
---menu-chroot=<path>
-    (OSD menu only)
-    Chroot the file selection menu to a specific location.
-
-    *EXAMPLE*: ``--menu-chroot=/home`` will restrict the file selection menu
-    to ``/home`` and downward (i.e. no access to ``/`` will be possible, but
-    ``/home/user_name`` will).
-
---menu-keepdir
-     (OSD menu only)
-     File browser starts from the last known location instead of current
-     directory.
-
---menu-root=<value>
-    (OSD menu only)
-    Specify the main menu.
-
---menu-startup
-    (OSD menu only)
-    Display the main menu at MPlayer startup.
-
 --mouse-movements
     Permit MPlayer to receive pointer events reported by the video output
     driver. Necessary to select the buttons in DVD menus. Supported for
