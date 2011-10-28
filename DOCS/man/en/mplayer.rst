@@ -481,7 +481,7 @@ GENERAL OPTIONS
 --noconfig=<options>
     Do not parse selected configuration files.
 
-    *NOTE*: If ``---include`` or ``---use-filedir-conf`` options are specified
+    *NOTE*: If ``--include`` or ``--use-filedir-conf`` options are specified
     at the command line, they will be honoured.
 
     Available options are:
@@ -602,7 +602,7 @@ PLAYER OPTIONS
 --crash-debug
     DEBUG CODE.
     Automatically attaches gdb upon crash or **SIGTRAP**. Support must be
-    compiled in by configuring with ``---enable-crash-debug``.
+    compiled in by configuring with ``--enable-crash-debug``.
 
 --doubleclick-time
     Time in milliseconds to recognize two consecutive button presses as a
