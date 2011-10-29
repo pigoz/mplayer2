@@ -798,9 +798,12 @@ PLAYER OPTIONS
     Print out a string before starting playback. The following expansions are
     supported:
 
-    :${NAME}:        Expand to the value of the property ``NAME``.
-    :?(NAME\:TEXT):  Expand ``TEXT`` only if the property ``NAME`` is available.
-    :?(!NAME\:TEXT): Expand ``TEXT`` only if the property ``NAME`` is not available.
+    ${NAME}
+        Expand to the value of the property ``NAME``.
+    ?(NAME:TEXT)
+        Expand ``TEXT`` only if the property ``NAME`` is available.
+    ?(!NAME:TEXT)
+        Expand ``TEXT`` only if the property ``NAME`` is not available.
 
 --playlist=<filename>
     Play files according to a playlist file (ASX, Winamp, SMIL, or
@@ -817,7 +820,7 @@ PLAYER OPTIONS
     *NOTE*: This option is considered an entry so options found after it will
     apply only to the elements of this playlist.
 
-.. FIXME: This needs to be clarified and documented thoroughly.
+    FIXME: This needs to be clarified and documented thoroughly.
 
 --rtc-device=<device>
     Use the specified device for RTC timing.
@@ -1112,9 +1115,12 @@ DEMUXER/STREAM OPTIONS
 
     *EXAMPLE*:
 
-    :-endpos 5 6:         Stop at 56 seconds.
-    :-endpos 0 1\:10\:00: Stop at 1 hour 10 minutes.
-    :-ss 10 -endpos 56:   Stop at 1 minute 6 seconds.
+    ``--endpos=56``
+        Stop at 56 seconds.
+    ``--endpos=01:10:00``
+        Stop at 1 hour 10 minutes.
+    ``--ss=10 --endpos=56``
+        Stop at 1 minute 6 seconds.
 
 --extbased, --no-extbased
     Enabled by default.
@@ -1456,8 +1462,10 @@ DEMUXER/STREAM OPTIONS
 
     *EXAMPLE*:
 
-    :-ss 56:         Seeks to 56 seconds.
-    :-ss 01\:10\:00: Seeks to 1 hour 10 min.
+    ``--ss=56``
+        Seeks to 56 seconds.
+    ``--ss=01:10:00``
+        Seeks to 1 hour 10 min.
 
 --tskeepbroken
     Tells MPlayer not to discard TS packets reported as broken in the stream.
@@ -1721,8 +1729,7 @@ DEMUXER/STREAM OPTIONS
 --vivo=<suboption>
     (DEBUG CODE)
     Force audio parameters for the VIVO demuxer (for debugging purposes).
-
-.. FIXME: Document this.
+    FIXME: Document this.
 
 
 OSD/SUBTITLE OPTIONS
@@ -2520,10 +2527,14 @@ VIDEO OUTPUT OPTIONS
 
     *EXAMPLE*:
 
-    :50:40:      Places the window at x=50, y=40.
-    :50%\:50%:   Places the window in the middle of the screen.
-    :100%:       Places the window at the middle of the right edge of the screen.
-    :100%\:100%: Places the window at the bottom right corner of the screen.
+    ``50:40``
+        Places the window at x=50, y=40.
+    ``50%:50%``
+        Places the window in the middle of the screen.
+    ``100%``
+        Places the window at the middle of the right edge of the screen.
+    ``100%:100%``
+        Places the window at the bottom right corner of the screen.
 
 --grabpointer, --no-grabpointer
     ``-no-grabpointer`` tells the player to not grab the mouse pointer after a
@@ -4562,14 +4573,16 @@ scale[=w:h[:interlaced[:chr_drop[:par[:par2[:presize[:noup[:arnd]]]]]]]]
         Set some scaling parameters depending on the type of scaler selected
         with ``--sws``.
 
-        :-sws 2 (bicubic):  B (blurring) and C (ringing)
-        :0.00\:0.60:        default
-        :0.00\:0.75:        VirtualDub's "precise bicubic"
-        :0.00\:0.50:        Catmull-Rom spline
-        :0.33\:0.33:        Mitchell-Netravali spline
-        :1.00\:0.00:        cubic B-spline
-        :-sws 7 (gaussian): sharpness (0 (soft) - 100 (sharp))
-        :-sws 9 (lanczos):  filter length (1-10)
+        | --sws=2 (bicubic):  B (blurring) and C (ringing)
+        |     0.00:0.60 default
+        |     0.00:0.75 VirtualDub's "precise bicubic"
+        |     0.00:0.50 Catmull-Rom spline
+        |     0.33:0.33 Mitchell-Netravali spline
+        |     1.00:0.00 cubic B-spline
+
+        --sws=7 (gaussian): sharpness (0 (soft) - 100 (sharp))
+
+        --sws=9 (lanczos):  filter length (1-10)
 
     <presize>
         Scale to preset sizes.
