@@ -107,7 +107,7 @@
 
 --aspect=<ratio>
     Override movie aspect ratio, in case aspect information is incorrect or
-    missing in the file being played.
+    missing in the file being played. See also ``--noaspect``.
 
     *EXAMPLE*:
 
@@ -281,8 +281,11 @@
     all video output drivers.
 
 --cache=<kBytes>
-    This option specifies how much memory (in kBytes) to use when precaching a
-    file or URL. Especially useful on slow media.
+    Enable caching of the input stream (if not already enabled) and set the
+    size of the cache in kilobytes. Caching is enabled by default (with a
+    default cache size) for network streams. May be useful when playing files
+    from slow media, but can also have negative effects, especially with file
+    formats that require a lot of seeking, such as mp4. See also ``--nocache``.
 
 --cache-min=<percentage>
     Playback will start when the cache has been filled up to <percentage> of
@@ -1294,7 +1297,8 @@
     files).
 
 --noaspect
-    Disable automatic movie aspect ratio compensation.
+    Ignore aspect ratio information from video file and assume the video has
+    square pixels. See also ``--aspect``.
 
 --nobps
     (Internal AVI demuxer which is not used by default only)
@@ -1302,7 +1306,7 @@
     files with broken header.
 
 --nocache
-    Turns off caching.
+    Turn off input stream caching. See ``--cache``.
 
 --nocolorkey
     Disables colorkeying. Only supported by the fbdev, svga, vesa, xmga,
