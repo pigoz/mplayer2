@@ -1430,7 +1430,8 @@
 --flip-hebrew
     Turns on flipping subtitles using FriBiDi.
 
---no-flip-hebrew-commas
+--flip-hebrew-commas, --no-flip-hebrew-commas
+    Enabled by default.
     Change FriBiDi's assumptions about the placements of commas in subtitles.
     Use this if commas in subtitles are shown at the start of a sentence
     instead of at the end.
