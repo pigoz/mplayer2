@@ -200,8 +200,8 @@
     skipped completely. May produce unwatchably choppy output. See also
     ``--hardframedrop``.
 
--h, --help
-    Show short summary of options.
+--help
+    Show short summary of options and key bindings.
 
 --hardframedrop
     More intense frame dropping (breaks decoding). Leads to image distortion!
@@ -2381,8 +2381,8 @@
     :``--vfm=xanim``:
         Try XAnim codecs first.
 
--x <x>
-    Scale image to width <x> (if software/hardware scaling is available).
+--x=<width>
+    Scale image to width <width> (if software/hardware scaling is available).
     Disables aspect calculations.
 
 --xvidopts=<option1:option2:...>
@@ -2413,8 +2413,8 @@
     :value>8:  Set width to value and calculate height to keep correct aspect
                ratio.
 
--y <y>
-    Scale image to height <y> (if software/hardware scaling is available).
+--y=<height>
+    Scale image to height <height> (if software/hardware scaling is available).
     Disables aspect calculations.
 
 --zoom
