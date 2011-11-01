@@ -222,3 +222,27 @@ eosd_skip_upload:
         state->targets_count++;
     }
 }
+
+// Calculate the bounding box of all sub-rectangles in the EOSD surface that
+// will be used for EOSD rendering.
+// If the bounding box is empty, return false.
+bool eosd_packer_calculate_source_bb(struct eosd_packer *state,
+                                     struct eosd_rect *out_bb)
+{
+    struct eosd_rect bb = { state->surface.w, state->surface.h, 0, 0 };
+
+    for (int n = 0; n < state->targets_count; n++) {
+        struct eosd_rect s = state->targets[n].source;
+        bb.x0 = FFMIN(bb.x0, s.x0);
+        bb.y0 = FFMIN(bb.y0, s.y0);
+        bb.x1 = FFMAX(bb.x1, s.x1);
+        bb.y1 = FFMAX(bb.y1, s.y1);
+    }
+
+    // avoid degenerate bounding box if empty
+    bb.x0 = FFMIN(bb.x0, bb.x1);
+    bb.y0 = FFMIN(bb.y0, bb.y1);
+
+    *out_bb = bb;
+    return state->targets_count > 0;
+}

@@ -65,5 +65,7 @@ void eosd_packer_reinit(struct eosd_packer *state, uint32_t max_width,
                         uint32_t max_height);
 void eosd_packer_generate(struct eosd_packer *state, mp_eosd_images_t *imgs,
                           bool *out_need_upload, bool *out_need_reallocate);
+bool eosd_packer_calculate_source_bb(struct eosd_packer *state,
+                                     struct eosd_rect *out_bb);
 
 #endif /* MPLAYER_EOSD_PACKER_H */
