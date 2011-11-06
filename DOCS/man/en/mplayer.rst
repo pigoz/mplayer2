@@ -516,10 +516,10 @@ jack
     name=<client
         Client name that is passed to JACK (default: MPlayer [<PID>]). Useful
         if you want to have certain connections established automatically.
-    (no)estimate
+    (no-)estimate
         Estimate the audio delay, supposed to make the video playback smoother
         (default: enabled).
-    (no)autostart
+    (no-)autostart
         Automatically start jackd if necessary (default: disabled). Note that
         this seems unreliable and will spam stdout with server messages.
 
@@ -575,7 +575,7 @@ kai (OS/2 only)
         Force UNIAUD mode.
     dart
         Force DART mode.
-    (no)share
+    (no-)share
         Open audio in shareable or exclusive mode.
     bufsize=<size>
         Set buffer size to <size> in samples (default: 2048).
@@ -583,7 +583,7 @@ kai (OS/2 only)
 dart (OS/2 only)
     OS/2 DART audio output driver
 
-    (no)share
+    (no-)share
         Open DART in shareable or exclusive mode.
     bufsize=<size>
         Set buffer size to <size> in samples (default: 2048).
@@ -611,7 +611,7 @@ null
 pcm
     raw PCM/wave file writer audio output
 
-    (no)waveheader
+    (no-)waveheader
         Include or do not include the wave header (default: included). When
         not included, raw PCM will be generated.
     file=<filename>
@@ -822,9 +822,9 @@ sdl (SDL only, buggy/outdated)
 
     driver=<driver>
         Explicitly choose the SDL driver to use.
-    (no)forcexv
+    (no-)forcexv
         Use XVideo through the sdl video output driver (default: forcexv).
-    (no)hwaccel
+    (no-)hwaccel
         Use hardware accelerated scaler (default: hwaccel).
 
 direct3d (Windows only) (BETA CODE!)
@@ -846,7 +846,7 @@ kva (OS/2 only)
         Force WarpOverlay! mode.
     dive
         Force DIVE mode.
-    (no)t23
+    (no-)t23
         Enable or disable workaround for T23 laptop (default: disabled). Try
         to enable this option if your video card supports upscaling only.
 
@@ -891,7 +891,7 @@ vesa
     Very general video output driver that should work on any VESA VBE 2.0
     compatible card.
 
-    (no)dga
+    (no-)dga
         Turns DGA mode on or off (default: on).
     neotv_pal
         Activate the NeoMagic TV out and set it to PAL norm.
@@ -930,16 +930,16 @@ gl
     even if you do not get any error message. Use ``glxinfo`` or a similar
     tool to display the supported OpenGL extensions.
 
-    (no)ati-hack
+    (no-)ati-hack
         ATI drivers may give a corrupted image when PBOs are used (when using
         ``--dr`` or `force-pbo`). This option fixes this, at the expense of
         using a bit more memory.
-    (no)force-pbo
+    (no-)force-pbo
         Always uses PBOs to transfer textures even if this involves an extra
         copy. Currently this gives a little extra speed with NVidia drivers
         and a lot more speed with ATI drivers. May need ``--no-slices`` and
         the ati-hack suboption to work correctly.
-    (no)scaled-osd
+    (no-)scaled-osd
         Changes the way the OSD behaves when the size of the window changes
         (default: disabled). When enabled behaves more like the other video
         output drivers, which is better for fixed-size fonts. Disabled looks
@@ -1090,13 +1090,13 @@ gl
     customtex=<filename>
         Load a custom "gamma ramp" texture from <filename>. This can be used
         in combination with yuv=4 or with the customprog option.
-    (no)customtlin
+    (no-)customtlin
         If enabled (default) use ``GL_LINEAR`` interpolation, otherwise use
         ``GL_NEAREST`` for customtex texture.
-    (no)customtrect
+    (no-)customtrect
         If enabled, use texture_rectangle for customtex texture. Default is
         disabled.
-    (no)mipmapgen
+    (no-)mipmapgen
         If enabled, mipmaps for the video are automatically generated. This
         should be useful together with the customprog and the TXB instruction
         to implement blur filters with a large radius. For most OpenGL
@@ -1106,10 +1106,10 @@ gl
     Normally there is no reason to use the following options, they mostly
     exist for testing purposes.
 
-    (no)glfinish
+    (no-)glfinish
         Call ``glFinish()`` before swapping buffers. Slower but in some cases
         more correct output (default: disabled).
-    (no)manyfmts
+    (no-)manyfmts
         Enables support for more (RGB and BGR) color formats (default:
         enabled). Needs OpenGL version >= 1.2.
     slice-height=<0-...>
@@ -1121,7 +1121,7 @@ gl
         setting has no effect, the size of the slices as provided by the
         decoder is used. If the decoder does not use slice rendering, the
         default is 16.
-    (no)osd
+    (no-)osd
         Enable or disable support for OSD rendering via OpenGL (default:
         enabled). This option is for testing; to disable the OSD use
         ``--osdlevel=0`` instead.
@@ -1161,7 +1161,7 @@ ggi
 directfb
     Play video using the DirectFB library.
 
-    (no)input
+    (no-)input
         Use the DirectFB instead of the MPlayer keyboard code (default:
         enabled).
     buffermode=single|double|triple
@@ -1185,21 +1185,21 @@ dfbmga
     library to make use of special hardware features. Enables CRTC2 (second
     head), displaying video independently of the first head.
 
-    (no)input
+    (no-)input
         same as directfb (default: disabled)
     buffermode=single|double|triple
         same as directfb (default: triple)
     fieldparity=top|bottom
         same as directfb
-    (no)bes
+    (no-)bes
         Enable the use of the Matrox BES (backend scaler) (default: disabled).
         Gives very good results concerning speed and output quality as
         interpolated picture processing is done in hardware. Works only on the
         primary head.
-    (no)spic
+    (no-)spic
         Make use of the Matrox sub picture layer to display the OSD (default:
         enabled).
-    (no)crtc2
+    (no-)crtc2
         Turn on TV-out on the second head (default: enabled). The output
         quality is amazing as it is a full interlaced picture with proper sync
         to every odd/even field.
