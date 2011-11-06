@@ -845,6 +845,19 @@
                the default behavior of arrow keys (default).
     :always:   Use precise seeks whenever possible.
 
+--hr-seek-demuxer-offset=<seconds>
+    This option exists to work around failures to do precise seeks (as in
+    ``--hr-seek``) caused by bugs or limitations in the demuxers for some file
+    formats. Some demuxers fail to seek to a keyframe before the given target
+    position, going to a later position instead. The value of this option is
+    subtracted from the time stamp given to the demuxer. Thus if you set this
+    option to 1.5 and try to do a precise seek to 60 seconds, the demuxer is
+    told to seek to time 58.5, which hopefully reduces the chance that it
+    erroneously goes to some time later than 60 seconds. The downside of
+    setting this option is that precise seeks become slower, as video between
+    the earlier demuxer position and the real target may be unnecessarily
+    decoded.
+
 --http-header-fields=<field1,field2>
     Set custom HTTP fields when accessing HTTP stream.
 
