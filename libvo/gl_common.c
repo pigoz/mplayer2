@@ -190,7 +190,7 @@ int glFindFormat(uint32_t fmt, int *bpp, GLint *gl_texfmt,
         break;
     case IMGFMT_420P16:
         supported = 0; // no native YUV support
-        *gl_texfmt = GL_LUMINANCE16;
+        *gl_texfmt = GL_R16;
         *bpp = 16;
         *gl_format = GL_LUMINANCE;
         *gl_type = GL_UNSIGNED_SHORT;
@@ -878,7 +878,8 @@ static void gen_spline_lookup_tex(GL *gl, GLenum unit)
 }
 
 static const char *sample_template =
-    "TEX $p0, $p1, $p2, $tex_type";
+    "TEX textemp, $p1, $p2, $tex_type;\n"
+    "MOV $p0, textemp.r";
 
 static const char *sample_2ch_hack_template =
     "TEX textemp, $p1, $p2, $tex_type;\n"
