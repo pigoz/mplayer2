@@ -91,6 +91,7 @@ struct gl_priv {
     int use_yuv;
     struct mp_csp_details colorspace;
     int is_yuv;
+    int yuv_bit_depth;
     int lscale;
     int cscale;
     float filter_strength;
@@ -103,6 +104,7 @@ struct gl_priv {
     uint32_t image_d_width;
     uint32_t image_d_height;
     int many_fmts;
+    int broken_16bit;
     int ati_hack;
     int force_pbo;
     int use_glFinish;
@@ -218,12 +220,13 @@ static void update_yuvconv(struct vo *vo)
     mp_csp_copy_equalizer_values(&cparams, &p->video_eq);
     gl_conversion_params_t params = {
         p->target, p->yuvconvtype, cparams,
-        p->texture_width, p->texture_height, 0, 0, p->filter_strength
+        p->texture_width, p->texture_height, 0, 0, p->filter_strength,
+        (p->broken_16bit && p->yuv_bit_depth > 8) ? p->yuv_bit_depth : 0,
     };
     mp_get_chroma_shift(p->image_format, &xs, &ys, &depth);
     params.chrom_texw = params.texw >> xs;
     params.chrom_texh = params.texh >> ys;
-    params.csp_params.input_shift = -depth & 7;
+    params.csp_params.input_shift = params.depth_2ch_hack ? 0 : -depth & 7;
     glSetupYUVConversion(gl, &params);
     if (p->custom_prog) {
         FILE *f = fopen(p->custom_prog, "rb");
@@ -488,6 +491,7 @@ static void autodetectGlExtensions(struct vo *vo)
     const char *version    = gl->GetString(GL_VERSION);
     const char *renderer   = gl->GetString(GL_RENDERER);
     int is_ati = vendor && strstr(vendor, "ATI") != NULL;
+    int is_intel_mesa = vendor && strstr(vendor, "Mesa DRI Intel") != NULL;
     int ati_broken_pbo = 0;
     mp_msg(MSGT_VO, MSGL_V, "[gl] Running on OpenGL '%s' by '%s', version '%s'\n",
            renderer, vendor, version);
@@ -503,6 +507,8 @@ static void autodetectGlExtensions(struct vo *vo)
         if (extensions && strstr(extensions, "_pixel_buffer_object"))
             p->force_pbo = is_ati;
     }
+    if (p->broken_16bit == -1)
+        p->broken_16bit = is_intel_mesa;
     if (p->use_rectangle == -1) {
         p->use_rectangle = 0;
         if (extensions) {
@@ -534,8 +540,9 @@ static void autodetectGlExtensions(struct vo *vo)
                " ATI cards.\n"
                "Tell _them_ to fix GL_REPEAT if you have issues.\n");
     mp_msg(MSGT_VO, MSGL_V, "[gl] Settings after autodetection: ati-hack = %i, "
-           "force-pbo = %i, rectangle = %i, yuv = %i\n",
-           p->ati_hack, p->force_pbo, p->use_rectangle, p->use_yuv);
+           "force-pbo = %i, rectangle = %i, yuv = %i, broken-16bit = %i\n",
+           p->ati_hack, p->force_pbo, p->use_rectangle, p->use_yuv,
+           p->broken_16bit);
 }
 
 static GLint get_scale_type(struct vo *vo, int chroma)
@@ -667,9 +674,15 @@ static int config(struct vo *vo, uint32_t width, uint32_t height,
     p->image_format = format;
     p->image_d_width = d_width;
     p->image_d_height = d_height;
-    p->is_yuv = mp_get_chroma_shift(p->image_format, &xs, &ys, NULL) > 0;
+    p->is_yuv = mp_get_chroma_shift(p->image_format, &xs, &ys,
+                                    &p->yuv_bit_depth) > 0;
     p->is_yuv |= (xs << 8) | (ys << 16);
     glFindFormat(format, NULL, &p->texfmt, &p->gl_format, &p->gl_type);
+    if (p->broken_16bit && p->texfmt == GL_LUMINANCE16) {
+        p->texfmt = GL_LUMINANCE_ALPHA;
+        p->gl_format = GL_LUMINANCE_ALPHA;
+        p->gl_type = GL_UNSIGNED_BYTE;
+    }
 
     p->vo_flipped = !!(flags & VOFLAG_FLIPPING);
 
@@ -1214,6 +1227,7 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
         {"lscale",       OPT_ARG_INT,  &p->lscale,       int_non_neg},
         {"cscale",       OPT_ARG_INT,  &p->cscale,       int_non_neg},
         {"filter-strength", OPT_ARG_FLOAT, &p->filter_strength, NULL},
+        {"broken-16bit", OPT_ARG_BOOL, &p->broken_16bit, NULL},
         {"ati-hack",     OPT_ARG_BOOL, &p->ati_hack,     NULL},
         {"force-pbo",    OPT_ARG_BOOL, &p->force_pbo,    NULL},
         {"glfinish",     OPT_ARG_BOOL, &p->use_glFinish, NULL},
@@ -1250,6 +1264,11 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
                "    0: use power-of-two textures\n"
                "    1: use texture_rectangle\n"
                "    2: use texture_non_power_of_two\n"
+               "  broken-16bit\n"
+               "    Workaround for drivers that don't sample from 16 bit\n"
+               "    textures with 16 bit precision. This might be needed with\n"
+               "    some drivers for playing back 10 bit pixel formats. This is\n"
+               "    enabled by default if Intel/Mesa drivers are detected.\n"
                "  ati-hack\n"
                "    Workaround ATI bug with PBOs\n"
                "  force-pbo\n"
