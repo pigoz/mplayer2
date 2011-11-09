@@ -112,7 +112,8 @@ int mp_fprintf(FILE *stream, const char *format, ...)
                 filetype &= ~(FILE_TYPE_REMOTE);
                 if (filetype == FILE_TYPE_CHAR)
                 {
-                    int ret = GetConsoleMode(wstream, NULL);
+                    DWORD ConsoleMode;
+                    int ret = GetConsoleMode(wstream, &ConsoleMode);
                     if (!ret && (GetLastError() == ERROR_INVALID_HANDLE))
                         isConsole = 0;
                     else
