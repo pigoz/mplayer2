@@ -743,33 +743,11 @@ vdpau (X11 only)
     pullup
         Try to apply inverse telecine, needs motion adaptive temporal
         deinterlacing.
-    colorspace=<0-3>
-        Select the color space for YUV to RGB conversion. In general BT.601
-        should be used for standard definition (SD) content and BT.709 for
-        high definition (HD) content. Using incorrect color space results in
-        slightly under or over saturated and shifted colors.
-
-        0
-            Guess the color space based on video resolution. Video with width
-            >= 1280 or height > 576 is assumed to be HD and BT.709 color space
-            will be used.
-        1
-            Use ITU-R BT.601 color space (default).
-        2
-            Use ITU-R BT.709 color space.
-        3
-            Use SMPTE-240M color space.
     hqscaling=<0-9>
         0
             Use default VDPAU scaling (default).
         1-9
             Apply high quality VDPAU scaling (needs capable hardware).
-    studio
-        Output video in studio level RGB (16-235). This is what TVs and video
-        monitors generally expect. By default PC level RGB (0-255) suitable
-        for PC monitors is used. Providing studio level output to a device
-        expecting PC level input results in grey blacks and dim whites, the
-        reverse in crushed blacks and whites.
     fps=<number>
         Override autodetected display refresh rate value (the value is needed
         for framedrop to allow video playback rates higher than display
@@ -980,10 +958,10 @@ gl
             Use software conversion. Compatible with all OpenGL versions.
             Provides brightness, contrast and saturation control.
         1
-            Use register combiners. This uses an nVidia-specific extension
-            (``GL_NV_register_combiners``). At least three texture units are
-            needed. Provides saturation and hue control. This method is fast
-            but inexact.
+            Same as 2. This used to use nVidia-specific extensions, which
+            didn't provide any advantages over using fragment programs, except
+            possibly on very ancient graphic cards. It produced a gray-ish
+            output, which is why it has been removed.
         2
             Use a fragment program. Needs the ``GL_ARB_fragment_program``
             extension and at least three texture units. Provides brightness,
@@ -1014,29 +992,6 @@ gl
             brightness, contrast, saturation, hue and gamma control. Gamma can
             also be set independently for red, green and blue. Speed depends
             more on GPU memory bandwidth than other methods.
-
-    colorspace
-        Select the color space for YUV to RGB conversion.
-
-        0
-            Use the formula used normally by MPlayer (default).
-        1
-            Use ITU-R BT.601 color space.
-        2
-            Use ITU-R BT.709 color space.
-        3
-            Use SMPTE-240M color space.
-
-    levelconv=<n>
-        Select the brightness level conversion to use for the YUV to RGB
-        conversion.
-
-        0
-            Convert TV to PC levels (default).
-        1
-            Convert PC to TV levels.
-        2
-            Do not do any conversion.
 
     lscale=<n>
         Select the scaling function to use for luminance scaling. Only valid
