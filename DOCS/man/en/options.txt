@@ -1769,6 +1769,24 @@
     Seek to byte position. Useful for playback from CD-ROM images or VOB files
     with junk at the beginning. See also ``--ss``.
 
+--screenshot-filetype=<type>
+    Set the image file type used for saving screenshots.
+
+    Available choices:
+
+    :png:   PNG (default)
+    :jpg:   JPEG
+    :jpeg:  JPEG (same as jpg, but with .jpeg file ending)
+
+--screenshot-jpeg-quality=<0-100>
+    Set the JPEG quality level. Higher means better quality. The default is 85.
+
+--screenshot-png-compression=<0-9>
+    Set the PNG compression level. Higher means better compression. This will
+    affect the file size of the written screenshot file, and the time it takes
+    to write a screenshot. Too high compression might occupy enough CPU time to
+    interrupt playback. The default is 7.
+
 --screenh=<pixels>
     Specify the screen height for video output drivers which do not know the
     screen resolution like fbdev, x11 and TV-out.
