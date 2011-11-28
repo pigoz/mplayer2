@@ -393,18 +393,21 @@
     BT.709 for HD video. (This is done by default.) Using incorrect color space
     results in slightly under or over saturated and shifted colors.
 
-    This option is not always supported. Different video outputs provide
+    The color space conversion is additionally influenced by the related options
+    --colormatrix-input-range and --colormatrix-output-range.
+
+    These options is not always supported. Different video outputs provide
     varying degrees of support. The gl and vdpau video output drivers usually
     offer full support. The xv output can set the color space if the system
-    video driver supports it, but not input or output levels. The scale video
-    filter provides color space and input levels, but only if the output format
-    is RGB. (If the video output driver supports RGB output, you can force this
-    with: ``-vf scale,format=rgba``)
+    video driver supports it, but not input and output levels. The scale video
+    filter can configure color space and input levels, but only if the output
+    format is RGB. (If the video output driver supports RGB output, you can
+    force this with ``-vf scale,format=rgba``)
 
     If this option is set to ``auto`` (which is the default), the color space
-    will be guessed using a simple heuristic, that attempts to distinguish
-    SD and HD video.If the video is larger than 1279x576 pixels, BT.709 (HD)
-    will be used, otherwise BT.601 (SD) is selected.
+    will be selected automatically. This is done using a simple heuristic, that
+    attempts to distinguish SD and HD video.If the video is larger than 1279x576
+    pixels, BT.709 (HD) will be used, otherwise BT.601 (SD) is selected.
 
     Available color spaces are:
 
