@@ -1807,10 +1807,11 @@
 
     Allowed format specifiers:
 
-    ``%n``
-        A sequence number, padded with zeros to length 4, e.g. ``0012``. The
-        number is incremented every time a screenshot is taken, or if the file
-        already exists.
+    ``%nX``
+        A sequence number, padded with zeros to length X. E.g. passing the
+        format ``%n4`` will yield ``0012`` on the 12th screenshot. The number is
+        incremented every time a screenshot is taken, or if the file already
+        exists. The length ``X`` must be in the range 0-9.
     ``%f``
         Filename of the currently played video.
     ``%F``
