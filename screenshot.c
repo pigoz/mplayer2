@@ -254,6 +254,33 @@ static char *format_time(void *talloc_ctx, double time, bool sub_seconds)
     return res;
 }
 
+#ifdef _WIN32
+#define ILLEGAL_FILENAME_CHARS "?\"/\\<>*|:"
+#else
+#define ILLEGAL_FILENAME_CHARS "/"
+#endif
+
+// Replace all characters disallowed in filenames with '_' and return the newly
+// allocated result string.
+static char *sanitize_filename(void *talloc_ctx, const char *s)
+{
+    char *res = talloc_strdup(talloc_ctx, s);
+    char *cur = res;
+    while (*cur) {
+        if (strchr(ILLEGAL_FILENAME_CHARS, *cur) || ((unsigned char)*cur) < 32)
+            *cur = '_';
+        cur++;
+    }
+    return res;
+}
+
+static void append_filename(char **s, const char *f)
+{
+    char *append = sanitize_filename(NULL, f);
+    *s = talloc_strdup_append(*s, append);
+    talloc_free(append);
+}
+
 static char *create_fname(screenshot_ctx *ctx, int *out_uses_frameno)
 {
     char *template = ctx->mpctx->opts.screenshot_template;
@@ -292,14 +319,14 @@ static char *create_fname(screenshot_ctx *ctx, int *out_uses_frameno)
                 char *name = video_file;
                 if (fmt == 'F')
                     name = stripext(res, video_file);
-                res = talloc_strdup_append(res, name);
+                append_filename(&res, name);
             }
             talloc_free(video_file);
             break;
         }
         case 'p':
         case 'P':
-            res = talloc_strdup_append(res,
+            append_filename(&res,
                     format_time(res, get_current_time(ctx->mpctx), fmt == 'P'));
             break;
         case 't': {
@@ -311,7 +338,7 @@ static char *create_fname(screenshot_ctx *ctx, int *out_uses_frameno)
             char buffer[20];
             if (strftime(buffer, sizeof(buffer), fmtstr, local_time) == 0)
                 buffer[0] = '\0';
-            res = talloc_asprintf_append(res, "%s", buffer);
+            append_filename(&res, buffer);
             break;
         }
         case '%':
