@@ -2023,7 +2023,7 @@ rectangle[=w:h:x:y]
     <x>,<y>
         top left corner position (default: -1, uppermost leftmost)
 
-expand[=w:h:x:y:o:a:r]
+expand[=w:h:x:y:osd:aspect:round]
     Expands (not scales) movie resolution to the given value and places the
     unscaled original at coordinates x, y. Can be used for placing
     subtitles/OSD in the resulting black bands.
@@ -2040,13 +2040,13 @@ expand[=w:h:x:y:o:a:r]
     <x>,<y>
         position of original image on the expanded image (default: center)
 
-    <o>
+    <osd>
         OSD/subtitle rendering
 
         :0: disable (default)
         :1: enable
 
-    <a>
+    <aspect>
         Expands to fit an aspect instead of a resolution (default: 0).
 
         *EXAMPLE*:
@@ -2055,7 +2055,7 @@ expand[=w:h:x:y:o:a:r]
             Expands to 800x600, unless the source is higher resolution, in
             which case it expands to fill a 4/3 aspect.
 
-    <r>
+    <round>
         Rounds up to make both width and height divisible by <r> (default: 1).
 
 flip
