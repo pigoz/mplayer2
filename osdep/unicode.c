@@ -100,7 +100,7 @@ int mp_fprintf(FILE *stream, const char *format, ...)
 //http://git.libav.org/?p=libav.git;a=blob;f=libavformat/os_support.c;h=a0fcd6c9ba2be4b0dbcc476f6c53587345cc1152;hb=HEAD#l30
 //http://git.libav.org/?p=libav.git;a=blob;f=cmdutils.c;h=ade3f10ce2fc030e32e375a85fbd06c26d43a433#l161
 
-static wchar_t *to_utf16(void *talloc_ctx, const char *s, int *out_nwchars)
+wchar_t *mp_to_utf16(void *talloc_ctx, const char *s, int *out_nwchars)
 {
     int count = MultiByteToWideChar(CP_UTF8, 0, s, -1, NULL, 0);
     if (count <= 0)
@@ -112,7 +112,7 @@ static wchar_t *to_utf16(void *talloc_ctx, const char *s, int *out_nwchars)
     return ret;
 }
 
-static char *to_utf8(void *talloc_ctx, const wchar_t *s)
+char *mp_to_utf8(void *talloc_ctx, const wchar_t *s)
 {
     int count = WideCharToMultiByte(CP_UTF8, 0, s, -1, NULL, 0, NULL, NULL);
     if (count <= 0)
@@ -124,7 +124,7 @@ static char *to_utf8(void *talloc_ctx, const wchar_t *s)
 
 int mp_open(const char *pathname, int flags, int mode)
 {
-    wchar_t *wpath = to_utf16(NULL, pathname, NULL);
+    wchar_t *wpath = mp_to_utf16(NULL, pathname, NULL);
     int res = _wopen(wpath, flags, mode);
     talloc_free(wpath);
     return res;
@@ -132,8 +132,8 @@ int mp_open(const char *pathname, int flags, int mode)
 
 FILE *mp_fopen(const char *pathname, const char *mode)
 {
-    wchar_t *wpath = to_utf16(NULL, pathname, NULL);
-    wchar_t *wmode = to_utf16(wpath, mode, NULL);
+    wchar_t *wpath = mp_to_utf16(NULL, pathname, NULL);
+    wchar_t *wmode = mp_to_utf16(wpath, mode, NULL);
     FILE *res = _wfopen(wpath, wmode);
     talloc_free(wpath);
     return res;
@@ -141,7 +141,7 @@ FILE *mp_fopen(const char *pathname, const char *mode)
 
 MP_DIR *mp_opendir(const char *pathname)
 {
-    wchar_t *wpath = to_utf16(NULL, pathname, NULL);
+    wchar_t *wpath = mp_to_utf16(NULL, pathname, NULL);
     _WDIR *res = _wopendir(wpath);
     talloc_free(wpath);
     return (MP_DIR *)res;
@@ -152,7 +152,7 @@ char *mp_readdir(MP_DIR *dirp, void *talloc_ctx)
     struct _wdirent *ent = _wreaddir((_WDIR *)dirp);
     if (!ent)
         return NULL;
-    return to_utf8(talloc_ctx, ent->d_name);
+    return mp_to_utf8(talloc_ctx, ent->d_name);
 }
 
 int mp_closedir(MP_DIR *dirp)
@@ -162,7 +162,7 @@ int mp_closedir(MP_DIR *dirp)
 
 int mp_mkdir(const char *pathname, int mode)
 {
-    wchar_t *wpath = to_utf16(NULL, pathname, NULL);
+    wchar_t *wpath = mp_to_utf16(NULL, pathname, NULL);
     int res = _wmkdir(wpath);
     talloc_free(wpath);
     return res;
@@ -170,7 +170,7 @@ int mp_mkdir(const char *pathname, int mode)
 
 int mp_file_exists(const char *pathname)
 {
-    wchar_t *wpath = to_utf16(NULL, pathname, NULL);
+    wchar_t *wpath = mp_to_utf16(NULL, pathname, NULL);
     struct _stat st;
     int res = _wstat(wpath, &st) == 0;
     talloc_free(wpath);
@@ -191,7 +191,7 @@ void mp_get_converted_argv(int *argc, char ***argv)
         win32_argv_utf8 = talloc_zero_array(NULL, char*, win32_argc + 1);
 
         for (int i = 0; i < win32_argc; i++) {
-            win32_argv_utf8[i] = to_utf8(NULL, argv_w[i]);
+            win32_argv_utf8[i] = mp_to_utf8(NULL, argv_w[i]);
         }
 
         LocalFree(argv_w);
@@ -240,7 +240,7 @@ int mp_fprintf(FILE *stream, const char *format, ...)
                     if (buf)
                     {
                         vsnprintf(buf, nchars, format, args);
-                        wchar_t *out = to_utf16(NULL, buf, &nchars);
+                        wchar_t *out = mp_to_utf16(NULL, buf, &nchars);
                         talloc_free(buf);
                         done = WriteConsoleW(wstream, out, nchars - 1, NULL, NULL);
                         talloc_free(out);

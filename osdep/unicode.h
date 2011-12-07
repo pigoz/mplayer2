@@ -45,4 +45,9 @@ void mp_get_converted_argv(int *argc, char ***argv);
 
 int mp_fprintf(FILE *stream, const char *format, ...);
 
+#ifdef _WIN32
+wchar_t *mp_to_utf16(void *talloc_ctx, const char *s, int *out_nwchars);
+char *mp_to_utf8(void *talloc_ctx, const wchar_t *s);
+#endif
+
 #endif /* MPLAYER_UNICODE_H */
