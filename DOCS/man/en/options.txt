@@ -156,8 +156,7 @@
     :0-3 + 4: The same, but hinting will only be performed if the OSD is
               rendered at screen resolution and will therefore not be scaled.
 
-    The default value is 5 (use light hinter for unscaled OSD and no hinting
-    otherwise).
+    The default value is 0 (no hinting).
 
 --ass-line-spacing=<value>
     Set line spacing value for SSA/ASS renderer.
