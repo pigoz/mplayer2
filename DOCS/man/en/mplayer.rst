@@ -3239,12 +3239,14 @@ screenshot
     can be bound to keypresses. See the slave mode documentation and the
     ``INTERACTIVE CONTROL`` section for details. Files named ``shotNNNN.png``
     will be saved in the working directory, using the first available number -
-    no files will be overwritten. The filter has no overhead when not used and
-    accepts an arbitrary colorspace, so it is safe to add it to the
-    configuration file. Make sure that the screenshot filter is added after
-    all other filters whose effect you want to record on the saved image. E.g.
-    it should be the last filter if you want to have an exact screenshot of
-    what you see on the monitor.
+    no files will be overwritten. The filter has no overhead when not used. It
+    does however break playback in some cases, especially VDPAU hardware
+    decoding is incompatible with the filter. Thus it is not completely safe to
+    add the filter to default configuration "just in case you might want to
+    take screenshots". Make sure that the screenshot filter is added after all
+    other filters whose effect you want to record on the saved image. E.g. it
+    should be the last filter if you want to have an exact screenshot of what
+    you see on the monitor.
 
 ass
     Moves SSA/ASS subtitle rendering to an arbitrary point in the filter
