@@ -3281,6 +3281,13 @@ Do not grab the mouse pointer after a video mode change (\-vm).
 Useful for multihead setups.
 .
 .TP
+.B "\-cursor-autohide-delay <delay>\ "
+Makes mouse cursor automatically hide after given number of milliseconds.
+A value of -1 will disable cursor autohide.
+A value of -2 will prevent the cursor to show itself on mouse movement.
+Supported by video output drivers which use X11 and Cocoa.
+.
+.TP
 .B \-nokeepaspect
 Do not keep window aspect ratio when resizing windows.
 By default MPlayer tries to keep the correct video aspect ratio by
