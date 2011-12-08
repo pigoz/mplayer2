@@ -782,14 +782,15 @@ static int check_resize(struct vo *vo)
 int vo_x11_check_events(struct vo *vo)
 {
     struct vo_x11_state *x11 = vo->x11;
+    struct MPOpts *opts = vo->opts;
     Display *display = vo->x11->display;
     int ret = 0;
     XEvent Event;
     char buf[100];
     KeySym keySym;
 
-    if (x11->vo_mouse_autohide && x11->mouse_waiting_hide &&
-                                 (GetTimerMS() - x11->mouse_timer >= 1000)) {
+    if (x11->vo_mouse_autohide && x11->mouse_waiting_hide && opts->cursor_autohide_delay != -1 &&
+        (GetTimerMS() - x11->mouse_timer >= opts->cursor_autohide_delay)) {
         vo_hidecursor(display, x11->window);
         x11->mouse_waiting_hide = 0;
     }
@@ -833,7 +834,7 @@ int vo_x11_check_events(struct vo *vo)
             case MotionNotify:
                     vo_mouse_movement(vo, Event.xmotion.x, Event.xmotion.y);
 
-                if (x11->vo_mouse_autohide)
+                if (x11->vo_mouse_autohide && opts->cursor_autohide_delay > -2)
                 {
                     vo_showcursor(display, x11->window);
                     x11->mouse_waiting_hide = 1;
@@ -841,7 +842,7 @@ int vo_x11_check_events(struct vo *vo)
                 }
                 break;
             case ButtonPress:
-                if (x11->vo_mouse_autohide)
+                if (x11->vo_mouse_autohide && opts->cursor_autohide_delay > -2)
                 {
                     vo_showcursor(display, x11->window);
                     x11->mouse_waiting_hide = 1;
@@ -852,7 +853,7 @@ int vo_x11_check_events(struct vo *vo)
                                 | MP_KEY_DOWN);
                 break;
             case ButtonRelease:
-                if (x11->vo_mouse_autohide)
+                if (x11->vo_mouse_autohide && opts->cursor_autohide_delay > -2)
                 {
                     vo_showcursor(display, x11->window);
                     x11->mouse_waiting_hide = 1;
