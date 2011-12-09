@@ -292,10 +292,11 @@ static void genEOSD(struct vo *vo, mp_eosd_images_t *imgs)
     struct gl_priv *p = vo->priv;
     GL *gl = p->gl;
 
-    bool need_upload, need_allocate;
-    eosd_packer_generate(p->eosd, imgs, &need_upload, &need_allocate);
+    bool need_repos, need_upload, need_allocate;
+    eosd_packer_generate(p->eosd, imgs, &need_repos, &need_upload,
+                         &need_allocate);
 
-    if (!need_upload)
+    if (!need_repos)
         return;
 
     if (!p->eosd_texture) {

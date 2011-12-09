@@ -133,17 +133,21 @@ static int pack_rectangles(struct eosd_target *rects, int num_rects,
 #define EOSD_PADDING 0
 
 // Release all previous images, and packs the images in imgs into state. The
-// caller must check *out_need_upload, and if it's set to true, upload all
-// images again. If *out_need_reallocate is true, the caller must resize the
-// EOSD texture to state->surface.w/h.
+// caller must check the change variables:
+// *out_need_reposition == true: sub-image positions changed
+// *out_need_upload == true: upload all sub-images again
+// *out_need_reallocate == true: resize the EOSD texture to state->surface.w/h
+// Logical implications: need_reallocate => need_upload => need_reposition
 void eosd_packer_generate(struct eosd_packer *state, mp_eosd_images_t *imgs,
-                          bool *out_need_upload, bool *out_need_reallocate)
+                          bool *out_need_reposition, bool *out_need_upload,
+                          bool *out_need_reallocate)
 {
     int i;
     ASS_Image *img = imgs->imgs;
     ASS_Image *p;
     struct eosd_surface *sfc = &state->surface;
 
+    *out_need_reposition = false;
     *out_need_upload = false;
     *out_need_reallocate = false;
 
@@ -157,6 +161,8 @@ void eosd_packer_generate(struct eosd_packer *state, mp_eosd_images_t *imgs,
         return; // Nothing changed, no need to redraw
 
     state->targets_count = 0;
+
+    *out_need_reposition = true;
 
     if (!img)
         return; // There's nothing to render!
