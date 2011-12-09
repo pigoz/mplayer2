@@ -1058,8 +1058,8 @@ static void generate_eosd(struct vo *vo, mp_eosd_images_t *imgs)
     struct eosd_packer *packer = vc->eosd_packer;
     int i;
 
-    bool need_upload, need_resize;
-    eosd_packer_generate(packer, imgs, &need_upload, &need_resize);
+    bool need_repos, need_upload, need_resize;
+    eosd_packer_generate(packer, imgs, &need_repos, &need_upload, &need_resize);
 
     if (!need_upload)
         return;
