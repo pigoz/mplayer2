@@ -16,6 +16,18 @@
 #include "osx_common.h"
 #include "mp_msg.h"
 
+#ifndef NSOpenGLPFAOpenGLProfile
+#define NSOpenGLPFAOpenGLProfile 99
+#endif
+
+#ifndef NSOpenGLProfileVersionLegacy
+#define NSOpenGLProfileVersionLegacy 0x1000
+#endif
+
+#ifndef NSOpenGLProfileVersion3_2Core
+#define NSOpenGLProfileVersion3_2Core 0x3200
+#endif
+
 #define NSLeftAlternateKeyMask (0x000020 | NSAlternateKeyMask)
 #define NSRightAlternateKeyMask (0x000040 | NSAlternateKeyMask)
 
@@ -142,7 +154,8 @@ void resize_window(struct vo *vo)
 }
 
 int vo_cocoa_create_window(struct vo *vo, uint32_t d_width,
-                           uint32_t d_height, uint32_t flags)
+                           uint32_t d_height, uint32_t flags,
+                           int gl3profile, const char *title)
 {
     if (s->current_video_size.width > 0 || s->current_video_size.height > 0)
         s->previous_video_size = s->current_video_size;
@@ -156,6 +169,7 @@ int vo_cocoa_create_window(struct vo *vo, uint32_t d_width,
         GLMPlayerOpenGLView *glView = [[GLMPlayerOpenGLView alloc] initWithFrame:NSMakeRect(0, 0, 100, 100)];
 
         NSOpenGLPixelFormatAttribute attrs[] = {
+            NSOpenGLPFAOpenGLProfile, (gl3profile ? NSOpenGLProfileVersion3_2Core : NSOpenGLProfileVersionLegacy),
             NSOpenGLPFADoubleBuffer, // double buffered
             NSOpenGLPFADepthSize, (NSOpenGLPixelFormatAttribute)16, // 16 bit depth buffer
             (NSOpenGLPixelFormatAttribute)0
