@@ -44,6 +44,10 @@
 // This old-vo wrapper macro would conflict with the struct member
 #undef update_xinerama_info
 #endif
+#ifdef CONFIG_GL_EGL_X11
+#include <EGL/egl.h>
+#include "x11_common.h"
+#endif
 #include <GL/gl.h>
 
 // workaround for some gl.h headers
@@ -367,6 +371,7 @@ enum MPGLType {
     GLTYPE_W32,
     GLTYPE_X11,
     GLTYPE_SDL,
+    GLTYPE_EGL_X11,
 };
 
 typedef struct MPGLContext {
@@ -385,6 +390,9 @@ typedef struct MPGLContext {
 #endif
 #ifdef CONFIG_GL_X11
         GLXContext x11;
+#endif
+#ifdef CONFIG_GL_EGL_X11
+        EGLContext egl;
 #endif
     } context;
     int (*create_window)(struct MPGLContext *ctx, uint32_t d_width,
@@ -411,10 +419,7 @@ struct GL {
     void (GLAPIENTRY *Viewport)(GLint, GLint, GLsizei, GLsizei);
     void (GLAPIENTRY *MatrixMode)(GLenum);
     void (GLAPIENTRY *LoadIdentity)(void);
-    void (GLAPIENTRY *Translated)(double, double, double);
-    void (GLAPIENTRY *Scaled)(double, double, double);
-    void (GLAPIENTRY *Ortho)(double, double, double, double, double,double);
-    void (GLAPIENTRY *Frustum)(double, double, double, double, double, double);
+    void (GLAPIENTRY *LoadMatrixf)(float *);
     void (GLAPIENTRY *PushMatrix)(void);
     void (GLAPIENTRY *PopMatrix)(void);
     void (GLAPIENTRY *Clear)(GLbitfield);
@@ -465,6 +470,12 @@ struct GL {
     void (GLAPIENTRY *ReadPixels)(GLint, GLint, GLsizei, GLsizei, GLenum,
                                   GLenum, GLvoid *);
     void (GLAPIENTRY *ReadBuffer)(GLenum);
+    void (GLAPIENTRY *VertexPointer)(GLint, GLenum, GLsizei, const GLvoid *);
+    void (GLAPIENTRY *TexCoordPointer)(GLint, GLenum, GLsizei, const GLvoid *);
+    void (GLAPIENTRY *ClientActiveTexture)(GLenum);
+    void (GLAPIENTRY *EnableClientState)(GLenum);
+    void (GLAPIENTRY *DisableClientState)(GLenum);
+    void (GLAPIENTRY *DrawArrays)(GLenum, GLint, GLsizei);
 
     // OpenGL extension functions
     void (GLAPIENTRY *GenBuffers)(GLsizei, GLuint *);

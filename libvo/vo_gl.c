@@ -144,6 +144,14 @@ static void resize(struct vo *vo, int x, int y)
     struct gl_priv *p = vo->priv;
     GL *gl = p->gl;
 
+    // simple orthogonal projection for 0-image_width;0-image_height
+    float matrix[16] = {
+        2.0/p->image_width,   0, 0, 0,
+        0, -2.0/p->image_height, 0, 0,
+        0, 0, 0, 0,
+        -1, 1, 0, 1
+    };
+
     mp_msg(MSGT_VO, MSGL_V, "[gl] Resize: %dx%d\n", x, y);
     if (WinID >= 0) {
         int left = 0, top = 0, w = x, h = y;
@@ -154,7 +162,6 @@ static void resize(struct vo *vo, int x, int y)
         gl->Viewport(0, 0, x, y);
 
     gl->MatrixMode(GL_PROJECTION);
-    gl->LoadIdentity();
     p->ass_border_x = p->ass_border_y = 0;
     if (aspect_scaling()) {
         int new_w, new_h;
@@ -165,11 +172,14 @@ static void resize(struct vo *vo, int x, int y)
         new_h += vo->panscan_y;
         scale_x = (GLdouble)new_w / (GLdouble)x;
         scale_y = (GLdouble)new_h / (GLdouble)y;
-        gl->Scaled(scale_x, scale_y, 1);
+        matrix[0]  *= scale_x;
+        matrix[12] *= scale_x;
+        matrix[5]  *= scale_y;
+        matrix[13] *= scale_y;
         p->ass_border_x = (vo->dwidth - new_w) / 2;
         p->ass_border_y = (vo->dheight - new_h) / 2;
     }
-    gl->Ortho(0, p->image_width, p->image_height, 0, -1, 1);
+    gl->LoadMatrixf(matrix);
 
     gl->MatrixMode(GL_MODELVIEW);
     gl->LoadIdentity();
@@ -578,7 +588,8 @@ static int initGl(struct vo *vo, uint32_t d_width, uint32_t d_height)
     gl->DepthMask(GL_FALSE);
     gl->Disable(GL_CULL_FACE);
     gl->Enable(p->target);
-    gl->DrawBuffer(vo_doublebuffering ? GL_BACK : GL_FRONT);
+    if (gl->DrawBuffer)
+        gl->DrawBuffer(vo_doublebuffering ? GL_BACK : GL_FRONT);
     gl->TexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 
     mp_msg(MSGT_VO, MSGL_V, "[gl] Creating %dx%d texture...\n",
@@ -793,10 +804,16 @@ static void do_render_osd(struct vo *vo, int type)
         return;
     // set special rendering parameters
     if (!p->scaled_osd) {
+        // simple orthogonal projection for 0-vo_dwidth;0-vo_dheight
+        float matrix[16] = {
+            2.0/vo->dwidth,   0, 0, 0,
+            0, -2.0/vo->dheight, 0, 0,
+            0,  0, 0, 0,
+            -1, 1, 0, 1
+        };
         gl->MatrixMode(GL_PROJECTION);
         gl->PushMatrix();
-        gl->LoadIdentity();
-        gl->Ortho(0, vo->dwidth, vo->dheight, 0, -1, 1);
+        gl->LoadMatrixf(matrix);
     }
     gl->Enable(GL_BLEND);
     if (draw_eosd) {

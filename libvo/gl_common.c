@@ -46,6 +46,7 @@
 #include "pnm_loader.h"
 #include "options.h"
 
+
 //! \defgroup glgeneral OpenGL general helper functions
 
 //! \defgroup glcontext OpenGL context management helper functions
@@ -297,8 +298,14 @@ typedef struct {
     void *fallback;
 } extfunc_desc_t;
 
+#if !defined(CONFIG_GL_WIN32) && !defined(CONFIG_GL_X11)
+#define DEF_FUNC_DESC(name) \
+    {offsetof(GL, name), NULL, {"gl" # name, NULL}, NULL}
+#else
 #define DEF_FUNC_DESC(name) \
     {offsetof(GL, name), NULL, {"gl" # name, NULL}, gl ## name}
+#endif
+
 #define DEF_EXT_FUNCS(...) __VA_ARGS__
 #define DEF_EXT_DESC(name, ext, funcnames) \
     {offsetof(GL, name), ext, {DEF_EXT_FUNCS funcnames}}
@@ -311,10 +318,7 @@ static const extfunc_desc_t extfuncs[] = {
     DEF_FUNC_DESC(Viewport),
     DEF_FUNC_DESC(MatrixMode),
     DEF_FUNC_DESC(LoadIdentity),
-    DEF_FUNC_DESC(Translated),
-    DEF_FUNC_DESC(Scaled),
-    DEF_FUNC_DESC(Ortho),
-    DEF_FUNC_DESC(Frustum),
+    DEF_FUNC_DESC(LoadMatrixf),
     DEF_FUNC_DESC(PushMatrix),
     DEF_FUNC_DESC(PopMatrix),
     DEF_FUNC_DESC(Clear),
@@ -359,6 +363,13 @@ static const extfunc_desc_t extfuncs[] = {
     DEF_FUNC_DESC(ColorMask),
     DEF_FUNC_DESC(ReadPixels),
     DEF_FUNC_DESC(ReadBuffer),
+    // Things needed to run on GLES
+    DEF_FUNC_DESC(VertexPointer),
+    DEF_FUNC_DESC(TexCoordPointer),
+    DEF_FUNC_DESC(ClientActiveTexture),
+    DEF_FUNC_DESC(EnableClientState),
+    DEF_FUNC_DESC(DisableClientState),
+    DEF_FUNC_DESC(DrawArrays),
 
     DEF_EXT_DESC(GenBuffers, NULL,
                  ("glGenBuffers", "glGenBuffersARB")),
@@ -1643,6 +1654,36 @@ void glDrawTex(GL *gl, GLfloat x, GLfloat y, GLfloat w, GLfloat h,
         y += h;
         h = -h;
     }
+
+    if (!gl->Begin) {
+        GLfloat vertices  [8] = { x,   y,   x,   y  +  h,   x  +  w,   y,   x  +  w,   y  +  h};
+        GLfloat texcoords [8] = {tx,  ty,  tx,  ty  + th,  tx  + tw,  ty,  tx  + tw,  ty  + th};
+        GLfloat texcoords2[8] = {tx2, ty2, tx2, ty2 + th2, tx2 + tw2, ty2, tx2 + tw2, ty2 + th2};
+        gl->EnableClientState(GL_VERTEX_ARRAY);
+        gl->VertexPointer(2, GL_FLOAT, 0, vertices);
+        gl->EnableClientState(GL_TEXTURE_COORD_ARRAY);
+        gl->TexCoordPointer(2, GL_FLOAT, 0, texcoords);
+        if (is_yv12) {
+            gl->ClientActiveTexture(GL_TEXTURE1);
+            gl->EnableClientState(GL_TEXTURE_COORD_ARRAY);
+            gl->TexCoordPointer(2, GL_FLOAT, 0, texcoords2);
+            gl->ClientActiveTexture(GL_TEXTURE2);
+            gl->EnableClientState(GL_TEXTURE_COORD_ARRAY);
+            gl->TexCoordPointer(2, GL_FLOAT, 0, texcoords2);
+            gl->ClientActiveTexture(GL_TEXTURE0);
+        }
+        gl->DrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+        if (is_yv12) {
+            gl->ClientActiveTexture(GL_TEXTURE1);
+            gl->DisableClientState(GL_TEXTURE_COORD_ARRAY);
+            gl->ClientActiveTexture(GL_TEXTURE2);
+            gl->DisableClientState(GL_TEXTURE_COORD_ARRAY);
+            gl->ClientActiveTexture(GL_TEXTURE0);
+        }
+        gl->DisableClientState(GL_VERTEX_ARRAY);
+        return;
+    }
+
     gl->Begin(GL_QUADS);
     gl->TexCoord2f(tx, ty);
     if (is_yv12) {
@@ -2028,6 +2069,107 @@ static void swapGlBuffers_x11(MPGLContext *ctx)
 }
 #endif
 
+#ifdef CONFIG_GL_EGL_X11
+static EGLDisplay eglDisplay = EGL_NO_DISPLAY;
+static EGLSurface eglSurface = EGL_NO_SURFACE;
+
+static int create_window_egl(MPGLContext *ctx, uint32_t d_width,
+                             uint32_t d_height, uint32_t flags)
+{
+    XVisualInfo vinfo = { .visual = CopyFromParent, .depth = CopyFromParent };
+    vo_x11_create_vo_window(ctx->vo, &vinfo, ctx->vo->dx, ctx->vo->dy, d_width,
+                            d_height, flags, CopyFromParent, "gl");
+    return 0;
+}
+
+/*
+ * Some genius thought it a good idea to make
+ * eglGetProcAddress not work for core functions.
+ * So we have to use a non-portable way that in addition
+ * might also return symbols from a different library
+ * that the one providing the current context, great job!
+ */
+static void *eglgpa(const GLubyte *name) {
+    void *res = eglGetProcAddress(name);
+    if (!res) {
+        void *h = dlopen("/usr/lib/libGLESv1_CM.so", RTLD_LAZY);
+        res = dlsym(h, name);
+        dlclose(h);
+    }
+    return res;
+}
+
+static int setGlWindow_egl(MPGLContext *ctx)
+{
+    static const EGLint cfg_attribs[] = { EGL_NONE };
+    static const EGLint ctx_attribs[] = { EGL_NONE };
+    EGLContext *context = &ctx->context.egl;
+    Window win = ctx->vo->x11->window;
+    GL *gl = ctx->gl;
+    EGLContext new_context = NULL;
+    EGLConfig eglConfig;
+    int num_configs;
+    if (eglDisplay == EGL_NO_DISPLAY) {
+        eglDisplay = eglGetDisplay(ctx->vo->x11->display);
+        if (eglDisplay == EGL_NO_DISPLAY) {
+            mp_msg(MSGT_VO, MSGL_FATAL, "eglGetDisplay failed: 0x%x\n", eglGetError());
+            return SET_WINDOW_FAILED;
+        }
+        if (!eglInitialize(eglDisplay, NULL, NULL)) {
+            mp_msg(MSGT_VO, MSGL_FATAL, "eglInitialize failed: 0x%x\n", eglGetError());
+            return SET_WINDOW_FAILED;
+        }
+    }
+    if (*context != EGL_NO_CONTEXT) {
+        eglMakeCurrent(eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+        eglDestroyContext(eglDisplay, *context);
+        eglDestroySurface(eglDisplay, eglSurface);
+    }
+    if (!eglChooseConfig(eglDisplay, cfg_attribs, &eglConfig, 1, &num_configs)
+        || num_configs != 1)
+        return SET_WINDOW_FAILED;
+    eglSurface = eglCreateWindowSurface(eglDisplay, eglConfig, win, NULL);
+    if (eglSurface == EGL_NO_SURFACE)
+        return SET_WINDOW_FAILED;
+
+    new_context = eglCreateContext(eglDisplay, eglConfig, EGL_NO_CONTEXT, ctx_attribs);
+    if (new_context == EGL_NO_CONTEXT)
+        return SET_WINDOW_FAILED;
+    if (!eglMakeCurrent(eglDisplay, eglSurface, eglSurface, new_context))
+        return SET_WINDOW_FAILED;
+
+    // set new values
+    *context = new_context;
+
+    getFunctions(gl, eglgpa, eglQueryString(eglDisplay, EGL_EXTENSIONS));
+    gl->Begin = NULL;
+    gl->DrawBuffer = NULL;
+
+    // and inform that reinit is necessary
+    return SET_WINDOW_REINIT;
+}
+
+/**
+ * \brief free the VisualInfo and GLXContext of an OpenGL context.
+ * \ingroup glcontext
+ */
+static void releaseGlContext_egl(MPGLContext *ctx) {
+    EGLContext *context = &ctx->context.egl;
+    if (*context != EGL_NO_CONTEXT)
+    {
+        ctx->gl->Finish();
+        eglMakeCurrent(eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+        eglDestroyContext(eglDisplay, *context);
+    }
+    *context = EGL_NO_CONTEXT;
+}
+
+static void swapGlBuffers_egl(MPGLContext *ctx) {
+    eglSwapBuffers(eglDisplay, eglSurface);
+}
+
+#endif
+
 #ifdef CONFIG_GL_SDL
 #include "sdl_common.h"
 
@@ -2124,7 +2266,13 @@ MPGLContext *init_mpglcontext(enum MPGLType type, struct vo *vo)
         ctx = init_mpglcontext(GLTYPE_X11, vo);
         if (ctx)
             return ctx;
-        return init_mpglcontext(GLTYPE_SDL, vo);
+        ctx = init_mpglcontext(GLTYPE_SDL, vo);
+        if (ctx)
+            return ctx;
+        ctx = init_mpglcontext(GLTYPE_EGL_X11, vo);
+        if (ctx)
+            return ctx;
+        return NULL;
     }
     ctx = talloc_zero(NULL, MPGLContext);
     ctx->gl = talloc_zero(ctx, GL);
@@ -2188,6 +2336,21 @@ MPGLContext *init_mpglcontext(enum MPGLType type, struct vo *vo)
         //the SDL code is hardcoded to use the deprecated vo API
         global_vo = vo;
         if (vo_sdl_init())
+            return ctx;
+        break;
+#endif
+#ifdef CONFIG_GL_EGL_X11
+    case GLTYPE_EGL_X11:
+        ctx->create_window = create_window_egl;
+        ctx->setGlWindow = setGlWindow_egl;
+        ctx->releaseGlContext = releaseGlContext_egl;
+        ctx->swapGlBuffers = swapGlBuffers_egl;
+        ctx->update_xinerama_info = update_xinerama_info;
+        ctx->border = vo_x11_border;
+        ctx->check_events = vo_x11_check_events;
+        ctx->fullscreen = vo_x11_fullscreen;
+        ctx->ontop = vo_x11_ontop;
+        if (vo_init(vo))
             return ctx;
         break;
 #endif

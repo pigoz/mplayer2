@@ -4512,6 +4512,10 @@ if (test "$_x11" = yes || test "$_sdl" = yes || test "$_cocoa" = yes || win32) &
 // we allow SDL hacking our main() only on OSX
 #undef main
 #endif
+#elif defined(GL_EGL_X11)
+#include <GL/gl.h>
+#include <X11/Xlib.h>
+#include <EGL/egl.h>
 #else
 #include <GL/gl.h>
 #include <X11/Xlib.h>
@@ -4523,10 +4527,15 @@ int main(int argc, char *argv[]) {
   wglCreateContext(dc);
 #elif defined(GL_SDL)
   SDL_GL_SwapBuffers();
+#elif defined(GL_EGL_X11)
+  EGLDisplay eglDisplay = EGL_NO_DISPLAY;
+  eglInitialize(eglDisplay, NULL, NULL);
 #else
   glXCreateContext(NULL, NULL, NULL, True);
 #endif
+#ifndef GL_EGL_X11
   glFinish();
+#endif
   return 0;
 }
 EOF
@@ -4539,6 +4548,11 @@ EOF
       break
     fi
   done
+  if cc_check -DGL_EGL_X11 -lEGL ; then
+    _gl=yes
+    _gl_egl_x11=yes
+    libs_mplayer="$libs_mplayer -lEGL $ld_dl"
+  fi
   if cc_check -DGL_WIN32 -lopengl32 ; then
     _gl=yes
     _gl_win32=yes
@@ -4579,6 +4593,10 @@ if test "$_gl" = yes ; then
     def_gl_x11='#define CONFIG_GL_X11 1'
     res_comment="$res_comment x11"
   fi
+  if test "$_gl_egl_x11" = yes ; then
+    def_gl_egl_x11='#define CONFIG_GL_EGL_X11 1'
+    res_comment="$res_comment egl_x11"
+  fi
   if test "$_gl_sdl" = yes ; then
     def_gl_sdl='#define CONFIG_GL_SDL 1'
     res_comment="$res_comment sdl"
@@ -4589,6 +4607,7 @@ else
   def_gl_cocoa='#undef CONFIG_GL_COCOA'
   def_gl_win32='#undef CONFIG_GL_WIN32'
   def_gl_x11='#undef CONFIG_GL_X11'
+  def_gl_egl_x11='#undef CONFIG_GL_EGL_X11'
   def_gl_sdl='#undef CONFIG_GL_SDL'
   novomodules="opengl $novomodules"
 fi
@@ -6704,6 +6723,7 @@ GL = $_gl
 GL_COCOA = $_gl_cocoa
 GL_WIN32 = $_gl_win32
 GL_X11 = $_gl_x11
+GL_EGL_X11 = $_gl_egl_x11
 GL_SDL = $_gl_sdl
 HAVE_POSIX_SELECT = $_posix_select
 HAVE_SYS_MMAN_H = $_mman
@@ -7109,6 +7129,7 @@ $def_gl
 $def_gl_cocoa
 $def_gl_win32
 $def_gl_x11
+$def_gl_egl_x11
 $def_gl_sdl
 $def_ivtv
 $def_jpeg
