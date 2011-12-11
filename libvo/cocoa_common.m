@@ -35,6 +35,7 @@ struct vo_cocoa_state {
     NSAutoreleasePool *pool;
     GLMPlayerWindow *window;
     NSOpenGLContext *glContext;
+    NSOpenGLPixelFormat *pixelFormat;
 
     NSSize current_video_size;
     NSSize previous_video_size;
@@ -193,8 +194,8 @@ int vo_cocoa_create_window(struct vo *vo, uint32_t d_width,
             (NSOpenGLPixelFormatAttribute)0
         };
 
-        NSOpenGLPixelFormat *pixelFormat = [[NSOpenGLPixelFormat alloc] initWithAttributes:attrs];
-        s->glContext = [[NSOpenGLContext alloc] initWithFormat:pixelFormat shareContext:nil];
+        s->pixelFormat = [[[NSOpenGLPixelFormat alloc] initWithAttributes:attrs] autorelease];
+        s->glContext = [[NSOpenGLContext alloc] initWithFormat:s->pixelFormat shareContext:nil];
 
         create_menu();
 
@@ -324,6 +325,16 @@ int vo_cocoa_swap_interval(int enabled)
 {
     [s->glContext setValues:&enabled forParameter:NSOpenGLCPSwapInterval];
     return 0;
+}
+
+void *vo_cocoa_cgl_context(void)
+{
+    return [s->glContext CGLContextObj];
+}
+
+void *vo_cocoa_cgl_pixel_format(void)
+{
+    return [s->pixelFormat CGLPixelFormatObj];
 }
 
 void create_menu()
