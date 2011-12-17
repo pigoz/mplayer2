@@ -43,6 +43,8 @@
 #include "sub/sub.h"
 #include "subopt-helper.h"
 
+#include "csputils.h"
+
 #include "input/input.h"
 #include "input/keycodes.h"
 #include "osx_common.h"
@@ -84,6 +86,8 @@ static uint32_t image_height;
 static uint32_t image_depth;
 static uint32_t image_bytes;
 static uint32_t image_format;
+
+static struct mp_csp_details colorspace = MP_CSP_DETAILS_DEFAULTS;
 
 static vo_info_t info =
 {
@@ -433,6 +437,32 @@ static int preinit(const char *arg)
     return 0;
 }
 
+static CFStringRef get_cv_csp_matrix(void)
+{
+    switch (colorspace.format) {
+        case MP_CSP_BT_601:
+            return kCVImageBufferYCbCrMatrix_ITU_R_601_4;
+        case MP_CSP_BT_709:
+            return kCVImageBufferYCbCrMatrix_ITU_R_709_2;
+        case MP_CSP_SMPTE_240M:
+            return kCVImageBufferYCbCrMatrix_SMPTE_240M_1995;
+    }
+    return kCVImageBufferYCbCrMatrix_ITU_R_601_4;
+}
+
+static void set_yuv_colorspace(void)
+{
+    if (!shared_buffer) {
+        CVBufferSetAttachment(frameBuffers[0],
+                              kCVImageBufferYCbCrMatrixKey, get_cv_csp_matrix(),
+                              kCVAttachmentMode_ShouldPropagate);
+        if(vo_doublebuffering)
+            CVBufferSetAttachment(frameBuffers[1],
+                                  kCVImageBufferYCbCrMatrixKey, get_cv_csp_matrix(),
+                                  kCVAttachmentMode_ShouldPropagate);
+    }
+}
+
 static int control(uint32_t request, void *data)
 {
     switch (request) {
@@ -462,6 +492,21 @@ static int control(uint32_t request, void *data)
         case VOCTRL_UPDATE_SCREENINFO:
             if (!shared_buffer) {
                 vo_cocoa_update_xinerama_info(global_vo);
+                return VO_TRUE;
+            } else {
+                return VO_NOTIMPL;
+            }
+        case VOCTRL_SET_YUV_COLORSPACE:
+            if (!shared_buffer) {
+                colorspace = *(struct mp_csp_details *)data;
+                set_yuv_colorspace();
+                return VO_TRUE;
+            } else {
+                return VO_NOTIMPL;
+            }
+        case VOCTRL_GET_YUV_COLORSPACE:
+            if (!shared_buffer) {
+                *(struct mp_csp_details *)data = colorspace;
                 return VO_TRUE;
             } else {
                 return VO_NOTIMPL;
