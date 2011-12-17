@@ -21,16 +21,28 @@
 
 #!section shader_prelude
 #!// inserted at the beginning of all shaders
+#ifdef GL_ES
+#version 100
+#define V_IN attribute
+#define V_OUT varying
+#define F_IN varying
+#define texture texture2D
+#else
 #version 140
+#define V_IN in
+#define V_OUT out
+#define F_IN in
+#endif
 
 #!section vertex_shader
 uniform mat3 transform;
 
-in vec2 vertex_position;
-in vec4 vertex_color;
-out vec4 color;
-in vec2 vertex_texcoord;
-out vec2 texcoord;
+V_IN vec2 vertex_position;
+V_IN vec4 vertex_color;
+V_IN vec2 vertex_texcoord;
+
+V_OUT vec4 color;
+V_OUT vec2 texcoord;
 
 void main() {
     gl_Position = vec4(transform * vec3(vertex_position, 1), 1);
@@ -39,44 +51,65 @@ void main() {
 }
 
 #!section frag_shader_eosd
+
+#ifdef GL_ES
+#define out_color gl_FragColor
+#else
+out vec4 out_color;
+#endif
+
 uniform sampler2D texture1;
 
-in vec2 texcoord;
-in vec4 color;
-out vec4 out_color;
+F_IN vec2 texcoord;
+F_IN vec4 color;
 
 void main() {
     out_color = vec4(color.rgb, texture(texture1, texcoord).r);
 }
 
 #!section frag_shader_osd
+
+#ifdef GL_ES
+#define out_color gl_FragColor
+#else
+out vec4 out_color;
+#endif
+
 uniform sampler2D texture1;
 
-in vec2 texcoord;
-out vec4 out_color;
+F_IN vec2 texcoord;
 
 void main() {
+#ifdef GL_ES
+    // GL_LUMINANCE_ALPHA instead of GL_RG
+    out_color = texture(texture1, texcoord).rrra;
+#else
     out_color = texture(texture1, texcoord).rrrg;
+#endif
 }
 
 #!section frag_shader_video
+
+#ifdef GL_ES
+#define out_color gl_FragColor
+#else
+out vec4 out_color;
+#endif
+
 uniform sampler2D texture1;
 uniform sampler2D texture2;
 uniform sampler2D texture3;
-uniform sampler1D lut_c_1d;
-uniform sampler1D lut_l_1d;
-uniform sampler2D lut_c_2d;
-uniform sampler2D lut_l_2d;
-uniform mat4x3 colormatrix;
+uniform mat4 colormatrix;
 uniform vec3 inv_gamma;
 uniform float filter_strength;
 
-in vec2 texcoord;
-out vec4 out_color;
+F_IN vec2 texcoord;
 
 vec4 sample_bilinear(sampler2D tex, vec2 texcoord) {
     return texture(tex, texcoord);
 }
+
+#ifndef GL_ES
 
 // Explanation how bicubic scaling with only 4 texel fetches is done:
 //   http://www.mate.tue.nl/mate/pdfs/10318.pdf
@@ -88,8 +121,8 @@ vec4 calcweights(float s) {
     vec4 t = vec4(-0.5, 0.1666, 0.3333, -0.3333) * s + vec4(1, 0, -0.5, 0.5);
     t = t * s + vec4(0, 0, -0.5, 0.5);
     t = t * s + vec4(-0.6666, 0, 0.8333, 0.1666);
-    vec2 a = vec2(1 / t.z, 1 / t.w);
-    t.xy = t.xy * a + vec2(1, 1);
+    vec2 a = vec2(1.0 / t.z, 1.0 / t.w);
+    t.xy = t.xy * a + vec2(1.0, 1.0);
     t.x = t.x + s;
     t.y = t.y - s;
     return t;
@@ -115,6 +148,11 @@ vec4 sample_bicubic(sampler2D tex, vec2 texcoord) {
     // x-interpolation
     return mix(aa, ab, parmx.b);
 }
+
+uniform sampler1D lut_c_1d;
+uniform sampler1D lut_l_1d;
+uniform sampler2D lut_c_2d;
+uniform sampler2D lut_l_2d;
 
 float[2] weights2(sampler1D lookup, float f) {
     vec4 c = texture(lookup, f);
@@ -236,6 +274,8 @@ vec4 sample_unsharp5(sampler2D tex, vec2 texcoord) {
     return p + t * filter_strength;
 }
 
+#endif
+
 void main() {
 #if USE_PLANAR
     vec3 color = vec3(SAMPLE_L(texture1, texcoord).r,
@@ -245,7 +285,7 @@ void main() {
     vec3 color = SAMPLE_L(texture1, texcoord).rgb;
 #endif
 #if USE_COLORMATRIX
-    color = mat3(colormatrix) * color + colormatrix[3];
+    color = (colormatrix * vec4(color, 1)).rgb;
 #endif
 #if USE_GAMMA_POW
     color = pow(color, inv_gamma);

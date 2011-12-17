@@ -23,6 +23,7 @@
 
 #ifndef MPLAYER_GL_COMMON_H
 #define MPLAYER_GL_COMMON_H
+#define CONFIG_GL_ES
 
 #include <stdio.h>
 #include <stdint.h>
@@ -43,6 +44,9 @@
 #include "x11_common.h"
 // This old-vo wrapper macro would conflict with the struct member
 #undef update_xinerama_info
+#endif
+#ifdef CONFIG_GL_ES
+#include <EGL/egl.h>
 #endif
 #include <GL/gl.h>
 
@@ -254,6 +258,8 @@ int glFmt2bpp(GLenum format, GLenum type);
 void glCreateClearTex(GL *gl, GLenum target, GLenum fmt, GLenum format,
                       GLenum type, GLint filter, int w, int h,
                       unsigned char val);
+void glCreateTex(GL *gl, GLenum target, GLenum fmt, GLenum format,
+                 GLenum type, GLint filter, int w, int h);
 int glCreatePPMTex(GL *gl, GLenum target, GLenum fmt, GLint filter,
                    FILE *f, int *width, int *height, int *maxval);
 void glUploadTex(GL *gl, GLenum target, GLenum format, GLenum type,
@@ -367,10 +373,12 @@ enum MPGLType {
     GLTYPE_W32,
     GLTYPE_X11,
     GLTYPE_SDL,
+    GLTYPE_X11_GLES,
 };
 
 enum {
     MPGLFLAG_DEBUG = 1,
+    MPGLFLAG_GLES = 2,
 };
 
 #define MPGL_VER(major, minor) (((major) << 16) | (minor))
@@ -395,6 +403,11 @@ typedef struct MPGLContext {
         GLXContext x11;
 #endif
     } context;
+#ifdef CONFIG_GL_ES
+    EGLDisplay egl_display;
+    EGLContext egl_context;
+    EGLSurface egl_surface;
+#endif
     int (*create_window)(struct MPGLContext *ctx, uint32_t d_width,
                          uint32_t d_height, uint32_t flags);
     int (*setGlWindow)(struct MPGLContext *);
@@ -402,13 +415,22 @@ typedef struct MPGLContext {
     void (*swapGlBuffers)(struct MPGLContext *);
     int (*check_events)(struct vo *vo);
     void (*fullscreen)(struct vo *vo);
-    // only available if GL3 context creation is supported
+    // Only available if GL3 context creation is supported. Note that the
+    // create_window and setGlWindow functions are not called on GL3 context
+    // creation, and this function replaces both.
     // gl_flags: bitfield of MPGLFLAG_* constants
     // gl_version: requested OpenGL version number (use MPGL_VER())
     // return value is one of the SET_WINDOW_* constants
     int (*create_window_gl3)(struct MPGLContext *ctx, int gl_flags,
                              int gl_version, uint32_t d_width,
                              uint32_t d_height, uint32_t flags);
+    // Only available if GLES context creation is supported. The parameters are
+    // the same as with create_window_gl3, except that gl_version refers to the
+    // GLES version. This should be able to create both ES 1.1 and 2.0 contexts,
+    // as long as the GLES library supports it.
+    int (*create_window_gles)(struct MPGLContext *ctx, int gl_flags,
+                              int gl_version, uint32_t d_width,
+                              uint32_t d_height, uint32_t flags);
     // optional
     void (*ontop)(struct vo *vo);
     void (*border)(struct vo *vo);
@@ -553,8 +575,8 @@ struct GL {
     void (GLAPIENTRY *Uniform1i)(GLint, GLint);
     void (GLAPIENTRY *UniformMatrix3fv)(GLint, GLsizei, GLboolean,
                                         const GLfloat *);
-    void (GLAPIENTRY *UniformMatrix4x3fv)(GLint, GLsizei, GLboolean,
-                                          const GLfloat *);
+    void (GLAPIENTRY *UniformMatrix4fv)(GLint, GLsizei, GLboolean,
+                                        const GLfloat *);
 
 };
 

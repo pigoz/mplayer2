@@ -477,7 +477,7 @@ static const extfunc_desc_t extfuncs[] = {
     DEF_GL3_DESC(Uniform3f),
     DEF_GL3_DESC(Uniform1i),
     DEF_GL3_DESC(UniformMatrix3fv),
-    DEF_GL3_DESC(UniformMatrix4x3fv),
+    DEF_GL3_DESC(UniformMatrix4fv),
 
     {-1}
 };
@@ -550,10 +550,6 @@ void glCreateClearTex(GL *gl, GLenum target, GLenum fmt, GLenum format,
                       GLenum type, GLint filter, int w, int h,
                       unsigned char val)
 {
-    GLfloat fval = (GLfloat)val / 255.0;
-    GLfloat border[4] = {
-        fval, fval, fval, fval
-    };
     int stride;
     char *init;
     if (w == 0)
@@ -565,17 +561,21 @@ void glCreateClearTex(GL *gl, GLenum target, GLenum fmt, GLenum format,
         return;
     init = malloc(stride * h);
     memset(init, val, stride * h);
-    glAdjustAlignment(gl, stride);
-    gl->PixelStorei(GL_UNPACK_ROW_LENGTH, w);
-    gl->TexImage2D(target, 0, fmt, w, h, 0, format, type, init);
+    glCreateTex(gl, target, fmt, format, type, filter, w, h);
+    //xxx using inefficient method to make it work with GLES
+    glUploadTex(gl, target, format, type, init, stride, 0, 0, w, h, 1);
+    free(init);
+}
+
+// Like glCreateClearTex, but leave contents undefined.
+void glCreateTex(GL *gl, GLenum target, GLenum fmt, GLenum format,
+                 GLenum type, GLint filter, int w, int h)
+{
+    gl->TexImage2D(target, 0, fmt, w, h, 0, format, type, NULL);
     gl->TexParameteri(target, GL_TEXTURE_MIN_FILTER, filter);
     gl->TexParameteri(target, GL_TEXTURE_MAG_FILTER, filter);
     gl->TexParameteri(target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     gl->TexParameteri(target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    // Border texels should not be used with CLAMP_TO_EDGE
-    // We set a sane default anyway.
-    gl->TexParameterfv(target, GL_TEXTURE_BORDER_COLOR, border);
-    free(init);
 }
 
 static GLint detect_hqtexfmt(GL *gl)
@@ -707,9 +707,12 @@ void glUploadTex(GL *gl, GLenum target, GLenum format, GLenum type,
         data += (h - 1) * stride;
         stride = -stride;
     }
-    // this is not always correct, but should work for MPlayer
-    glAdjustAlignment(gl, stride);
-    gl->PixelStorei(GL_UNPACK_ROW_LENGTH, stride / glFmt2bpp(format, type));
+    // avoid generating GL errors under ES (no ROW_LENGTH)
+    if (slice != 1) {
+        // this is not always correct, but should work for MPlayer
+        glAdjustAlignment(gl, stride);
+        gl->PixelStorei(GL_UNPACK_ROW_LENGTH, stride / glFmt2bpp(format, type));
+    }
     for (; y + slice <= y_max; y += slice) {
         gl->TexSubImage2D(target, 0, x, y, w, slice, format, type, data);
         data += stride * slice;
@@ -2182,6 +2185,161 @@ static void swapGlBuffers_x11(MPGLContext *ctx)
 }
 #endif
 
+#ifdef CONFIG_GL_ES
+
+// generic EGL context creation
+
+static EGLConfig select_fb_config_gles(MPGLContext *ctx, int gl_flags,
+                                       int gl_version)
+{
+    bool gles2 = MPGL_VER_GET_MAJOR(gl_version) > 1;
+
+    EGLint attributes[] = {
+        EGL_RED_SIZE, 8,
+        EGL_GREEN_SIZE, 8,
+        EGL_BLUE_SIZE, 8,
+        EGL_DEPTH_SIZE, 0,
+        EGL_RENDERABLE_TYPE, gles2 ? EGL_OPENGL_ES2_BIT : EGL_OPENGL_ES_BIT,
+        EGL_NONE
+    };
+
+    EGLint config_count;
+    EGLConfig config;
+
+    eglChooseConfig(ctx->egl_display, attributes, &config, 1, &config_count);
+
+    if (!config_count) {
+        mp_msg(MSGT_VO, MSGL_FATAL, "[gl] Could find EGL configuration!\n");
+        return NULL;
+    }
+
+    return config;
+}
+
+static bool create_context_gles(MPGLContext *ctx,int gl_flags, int gl_version,
+                                EGLConfig config, EGLNativeWindowType window)
+{
+    bool gles2 = MPGL_VER_GET_MAJOR(gl_version) > 1;
+
+    EGLint context_attributes[] = {
+        EGL_CONTEXT_CLIENT_VERSION, gles2 ? 2 : 1,
+        EGL_NONE
+    };
+
+    ctx->egl_surface = eglCreateWindowSurface(ctx->egl_display, config, window,
+                                              NULL);
+
+    if (ctx->egl_surface == EGL_NO_SURFACE) {
+        mp_msg(MSGT_VO, MSGL_FATAL, "[gl] Could not create EGL surface!\n");
+        return false;
+    }
+
+    ctx->egl_context = eglCreateContext(ctx->egl_display, config,
+                                        EGL_NO_CONTEXT, context_attributes);
+
+    if (ctx->egl_context == EGL_NO_CONTEXT) {
+        mp_msg(MSGT_VO, MSGL_FATAL, "[gl] Could not create EGL context!\n");
+        return false;
+    }
+
+    eglMakeCurrent(ctx->egl_display, ctx->egl_surface, ctx->egl_surface,
+                   ctx->egl_context);
+
+    return true;
+}
+
+#endif
+
+#if defined(CONFIG_GL_X11) && defined(CONFIG_GL_ES)
+static void *gpa_gles2_linux(const GLubyte *name) {
+    void *res = eglGetProcAddress(name);
+    if (!res) {
+        // The problem is that eglGetProcAddress does not always return a
+        // function pointer. Also, we are probably linked against the "main"
+        // libGL.so, which provides different functions with the same names as
+        // most GLES functions.
+        void *h = dlopen("libGLESv2.so", RTLD_LAZY);
+        res = dlsym(h, name);
+        dlclose(h);
+    }
+    return res;
+}
+
+static int create_window_x11_gles(struct MPGLContext *ctx, int gl_flags,
+                                 int gl_version, uint32_t d_width,
+                                 uint32_t d_height, uint32_t flags)
+{
+    struct vo *vo = ctx->vo;
+
+    if (ctx->egl_context) {
+        // GL context and window already exist.
+        // Only update window geometry etc.
+        vo_x11_create_vo_window(vo, NULL, vo->dx, vo->dy, d_width,
+                                d_height, flags, CopyFromParent, "gl");
+        return SET_WINDOW_OK;
+    }
+
+    ctx->egl_display = eglGetDisplay(vo->x11->display);
+    eglInitialize(ctx->egl_display, NULL, NULL);
+
+    EGLConfig config = select_fb_config_gles(ctx, gl_flags, gl_version);
+    if (!config)
+        return SET_WINDOW_FAILED;
+
+    int vID, n;
+    XVisualInfo *visual, template;
+
+    eglGetConfigAttrib(ctx->egl_display, config, EGL_NATIVE_VISUAL_ID, &vID);
+    template.visualid = vID;
+    visual = XGetVisualInfo(vo->x11->display, VisualIDMask, &template, &n);
+
+    if (!visual) {
+        mp_msg(MSGT_VO, MSGL_FATAL, "[gl] Getting X visual failed!\n");
+        return SET_WINDOW_FAILED;
+    }
+
+    Colormap colormap = XCreateColormap(vo->x11->display, vo->x11->rootwin, visual->visual, AllocNone);
+
+    vo_x11_create_vo_window(vo, visual, vo->dx, vo->dy, d_width,
+                            d_height, flags, colormap, "gl");
+
+    if (!create_context_gles(ctx, gl_flags, gl_version, config,
+                             (EGLNativeWindowType)vo->x11->window))
+    {
+        vo_x11_uninit(ctx->vo);
+        return SET_WINDOW_FAILED;
+    }
+
+    // xxx needs a different function to query function pointers for GLES 1.x
+    getFunctions(ctx->gl, gpa_gles2_linux, NULL, false);
+
+    // MESA provides functions for VAOs, but doesn't seem to properly support
+    // them, and doesn't report any VAO extensions either
+    GL *gl = ctx->gl;
+    gl->GenVertexArrays = NULL;
+    gl->DeleteVertexArrays = NULL;
+    gl->BindVertexArray = NULL;
+
+    return SET_WINDOW_OK;
+}
+
+static void releaseGlContext_gles(MPGLContext *ctx) {
+    if (ctx->egl_context) {
+        if (ctx->gl->Finish)
+            ctx->gl->Finish();
+        eglMakeCurrent(ctx->egl_display, EGL_NO_SURFACE, EGL_NO_SURFACE,
+                       EGL_NO_CONTEXT);
+        eglDestroyContext(ctx->egl_display, ctx->egl_context);
+    }
+    ctx->egl_context = EGL_NO_CONTEXT;
+}
+
+static void swapGlBuffers_gles(MPGLContext *ctx) {
+    eglSwapBuffers(ctx->egl_display, ctx->egl_surface);
+}
+
+#endif
+
 #ifdef CONFIG_GL_SDL
 #include "sdl_common.h"
 
@@ -2316,6 +2474,20 @@ MPGLContext *init_mpglcontext(enum MPGLType type, struct vo *vo)
             return ctx;
         break;
 #endif
+#if defined(CONFIG_GL_X11) && defined(CONFIG_GL_ES)
+    case GLTYPE_X11_GLES:
+        ctx->create_window_gles = create_window_x11_gles;
+        ctx->releaseGlContext = releaseGlContext_gles;
+        ctx->swapGlBuffers = swapGlBuffers_gles;
+        ctx->update_xinerama_info = update_xinerama_info;
+        ctx->border = vo_x11_border;
+        ctx->check_events = vo_x11_check_events;
+        ctx->fullscreen = vo_x11_fullscreen;
+        ctx->ontop = vo_x11_ontop;
+        if (vo_init(vo))
+            return ctx;
+        break;
+#endif
     }
     talloc_free(ctx);
     return NULL;
@@ -2324,7 +2496,15 @@ MPGLContext *init_mpglcontext(enum MPGLType type, struct vo *vo)
 int create_mpglcontext(struct MPGLContext *ctx, int gl_flags, int gl_version,
                        uint32_t d_width, uint32_t d_height, uint32_t flags)
 {
-    if (gl_version < MPGL_VER(3, 0)) {
+    if (gl_flags & MPGLFLAG_GLES) {
+        if (!ctx->create_window_gles) {
+            mp_msg(MSGT_VO, MSGL_ERR, "[gl] OpenGL ES context creation not "
+                   "available.\n");
+            return SET_WINDOW_FAILED;
+        }
+        return ctx->create_window_gles(ctx, gl_flags, gl_version, d_width,
+                                       d_height, flags);
+    } else if (gl_version < MPGL_VER(3, 0)) {
         if (ctx->create_window(ctx, d_width, d_height, flags) < 0)
             return SET_WINDOW_FAILED;
         return ctx->setGlWindow(ctx);
@@ -2357,6 +2537,9 @@ void uninit_mpglcontext(MPGLContext *ctx)
 #endif
 #ifdef CONFIG_GL_X11
     case GLTYPE_X11:
+        vo_x11_uninit(ctx->vo);
+        break;
+    case GLTYPE_X11_GLES:
         vo_x11_uninit(ctx->vo);
         break;
 #endif

@@ -146,6 +146,7 @@ struct gl_priv {
     GL *gl;
 
     int gl_debug;
+    int gl_es;
 
     struct vertex_array va_osd, va_eosd, va_video;
 
@@ -235,18 +236,33 @@ static bool can_use_filter_kernel(struct filter_kernel *kernel)
     return !!convolution_filters[kernel->size].shader_fn;
 }
 
+static void va_enable(GL *gl, GLuint program);
+
 static void vertex_array_init(GL *gl, struct vertex_array * va, GLuint program)
 {
-    size_t stride = sizeof(struct vertex);
-    GLint loc;
-
     *va = (struct vertex_array) { .program = program };
 
     gl->GenBuffers(1, &va->buffer);
+
+    // GLES doesn't have VAOs as part of its core
+    if (!gl->GenVertexArrays)
+        return;
+
     gl->GenVertexArrays(1, &va->vao);
 
     gl->BindBuffer(GL_ARRAY_BUFFER, va->buffer);
     gl->BindVertexArray(va->vao);
+
+    va_enable(gl, program);
+
+    gl->BindBuffer(GL_ARRAY_BUFFER, 0);
+    gl->BindVertexArray(0);
+}
+
+static void va_enable(GL *gl, GLuint program)
+{
+    size_t stride = sizeof(struct vertex);
+    GLint loc;
 
     loc = gl->GetAttribLocation(program, "vertex_position");
     if (loc >= 0) {
@@ -268,14 +284,29 @@ static void vertex_array_init(GL *gl, struct vertex_array * va, GLuint program)
         gl->VertexAttribPointer(loc, 2, GL_FLOAT, GL_FALSE, stride,
                                 (void*)offsetof(struct vertex, texcoord));
     }
+}
 
-    gl->BindBuffer(GL_ARRAY_BUFFER, 0);
-    gl->BindVertexArray(0);
+static void va_disable(GL *gl, GLuint program)
+{
+    GLint loc;
+
+    loc = gl->GetAttribLocation(program, "vertex_position");
+    if (loc >= 0)
+        gl->DisableVertexAttribArray(loc);
+
+    loc = gl->GetAttribLocation(program, "vertex_color");
+    if (loc >= 0)
+        gl->DisableVertexAttribArray(loc);
+
+    loc = gl->GetAttribLocation(program, "vertex_texcoord");
+    if (loc >= 0)
+        gl->DisableVertexAttribArray(loc);
 }
 
 static void vertex_array_uninit(GL *gl, struct vertex_array *va)
 {
-    gl->DeleteVertexArrays(1, &va->vao);
+    if (va->vao)
+        gl->DeleteVertexArrays(1, &va->vao);
     gl->DeleteBuffers(1, &va->buffer);
     *va = (struct vertex_array) {0};
 }
@@ -290,13 +321,33 @@ static void vertex_array_upload(GL *gl, struct vertex_array *va,
     va->vertex_count = vertex_count;
 }
 
-static void vertex_array_draw(GL *gl, struct vertex_array *va)
+static void vertex_array_bind(GL *gl, struct vertex_array *va)
 {
     gl->UseProgram(va->program);
-    gl->BindVertexArray(va->vao);
-    gl->DrawArrays(GL_TRIANGLES, 0, va->vertex_count);
-    gl->BindVertexArray(0);
+    if (va->vao) {
+        gl->BindVertexArray(va->vao);
+    } else {
+        gl->BindBuffer(GL_ARRAY_BUFFER, va->buffer);
+        va_enable(gl, va->program);
+    }
+}
+
+static void vertex_array_unbind(GL *gl, struct vertex_array *va)
+{
+    if (va->vao) {
+        gl->BindVertexArray(0);
+    } else {
+        va_disable(gl, va->program);
+        gl->BindBuffer(GL_ARRAY_BUFFER, 0);
+    }
     gl->UseProgram(0);
+}
+
+static void vertex_array_draw(GL *gl, struct vertex_array *va)
+{
+    vertex_array_bind(gl, va);
+    gl->DrawArrays(GL_TRIANGLES, 0, va->vertex_count);
+    vertex_array_unbind(gl, va);
 
     glCheckError(gl, "after rendering");
 }
@@ -416,9 +467,10 @@ static void update_uniforms(struct vo *vo, GLuint program)
 
     loc = gl->GetUniformLocation(program, "colormatrix");
     if (loc >= 0) {
-        float yuv2rgb[3][4];
+        float yuv2rgb[3][4], matrix[4][4] = {{0}};
         mp_get_yuv2rgb_coeffs(&cparams, yuv2rgb);
-        gl->UniformMatrix4x3fv(loc, 1, GL_TRUE, &yuv2rgb[0][0]);
+        memcpy(matrix, yuv2rgb, sizeof(float) * 3 * 4);
+        gl->UniformMatrix4fv(loc, 1, GL_TRUE, &matrix[0][0]);
     }
 
     loc = gl->GetUniformLocation(program, "inv_gamma");
@@ -541,13 +593,15 @@ static void genEOSD(struct vo *vo, mp_eosd_images_t *imgs)
     if (!p->eosd_texture)
         gl->GenTextures(1, &p->eosd_texture);
 
+    int texfmt = p->gl_es ? GL_LUMINANCE : GL_RED;
+
     gl->BindTexture(GL_TEXTURE_2D, p->eosd_texture);
 
     if (need_allocate) {
         texSize(vo, p->eosd->surface.w, p->eosd->surface.h,
                 &p->eosd_texture_width, &p->eosd_texture_height);
         // xxx it doesn't need to be cleared, that's a waste of time
-        glCreateClearTex(gl, GL_TEXTURE_2D, GL_RED, GL_RED,
+        glCreateClearTex(gl, GL_TEXTURE_2D, texfmt, texfmt,
                          GL_UNSIGNED_BYTE, GL_NEAREST,
                          p->eosd_texture_width, p->eosd_texture_height, 0);
     }
@@ -564,9 +618,9 @@ static void genEOSD(struct vo *vo, mp_eosd_images_t *imgs)
         ASS_Image *i = target->ass_img;
 
         if (need_upload) {
-            glUploadTex(gl, GL_TEXTURE_2D, GL_RED, GL_UNSIGNED_BYTE, i->bitmap,
+            glUploadTex(gl, GL_TEXTURE_2D, texfmt, GL_UNSIGNED_BYTE, i->bitmap,
                         i->stride, target->source.x0, target->source.y0,
-                        i->w, i->h, 0);
+                        i->w, i->h, p->gl_es ? 1 : 0);
         }
 
         uint8_t color[4] = { i->color >> 24, (i->color >> 16) & 0xff,
@@ -585,6 +639,8 @@ static void genEOSD(struct vo *vo, mp_eosd_images_t *imgs)
 
     vertex_array_upload(gl, &p->va_eosd, p->eosd_va,
                         p->eosd->targets_count * VERTICES_PER_QUAD);
+
+    glCheckError(p->gl, "uploading EOSD");
 }
 
 static void draw_eosd(struct vo *vo, mp_eosd_images_t *imgs)
@@ -853,8 +909,14 @@ static void initVideo(struct vo *vo)
     if (p->gl_internal_format == 2) p->gl_internal_format = GL_RG;
     if (p->gl_internal_format == 3) p->gl_internal_format = GL_RGB;
     if (p->gl_internal_format == 4) p->gl_internal_format = GL_RGBA;
-    if (p->gl_format == GL_LUMINANCE)
-        p->gl_format = GL_RED;
+
+    if (p->gl_es) {
+        if (p->gl_internal_format == GL_RED)
+            p->gl_internal_format = GL_LUMINANCE;
+    } else {
+        if (p->gl_format == GL_LUMINANCE)
+            p->gl_format = GL_RED;
+    }
 
     if (!p->is_yuv) {
         // xxx mp_image_setfmt calculates this as well
@@ -926,6 +988,11 @@ static int create_window(struct vo *vo, uint32_t d_width, uint32_t d_height,
     int mpgl_flags = 0;
     if (p->gl_debug)
         mpgl_flags |= MPGLFLAG_DEBUG;
+
+    if (p->gl_es) {
+        mpgl_version = MPGL_VER(2, 0);
+        mpgl_flags |= MPGLFLAG_GLES;
+    }
 
     return create_mpglcontext(p->glctx, mpgl_flags, mpgl_version, d_width,
                               d_height, flags);
@@ -1007,9 +1074,11 @@ static void create_osd_texture(void *ctx, int x0, int y0, int w, int h,
         return;
     }
 
+    int texfmt = p->gl_es ? GL_LUMINANCE_ALPHA : GL_RG;
+
     gl->GenTextures(1, &p->osdtex[p->osdtexCnt]);
     gl->BindTexture(GL_TEXTURE_2D, p->osdtex[p->osdtexCnt]);
-    glCreateClearTex(gl, GL_TEXTURE_2D, GL_RG, GL_RG, GL_UNSIGNED_BYTE,
+    glCreateClearTex(gl, GL_TEXTURE_2D, texfmt, texfmt, GL_UNSIGNED_BYTE,
                      scale_type, sx, sy, 0);
     {
         int i;
@@ -1019,8 +1088,8 @@ static void create_osd_texture(void *ctx, int x0, int y0, int w, int h,
             tmp[i*2+0] = src[i];
             tmp[i*2+1] = -srca[i];
         }
-        glUploadTex(gl, GL_TEXTURE_2D, GL_RG, GL_UNSIGNED_BYTE, tmp, stride * 2,
-                    0, 0, w, h, 0);
+        glUploadTex(gl, GL_TEXTURE_2D, texfmt, GL_UNSIGNED_BYTE, tmp, stride * 2,
+                    0, 0, w, h, p->gl_es ? 1 : 0);
         free(tmp);
     }
 
@@ -1054,17 +1123,13 @@ static void draw_osd(struct vo *vo, struct osd_state *osd)
     if (p->osdtexCnt > 0) {
         gl->Enable(GL_BLEND);
 
-        gl->UseProgram(p->va_osd.program);
-        gl->BindVertexArray(p->va_osd.vao);
-
+        vertex_array_bind(gl, &p->va_osd);
         for (int n = 0; n < p->osdtexCnt; n++) {
             gl->BindTexture(GL_TEXTURE_2D, p->osdtex[n]);
             gl->DrawArrays(GL_TRIANGLES, n * VERTICES_PER_QUAD,
                            VERTICES_PER_QUAD);
         }
-
-        gl->BindVertexArray(0);
-        gl->UseProgram(0);
+        vertex_array_unbind(gl, &p->va_osd);
 
         gl->Disable(GL_BLEND);
         gl->BindTexture(GL_TEXTURE_2D, 0);
@@ -1100,8 +1165,7 @@ static void do_render(struct vo *vo)
 
         vertex_array_upload(gl, &p->va_video, vb, VERTICES_PER_QUAD * 2);
 
-        gl->UseProgram(p->va_video.program);
-        gl->BindVertexArray(p->va_video.vao);
+        vertex_array_bind(gl, &p->va_video);
 
         glEnable3DLeft(gl, p->stereo_mode);
         gl->DrawArrays(GL_TRIANGLES, 0, VERTICES_PER_QUAD);
@@ -1109,8 +1173,7 @@ static void do_render(struct vo *vo)
         gl->DrawArrays(GL_TRIANGLES, VERTICES_PER_QUAD, VERTICES_PER_QUAD);
         glDisable3D(gl, p->stereo_mode);
 
-        gl->BindVertexArray(0);
-        gl->UseProgram(0);
+        vertex_array_unbind(gl, &p->va_video);
     } else {
         write_quad(vb,
                    p->dst_rect.left, p->dst_rect.top,
@@ -1150,7 +1213,8 @@ static int draw_slice(struct vo *vo, uint8_t *src[], int stride[], int w, int h,
         gl->BindTexture(GL_TEXTURE_2D, p->planes[n].gl_texture);
         int xs = p->planes[n].shift_x, ys = p->planes[n].shift_y;
         glUploadTex(gl, GL_TEXTURE_2D, p->gl_format, p->gl_type, src[n],
-                    stride[n], x >> xs, y >> ys, w >> xs, h >> ys, 0);
+                    stride[n], x >> xs, y >> ys, w >> xs, h >> ys,
+                    p->gl_es ? 1 : 0);
     }
     gl->ActiveTexture(GL_TEXTURE0);
 
@@ -1163,6 +1227,10 @@ static uint32_t get_image(struct vo *vo, mp_image_t *mpi)
     GL *gl = p->gl;
 
     assert(mpi->num_planes == p->plane_count);
+
+    // GL ES has no PBOs
+    if (p->gl_es)
+        return VO_FALSE;
 
     if (mpi->flags & MP_IMGFLAG_READABLE)
         return VO_FALSE;
@@ -1233,10 +1301,11 @@ static uint32_t draw_image(struct vo *vo, mp_image_t *mpi)
         gl->BindTexture(GL_TEXTURE_2D, plane->gl_texture);
         glUploadTex(gl, GL_TEXTURE_2D, p->gl_format, p->gl_type, plane_ptr,
                     mpi->stride[n], mpi->x >> xs, mpi->y >> ys, w >> xs,
-                    h >> ys, 0);
+                    h >> ys, p->gl_es ? 1 : 0);
     }
     gl->ActiveTexture(GL_TEXTURE0);
-    gl->BindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+    if (mpi->flags & MP_IMGFLAG_DIRECT)
+        gl->BindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 skip_upload:
     do_render(vo);
     return VO_TRUE;
@@ -1395,6 +1464,7 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
         {"lscale",       OPT_ARG_MSTRZ,&lscale,          NULL},
         {"cscale",       OPT_ARG_MSTRZ,&cscale,          NULL},
         {"debug",        OPT_ARG_BOOL, &p->gl_debug,     NULL},
+        {"gles",         OPT_ARG_BOOL, &p->gl_es,        NULL},
         {NULL}
     };
 
@@ -1446,9 +1516,14 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
                "    1: side-by-side to red-cyan stereo\n"
                "    2: side-by-side to green-magenta stereo\n"
                "    3: side-by-side to quadbuffer stereo\n"
+               "  gles\n"
+               "    Use OpenGL ES.\n"
                "\n");
         return -1;
     }
+
+    if (p->gl_es)
+        gltype = GLTYPE_X11_GLES;
 
     p->scalers[0].name = talloc_strdup(vo, lscale);
     p->scalers[1].name = talloc_strdup(vo, cscale);
