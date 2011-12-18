@@ -2234,12 +2234,14 @@ static struct backend backends[] = {
     {"win", GLTYPE_W32},
     {"x11", GLTYPE_X11},
     {"sdl", GLTYPE_SDL},
+    {"xegl", GLTYPE_EGL_X11},
     // mplayer-svn aliases (note that mplayer-svn couples these with the numeric
     // values of the internal GLTYPE_* constants)
     {"-1", GLTYPE_AUTO},
     { "0", GLTYPE_W32},
     { "1", GLTYPE_X11},
     { "2", GLTYPE_SDL},
+    { "3", GLTYPE_EGL_X11},
 
     {0}
 };

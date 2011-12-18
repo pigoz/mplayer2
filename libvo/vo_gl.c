@@ -1373,6 +1373,7 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw)
                "    win: Win32/WGL\n"
                "    x11: X11/GLX\n"
                "    sdl: SDL\n"
+               "    xegl: X11/EGL (highly experimental)\n"
                "\n");
         return -1;
     }
