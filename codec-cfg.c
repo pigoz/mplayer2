@@ -780,7 +780,7 @@ codecs_t* find_codec(unsigned int fourcc,unsigned int *fourccmap,
             if(start && c<=start) continue;
             for (j = 0; j < CODECS_MAX_FOURCC; j++) {
                 // FIXME: do NOT hardwire 'null' name here:
-                if (c->fourcc[j]==fourcc || !strcmp(c->drv,"null")) {
+                if (c->fourcc[j] == -1 ? !j : c->fourcc[j]==fourcc) {
                     if (fourccmap)
                         *fourccmap = c->fourccmap[j];
                     return c;

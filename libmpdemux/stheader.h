@@ -33,6 +33,7 @@ struct demuxer;
     struct demux_stream *ds;                                            \
     struct codecs *codec;                                               \
     unsigned int format;                                                \
+    int libav_codec_id;                                                 \
     int initialized;                                                    \
     /* number of seconds stream should be delayed                       \
      * (according to dwStart or similar) */                             \

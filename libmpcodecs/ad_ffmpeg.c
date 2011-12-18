@@ -114,12 +114,23 @@ static int init(sh_audio_t *sh_audio)
 
     mp_msg(MSGT_DECAUDIO, MSGL_V, "FFmpeg's libavcodec audio codec\n");
 
-    lavc_codec = avcodec_find_decoder_by_name(sh_audio->codec->dll);
-    if (!lavc_codec) {
-        mp_tmsg(MSGT_DECAUDIO, MSGL_ERR,
-                "Cannot find codec '%s' in libavcodec...\n",
-                sh_audio->codec->dll);
+    if (sh_audio->codec->dll) {
+        lavc_codec = avcodec_find_decoder_by_name(sh_audio->codec->dll);
+        if (!lavc_codec) {
+            mp_tmsg(MSGT_DECAUDIO, MSGL_ERR,
+                    "Cannot find codec '%s' in libavcodec...\n",
+                    sh_audio->codec->dll);
+            return 0;
+        }
+    } else if (!sh_audio->libav_codec_id) {
+        mp_msg(MSGT_DECVIDEO, MSGL_INFO, "no lavf id\n");
         return 0;
+    } else {
+        lavc_codec = avcodec_find_decoder(sh_audio->libav_codec_id);
+        if (!lavc_codec) {
+            return 0;
+            mp_msg(MSGT_DECVIDEO, MSGL_INFO, "no codec for lavf id\n");
+        }
     }
 
     struct priv *ctx = talloc_zero(NULL, struct priv);
