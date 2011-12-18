@@ -26,22 +26,18 @@
 #include <unistd.h>
 #include <CoreServices/CoreServices.h>
 
-//MPLAYER
+// mplayer includes
 #include "config.h"
 #include "fastmemcpy.h"
 #include "video_out.h"
-#include "video_out_internal.h"
 #include "aspect.h"
-#include "mp_msg.h"
-#include "m_option.h"
-#include "mp_fifo.h"
 #include "sub/sub.h"
 #include "subopt-helper.h"
 
 #include "csputils.h"
-
-#include "input/input.h"
-#include "input/keycodes.h"
+#include "libmpcodecs/vfcap.h"
+#include "libmpcodecs/mp_image.h"
+#include "osd.h"
 
 #import "cocoa_common.h"
 
@@ -83,17 +79,7 @@ static uint32_t image_format;
 
 static struct mp_csp_details colorspace = MP_CSP_DETAILS_DEFAULTS;
 
-static vo_info_t info =
-{
-    "Mac OS X Core Video",
-    "corevideo",
-    "Nicolas Plourde <nicolas.plourde@gmail.com> and others",
-    ""
-};
-
-LIBVO_EXTERN(corevideo)
-
-static void draw_alpha(int x0, int y0, int w, int h, unsigned char *src, unsigned char *srca, int stride)
+static void draw_alpha(void *ctx, int x0, int y0, int w, int h, unsigned char *src, unsigned char *srca, int stride)
 {
     switch (image_format)
     {
@@ -134,7 +120,7 @@ static void free_file_specific(void)
     }
 }
 
-static void resize(int width, int height)
+static void resize(struct vo *vo, int width, int height)
 {
     int d_width, d_height;
 
@@ -147,20 +133,22 @@ static void resize(int width, int height)
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
 
-    aspect(&d_width, &d_height, A_WINZOOM);
-    textureFrame = NSMakeRect((vo_dwidth - d_width) / 2, (vo_dheight - d_height) / 2, d_width, d_height);
+    aspect(vo, &d_width, &d_height, A_WINZOOM);
+    textureFrame = NSMakeRect((vo->dwidth - d_width) / 2, (vo->dheight - d_height) / 2, d_width, d_height);
 }
 
-static void prepare_opengl(void)
+static void prepare_opengl(struct vo *vo)
 {
     glEnable(GL_BLEND);
     glDisable(GL_DEPTH_TEST);
     glDepthMask(GL_FALSE);
     glDisable(GL_CULL_FACE);
-    resize(global_vo->dwidth, global_vo->dheight);
+    resize(vo, vo->dwidth, vo->dheight);
 }
 
-static int config(uint32_t width, uint32_t height, uint32_t d_width, uint32_t d_height, uint32_t flags, char *title, uint32_t format)
+static int config(struct vo *vo, uint32_t width, uint32_t height,
+                  uint32_t d_width, uint32_t d_height, uint32_t flags,
+                  uint32_t format)
 {
     free_file_specific();
 
@@ -198,8 +186,8 @@ static int config(uint32_t width, uint32_t height, uint32_t d_width, uint32_t d_
         CVOpenGLTextureRelease(texture);
         texture = NULL;
 
-        vo_cocoa_create_window(global_vo, d_width, d_height, flags);
-        prepare_opengl();
+        vo_cocoa_create_window(vo, d_width, d_height, flags);
+        prepare_opengl(vo);
         vo_cocoa_swap_interval(1);
 
         error = CVOpenGLTextureCacheCreate(NULL, 0, vo_cocoa_cgl_context(), vo_cocoa_cgl_pixel_format(), 0, &textureCache);
@@ -268,18 +256,18 @@ static int config(uint32_t width, uint32_t height, uint32_t d_width, uint32_t d_
     return 0;
 }
 
-static void check_events(void)
+static void check_events(struct vo *vo)
 {
     if (!shared_buffer) {
-        int e = vo_cocoa_check_events(global_vo);
+        int e = vo_cocoa_check_events(vo);
         if (e & VO_EVENT_RESIZE)
-            resize(global_vo->dwidth, global_vo->dheight);
+            resize(vo, vo->dwidth, vo->dheight);
     }
 }
 
-static void draw_osd(void)
+static void draw_osd(struct vo *vo, struct osd_state *osd)
 {
-    vo_draw_text(image_width, image_height, draw_alpha);
+    osd_draw_text(osd, image_width, image_height, draw_alpha, vo);
 }
 
 static void prepare_texture(void)
@@ -293,7 +281,7 @@ static void prepare_texture(void)
     CVOpenGLTextureGetCleanTexCoords(texture, lowerLeft, lowerRight, upperRight, upperLeft);
 }
 
-static void do_render(void)
+static void do_render(struct vo *vo)
 {
     glClear(GL_COLOR_BUFFER_BIT);
 
@@ -302,15 +290,15 @@ static void do_render(void)
 
     glColor3f(1,1,1);
     glBegin(GL_QUADS);
-    glTexCoord2f(upperLeft[0], upperLeft[1]); glVertex2i(textureFrame.origin.x-(vo_panscan_x >> 1), textureFrame.origin.y-(vo_panscan_y >> 1));
-    glTexCoord2f(lowerLeft[0], lowerLeft[1]); glVertex2i(textureFrame.origin.x-(vo_panscan_x >> 1), NSMaxY(textureFrame)+(vo_panscan_y >> 1));
-    glTexCoord2f(lowerRight[0], lowerRight[1]); glVertex2i(NSMaxX(textureFrame)+(vo_panscan_x >> 1), NSMaxY(textureFrame)+(vo_panscan_y >> 1));
-    glTexCoord2f(upperRight[0], upperRight[1]); glVertex2i(NSMaxX(textureFrame)+(vo_panscan_x >> 1), textureFrame.origin.y-(vo_panscan_y >> 1));
+    glTexCoord2f(upperLeft[0], upperLeft[1]); glVertex2i(textureFrame.origin.x-(vo->panscan_x >> 1), textureFrame.origin.y-(vo->panscan_y >> 1));
+    glTexCoord2f(lowerLeft[0], lowerLeft[1]); glVertex2i(textureFrame.origin.x-(vo->panscan_x >> 1), NSMaxY(textureFrame)+(vo->panscan_y >> 1));
+    glTexCoord2f(lowerRight[0], lowerRight[1]); glVertex2i(NSMaxX(textureFrame)+(vo->panscan_x >> 1), NSMaxY(textureFrame)+(vo->panscan_y >> 1));
+    glTexCoord2f(upperRight[0], upperRight[1]); glVertex2i(NSMaxX(textureFrame)+(vo->panscan_x >> 1), textureFrame.origin.y-(vo->panscan_y >> 1));
     glEnd();
     glDisable(CVOpenGLTextureGetTarget(texture));
 }
 
-static void flip_page(void)
+static void flip_page(struct vo *vo)
 {
     if(shared_buffer) {
         NSAutoreleasePool *pool = [NSAutoreleasePool new];
@@ -318,24 +306,13 @@ static void flip_page(void)
         [pool release];
     } else {
         prepare_texture();
-        do_render();
+        do_render(vo);
         if (vo_doublebuffering) {
             image_page = 1 - image_page;
             image_data = image_datas[image_page];
         }
         vo_cocoa_swap_buffers();
     }
-}
-
-static int draw_slice(uint8_t *src[], int stride[], int w,int h,int x,int y)
-{
-    return 0;
-}
-
-
-static int draw_frame(uint8_t *src[])
-{
-    return 0;
 }
 
 static uint32_t draw_image(mp_image_t *mpi)
@@ -373,7 +350,7 @@ static int query_format(uint32_t format)
     return 0;
 }
 
-static void uninit(void)
+static void uninit(struct vo *vo)
 {
     SetSystemUIMode(kUIModeNormal, 0);
     CGDisplayShowCursor(kCGDirectMainDisplay);
@@ -381,7 +358,7 @@ static void uninit(void)
     free_file_specific();
 
     if (!shared_buffer)
-        vo_cocoa_uninit(global_vo);
+        vo_cocoa_uninit(vo);
 
     free(buffer_name);
     buffer_name = NULL;
@@ -394,7 +371,7 @@ static const opt_t subopts[] = {
 {NULL}
 };
 
-static int preinit(const char *arg)
+static int preinit(struct vo *vo, const char *arg)
 {
     // set defaults
     screen_id = -1;
@@ -426,7 +403,7 @@ static int preinit(const char *arg)
         shared_buffer = true;
 
     if (!shared_buffer)
-        vo_cocoa_init(global_vo);
+        vo_cocoa_init(vo);
 
     return 0;
 }
@@ -458,23 +435,22 @@ static void set_yuv_colorspace(struct vo *vo)
     }
 }
 
-static int control(uint32_t request, void *data)
+static int control(struct vo *vo, uint32_t request, void *data)
 {
     switch (request) {
         case VOCTRL_DRAW_IMAGE: return draw_image(data);
         case VOCTRL_QUERY_FORMAT: return query_format(*(uint32_t*)data);
         case VOCTRL_ONTOP:
             if (!shared_buffer) {
-                vo_cocoa_ontop(global_vo);
+                vo_cocoa_ontop(vo);
             } else {
-                vo_ontop = !vo_ontop;
                 [mplayerosxProto ontop];
             }
             return VO_TRUE;
         case VOCTRL_FULLSCREEN:
             if (!shared_buffer) {
-                vo_cocoa_fullscreen(global_vo);
-                resize(global_vo->dwidth, global_vo->dheight);
+                vo_cocoa_fullscreen(vo);
+                resize(vo, vo->dwidth, vo->dheight);
             } else {
                 [mplayerosxProto toggleFullscreen];
             }
@@ -482,11 +458,11 @@ static int control(uint32_t request, void *data)
         case VOCTRL_GET_PANSCAN:
             return VO_TRUE;
         case VOCTRL_SET_PANSCAN:
-            panscan_calc_windowed();
+            panscan_calc_windowed(vo);
             return VO_TRUE;
         case VOCTRL_UPDATE_SCREENINFO:
             if (!shared_buffer) {
-                vo_cocoa_update_xinerama_info(global_vo);
+                vo_cocoa_update_xinerama_info(vo);
                 return VO_TRUE;
             } else {
                 return VO_NOTIMPL;
@@ -494,7 +470,7 @@ static int control(uint32_t request, void *data)
         case VOCTRL_SET_YUV_COLORSPACE:
             if (!shared_buffer) {
                 colorspace.format = ((struct mp_csp_details *)data)->format;
-                set_yuv_colorspace(global_vo);
+                set_yuv_colorspace(vo);
                 return VO_TRUE;
             } else {
                 return VO_NOTIMPL;
@@ -509,3 +485,20 @@ static int control(uint32_t request, void *data)
     }
     return VO_NOTIMPL;
 }
+
+const struct vo_driver video_out_corevideo = {
+    .is_new = true,
+    .info = &(const vo_info_t) {
+        "Mac OS X Core Video",
+        "corevideo",
+        "Nicolas Plourde <nicolas.plourde@gmail.com> and others",
+        ""
+    },
+    .preinit = preinit,
+    .config = config,
+    .control = control,
+    .draw_osd = draw_osd,
+    .flip_page = flip_page,
+    .check_events = check_events,
+    .uninit = uninit,
+};
