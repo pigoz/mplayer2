@@ -166,6 +166,38 @@ static void prepare_opengl(void)
     resize(global_vo->dwidth, global_vo->dheight);
 }
 
+void cv_create_pixel_buffer_packed(void)
+{
+    CVReturn error;
+    error = CVPixelBufferCreateWithBytes(NULL, image_width, image_height, pixelFormat,
+                                         image_datas[0], image_width*image_bytes, NULL, NULL, NULL, &frameBuffers[0]);
+    if(error != kCVReturnSuccess)
+        mp_msg(MSGT_VO, MSGL_ERR,"[vo_corevideo] Failed to create Packed Pixel Buffer(%d)\n", error);
+
+    if (vo_doublebuffering) {
+        error = CVPixelBufferCreateWithBytes(NULL, image_width, image_height, pixelFormat,
+                                             image_datas[1], image_width*image_bytes, NULL, NULL, NULL, &frameBuffers[1]);
+        if(error != kCVReturnSuccess)
+            mp_msg(MSGT_VO, MSGL_ERR,"[vo_corevideo] Failed to create Packed Pixel Double Buffer(%d)\n", error);
+    }
+}
+
+void cv_create_pixel_buffer_planar(void)
+{
+    CVReturn error;
+    error = CVPixelBufferCreateWithPlanarBytes(NULL, image_width, image_height, pixelFormat, NULL, 0,
+		3, image_datas[0], NULL, NULL, NULL, NULL, NULL, NULL, &frameBuffers[0]);
+    if(error != kCVReturnSuccess)
+        mp_msg(MSGT_VO, MSGL_ERR,"[vo_corevideo] Failed to create Planar Pixel Buffer(%d)\n", error);
+
+    if (vo_doublebuffering) {
+        error = CVPixelBufferCreateWithPlanarBytes(NULL, image_width, image_height, pixelFormat, NULL, 0,
+			3, image_datas[1], NULL, NULL, NULL, NULL, NULL, NULL, &frameBuffers[0]);
+        if(error != kCVReturnSuccess)
+            mp_msg(MSGT_VO, MSGL_ERR,"[vo_corevideo] Failed to create Packed Pixel Double Buffer(%d)\n", error);
+    }
+}
+
 static int config(uint32_t width, uint32_t height, uint32_t d_width, uint32_t d_height, uint32_t flags, char *title, uint32_t format)
 {
     free_file_specific();
@@ -214,17 +246,7 @@ static int config(uint32_t width, uint32_t height, uint32_t d_width, uint32_t d_
         if(error != kCVReturnSuccess)
             mp_msg(MSGT_VO, MSGL_ERR,"[vo_corevideo] Failed to create OpenGL texture Cache(%d)\n", error);
 
-        error = CVPixelBufferCreateWithBytes(NULL, image_width, image_height, pixelFormat,
-                                             image_datas[0], image_width*image_bytes, NULL, NULL, NULL, &frameBuffers[0]);
-        if(error != kCVReturnSuccess)
-            mp_msg(MSGT_VO, MSGL_ERR,"[vo_corevideo] Failed to create Pixel Buffer(%d)\n", error);
-
-        if (vo_doublebuffering) {
-            error = CVPixelBufferCreateWithBytes(NULL, image_width, image_height, pixelFormat,
-                                                 image_datas[1], image_width*image_bytes, NULL, NULL, NULL, &frameBuffers[1]);
-            if(error != kCVReturnSuccess)
-                mp_msg(MSGT_VO, MSGL_ERR,"[vo_corevideo] Failed to create Pixel Double Buffer(%d)\n", error);
-        }
+        cv_create_pixel_buffer_planar();
 
         error = CVOpenGLTextureCacheCreateTextureFromImage(NULL, textureCache, frameBuffers[image_page], 0, &texture);
         if(error != kCVReturnSuccess)
@@ -363,6 +385,10 @@ static int query_format(uint32_t format)
     {
         case IMGFMT_YUY2:
             pixelFormat = kYUVSPixelFormat;
+            return supportflags;
+
+        case IMGFMT_YV12:
+            pixelFormat = kYUV420PixelFormat;
             return supportflags;
 
         case IMGFMT_RGB24:
