@@ -20,42 +20,24 @@
  */
 
 #import "vo_corevideo.h"
-#include <sys/types.h>
-#include <sys/ipc.h>
-#include <sys/mman.h>
-#include <unistd.h>
-#include <CoreServices/CoreServices.h>
 
 // mplayer includes
-#include "config.h"
-#include "fastmemcpy.h"
-#include "video_out.h"
-#include "aspect.h"
-#include "sub/sub.h"
-#include "subopt-helper.h"
+#import "fastmemcpy.h"
+#import "video_out.h"
+#import "aspect.h"
+#import "sub/sub.h"
+#import "subopt-helper.h"
 
-#include "csputils.h"
-#include "libmpcodecs/vfcap.h"
-#include "libmpcodecs/mp_image.h"
-#include "osd.h"
+#import "csputils.h"
+#import "libmpcodecs/vfcap.h"
+#import "libmpcodecs/mp_image.h"
+#import "osd.h"
 
 #import "cocoa_common.h"
 
-//Cocoa
-NSDistantObject *mplayerosxProxy;
-id <MPlayerOSXVOProto> mplayerosxProto;
-NSAutoreleasePool *autoreleasepool;
 OSType pixelFormat;
 
-//shared memory
-BOOL shared_buffer = false;
-#define DEFAULT_BUFFER_NAME "mplayerosx"
-static char *buffer_name;
-
-int screen_id;
-
-//CoreVideo
-CVPixelBufferRef frameBuffers[2];
+CVPixelBufferRef pixelBuffer;
 CVOpenGLTextureCacheRef textureCache;
 CVOpenGLTextureRef texture;
 NSRect textureFrame;
@@ -65,60 +47,7 @@ GLfloat lowerRight[2];
 GLfloat upperRight[2];
 GLfloat upperLeft[2];
 
-//image
-unsigned char *image_data;
-// For double buffering
-static uint8_t image_page = 0;
-static unsigned char *image_datas[2];
-
-static uint32_t image_width;
-static uint32_t image_height;
-static uint32_t image_depth;
-static uint32_t image_bytes;
-static uint32_t image_format;
-
 static struct mp_csp_details colorspace = MP_CSP_DETAILS_DEFAULTS;
-
-static void draw_alpha(void *ctx, int x0, int y0, int w, int h, unsigned char *src, unsigned char *srca, int stride)
-{
-    switch (image_format)
-    {
-        case IMGFMT_RGB24:
-            vo_draw_alpha_rgb24(w,h,src,srca,stride,image_data+3*(y0*image_width+x0),3*image_width);
-            break;
-        case IMGFMT_ARGB:
-        case IMGFMT_BGRA:
-            vo_draw_alpha_rgb32(w,h,src,srca,stride,image_data+4*(y0*image_width+x0),4*image_width);
-            break;
-        case IMGFMT_YUY2:
-            vo_draw_alpha_yuy2(w,h,src,srca,stride,image_data + (x0 + y0 * image_width) * 2,image_width*2);
-            break;
-    }
-}
-
-static void free_file_specific(void)
-{
-    if(shared_buffer)
-    {
-        [mplayerosxProto stop];
-        mplayerosxProto = nil;
-        [mplayerosxProxy release];
-        mplayerosxProxy = nil;
-
-        if (munmap(image_data, image_width*image_height*image_bytes) == -1)
-            mp_msg(MSGT_VO, MSGL_FATAL, "[vo_corevideo] uninit: munmap failed. Error: %s\n", strerror(errno));
-
-        if (shm_unlink(buffer_name) == -1)
-            mp_msg(MSGT_VO, MSGL_FATAL, "[vo_corevideo] uninit: shm_unlink failed. Error: %s\n", strerror(errno));
-    } else {
-        free(image_datas[0]);
-        if (vo_doublebuffering)
-            free(image_datas[1]);
-        image_datas[0] = NULL;
-        image_datas[1] = NULL;
-        image_data = NULL;
-    }
-}
 
 static void resize(struct vo *vo, int width, int height)
 {
@@ -150,131 +79,35 @@ static int config(struct vo *vo, uint32_t width, uint32_t height,
                   uint32_t d_width, uint32_t d_height, uint32_t flags,
                   uint32_t format)
 {
-    free_file_specific();
+    CVPixelBufferRelease(pixelBuffer);
+    pixelBuffer = NULL;
+    CVOpenGLTextureRelease(texture);
+    texture = NULL;
 
-    //misc mplayer setup
-    image_width = width;
-    image_height = height;
-    switch (image_format) {
-        case IMGFMT_RGB24:
-            image_depth = 24;
-            break;
-        case IMGFMT_ARGB:
-        case IMGFMT_BGRA:
-            image_depth = 32;
-            break;
-        case IMGFMT_YUY2:
-            image_depth = 16;
-            break;
-    }
+    vo_cocoa_create_window(vo, d_width, d_height, flags);
+    prepare_opengl(vo);
+    vo_cocoa_swap_interval(1);
 
-    image_bytes = (image_depth ? image_depth : 16 + 7) / 8;
-
-    if (!shared_buffer) {
-        CVReturn error;
-
-        image_data = malloc(image_width*image_height*image_bytes);
-        image_datas[0] = image_data;
-        if (vo_doublebuffering)
-            image_datas[1] = malloc(image_width*image_height*image_bytes);
-        image_page = 0;
-
-        CVPixelBufferRelease(frameBuffers[0]);
-        frameBuffers[0] = NULL;
-        CVPixelBufferRelease(frameBuffers[1]);
-        frameBuffers[1] = NULL;
-        CVOpenGLTextureRelease(texture);
-        texture = NULL;
-
-        vo_cocoa_create_window(vo, d_width, d_height, flags);
-        prepare_opengl(vo);
-        vo_cocoa_swap_interval(1);
-
-        error = CVOpenGLTextureCacheCreate(NULL, 0, vo_cocoa_cgl_context(), vo_cocoa_cgl_pixel_format(), 0, &textureCache);
-        if(error != kCVReturnSuccess)
-            mp_msg(MSGT_VO, MSGL_ERR,"[vo_corevideo] Failed to create OpenGL texture Cache(%d)\n", error);
-
-        error = CVPixelBufferCreateWithBytes(NULL, image_width, image_height, pixelFormat,
-                                             image_datas[0], image_width*image_bytes, NULL, NULL, NULL, &frameBuffers[0]);
-        if(error != kCVReturnSuccess)
-            mp_msg(MSGT_VO, MSGL_ERR,"[vo_corevideo] Failed to create Pixel Buffer(%d)\n", error);
-
-        if (vo_doublebuffering) {
-            error = CVPixelBufferCreateWithBytes(NULL, image_width, image_height, pixelFormat,
-                                                 image_datas[1], image_width*image_bytes, NULL, NULL, NULL, &frameBuffers[1]);
-            if(error != kCVReturnSuccess)
-                mp_msg(MSGT_VO, MSGL_ERR,"[vo_corevideo] Failed to create Pixel Double Buffer(%d)\n", error);
-        }
-
-        error = CVOpenGLTextureCacheCreateTextureFromImage(NULL, textureCache, frameBuffers[image_page], 0, &texture);
-        if(error != kCVReturnSuccess)
-            mp_msg(MSGT_VO, MSGL_ERR,"[vo_corevideo] Failed to create OpenGL texture(%d)\n", error);
-    } else {
-        int shm_fd;
-        mp_msg(MSGT_VO, MSGL_INFO, "[vo_corevideo] writing output to a shared buffer "
-                "named \"%s\"\n",buffer_name);
-
-        // create shared memory
-        shm_fd = shm_open(buffer_name, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
-        if (shm_fd == -1) {
-            mp_msg(MSGT_VO, MSGL_FATAL,
-                   "[vo_corevideo] failed to open shared memory. Error: %s\n", strerror(errno));
-            return 1;
-        }
-
-        if (ftruncate(shm_fd, image_width*image_height*image_bytes) == -1) {
-            mp_msg(MSGT_VO, MSGL_FATAL,
-                   "[vo_corevideo] failed to size shared memory, possibly already in use. Error: %s\n", strerror(errno));
-            close(shm_fd);
-            shm_unlink(buffer_name);
-            return 1;
-        }
-
-        image_data = mmap(NULL, image_width*image_height*image_bytes,
-                    PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
-        close(shm_fd);
-
-        if (image_data == MAP_FAILED) {
-            mp_msg(MSGT_VO, MSGL_FATAL,
-                   "[vo_corevideo] failed to map shared memory. Error: %s\n", strerror(errno));
-            shm_unlink(buffer_name);
-            return 1;
-        }
-
-        //connect to mplayerosx
-        mplayerosxProxy=[NSConnection rootProxyForConnectionWithRegisteredName:[NSString stringWithUTF8String:buffer_name] host:nil];
-        if ([mplayerosxProxy conformsToProtocol:@protocol(MPlayerOSXVOProto)]) {
-            [mplayerosxProxy setProtocolForProxy:@protocol(MPlayerOSXVOProto)];
-            mplayerosxProto = (id <MPlayerOSXVOProto>)mplayerosxProxy;
-            [mplayerosxProto startWithWidth: image_width withHeight: image_height withBytes: image_bytes withAspect:d_width*100/d_height];
-        } else {
-            [mplayerosxProxy release];
-            mplayerosxProxy = nil;
-            mplayerosxProto = nil;
-        }
-    }
     return 0;
 }
 
 static void check_events(struct vo *vo)
 {
-    if (!shared_buffer) {
-        int e = vo_cocoa_check_events(vo);
-        if (e & VO_EVENT_RESIZE)
-            resize(vo, vo->dwidth, vo->dheight);
-    }
+    int e = vo_cocoa_check_events(vo);
+    if (e & VO_EVENT_RESIZE)
+        resize(vo, vo->dwidth, vo->dheight);
 }
 
 static void draw_osd(struct vo *vo, struct osd_state *osd)
 {
-    osd_draw_text(osd, image_width, image_height, draw_alpha, vo);
+    //osd_draw_text(osd, image_width, image_height, draw_alpha, vo);
 }
 
 static void prepare_texture(void)
 {
     CVReturn error;
     CVOpenGLTextureRelease(texture);
-    error = CVOpenGLTextureCacheCreateTextureFromImage(NULL, textureCache, frameBuffers[image_page], 0, &texture);
+    error = CVOpenGLTextureCacheCreateTextureFromImage(NULL, textureCache, pixelBuffer, 0, &texture);
     if(error != kCVReturnSuccess)
         mp_msg(MSGT_VO, MSGL_ERR,"[vo_corevideo] Failed to create OpenGL texture(%d)\n", error);
 
@@ -300,26 +133,32 @@ static void do_render(struct vo *vo)
 
 static void flip_page(struct vo *vo)
 {
-    if(shared_buffer) {
-        NSAutoreleasePool *pool = [NSAutoreleasePool new];
-        [mplayerosxProto render];
-        [pool release];
-    } else {
-        prepare_texture();
-        do_render(vo);
-        if (vo_doublebuffering) {
-            image_page = 1 - image_page;
-            image_data = image_datas[image_page];
-        }
+    if (vo_doublebuffering) {
         vo_cocoa_swap_buffers();
+    } else {
+        mp_msg(MSGT_VO, MSGL_ERR,"[vo_corevideo] Shit happening!\n");
     }
 }
 
-static uint32_t draw_image(mp_image_t *mpi)
+static uint32_t draw_image(struct vo *vo, mp_image_t *mpi)
 {
-    memcpy_pic(image_data, mpi->planes[0], image_width*image_bytes, image_height, image_width*image_bytes, mpi->stride[0]);
+    CVReturn error;
 
-    return 0;
+    if (!textureCache || !pixelBuffer) {
+        error = CVOpenGLTextureCacheCreate(NULL, 0, vo_cocoa_cgl_context(), vo_cocoa_cgl_pixel_format(), 0, &textureCache);
+        if(error != kCVReturnSuccess)
+            mp_msg(MSGT_VO, MSGL_ERR,"[vo_corevideo] Failed to create OpenGL texture Cache(%d)\n", error);
+
+        error = CVPixelBufferCreateWithBytes(NULL, mpi->width, mpi->height, pixelFormat,
+                                             mpi->planes[0], mpi->width * mpi->bpp / 8, NULL, NULL, NULL, &pixelBuffer);
+        if(error != kCVReturnSuccess)
+            mp_msg(MSGT_VO, MSGL_ERR,"[vo_corevideo] Failed to create Pixel Buffer(%d)\n", error);
+    }
+
+    prepare_texture();
+    do_render(vo);
+
+    return VO_TRUE;
 }
 
 static int query_format(uint32_t format)
@@ -327,7 +166,6 @@ static int query_format(uint32_t format)
     const int supportflags = VFCAP_CSP_SUPPORTED | VFCAP_CSP_SUPPORTED_BY_HW |
                              VFCAP_OSD | VFCAP_HWSCALE_UP | VFCAP_HWSCALE_DOWN |
                              VOCAP_NOSLICES;
-    image_format = format;
 
     switch(format)
     {
@@ -352,59 +190,24 @@ static int query_format(uint32_t format)
 
 static void uninit(struct vo *vo)
 {
-    SetSystemUIMode(kUIModeNormal, 0);
-    CGDisplayShowCursor(kCGDirectMainDisplay);
-
-    free_file_specific();
-
-    if (!shared_buffer)
-        vo_cocoa_uninit(vo);
-
-    free(buffer_name);
-    buffer_name = NULL;
+    vo_cocoa_uninit(vo);
 }
 
 static const opt_t subopts[] = {
-{"device_id",     OPT_ARG_INT,  &screen_id,     NULL},
-{"shared_buffer", OPT_ARG_BOOL, &shared_buffer, NULL},
-{"buffer_name",   OPT_ARG_MSTRZ,&buffer_name,   NULL},
 {NULL}
 };
 
 static int preinit(struct vo *vo, const char *arg)
 {
-    // set defaults
-    screen_id = -1;
-    shared_buffer = false;
-    buffer_name = NULL;
-
     if (subopt_parse(arg, subopts) != 0) {
         mp_msg(MSGT_VO, MSGL_FATAL,
                 "\n-vo corevideo command line help:\n"
-                "Example: mplayer -vo corevideo:device_id=1:shared_buffer:buffer_name=mybuff\n"
-                "\nOptions:\n"
-                "  device_id=<0-...>\n"
-                "    Set screen device ID for fullscreen.\n"
-                "  shared_buffer\n"
-                "    Write output to a shared memory buffer instead of displaying it.\n"
-                "  buffer_name=<name>\n"
-                "    Name of the shared buffer created with shm_open() as well as\n"
-                "    the name of the NSConnection MPlayer will try to open.\n"
-                "    Setting buffer_name implicitly enables shared_buffer.\n"
+                "Example: mplayer -vo corevideo\n"
                 "\n" );
         return -1;
     }
 
-    autoreleasepool = [[NSAutoreleasePool alloc] init];
-
-    if (!buffer_name)
-        buffer_name = strdup(DEFAULT_BUFFER_NAME);
-    else
-        shared_buffer = true;
-
-    if (!shared_buffer)
-        vo_cocoa_init(vo);
-
+    vo_cocoa_init(vo);
     return 0;
 }
 
@@ -423,37 +226,25 @@ static CFStringRef get_cv_csp_matrix(void)
 
 static void set_yuv_colorspace(struct vo *vo)
 {
-    if (!shared_buffer) {
-        CVBufferSetAttachment(frameBuffers[0],
-                              kCVImageBufferYCbCrMatrixKey, get_cv_csp_matrix(),
-                              kCVAttachmentMode_ShouldPropagate);
-        if(vo_doublebuffering)
-            CVBufferSetAttachment(frameBuffers[1],
-                                  kCVImageBufferYCbCrMatrixKey, get_cv_csp_matrix(),
-                                  kCVAttachmentMode_ShouldPropagate);
-        vo->want_redraw = true;
-    }
+    CVBufferSetAttachment(pixelBuffer,
+                          kCVImageBufferYCbCrMatrixKey, get_cv_csp_matrix(),
+                          kCVAttachmentMode_ShouldPropagate);
+    vo->want_redraw = true;
 }
 
 static int control(struct vo *vo, uint32_t request, void *data)
 {
     switch (request) {
-        case VOCTRL_DRAW_IMAGE: return draw_image(data);
-        case VOCTRL_QUERY_FORMAT: return query_format(*(uint32_t*)data);
+        case VOCTRL_DRAW_IMAGE:
+            return draw_image(vo, data);
+        case VOCTRL_QUERY_FORMAT:
+            return query_format(*(uint32_t*)data);
         case VOCTRL_ONTOP:
-            if (!shared_buffer) {
-                vo_cocoa_ontop(vo);
-            } else {
-                [mplayerosxProto ontop];
-            }
+            vo_cocoa_ontop(vo);
             return VO_TRUE;
         case VOCTRL_FULLSCREEN:
-            if (!shared_buffer) {
-                vo_cocoa_fullscreen(vo);
-                resize(vo, vo->dwidth, vo->dheight);
-            } else {
-                [mplayerosxProto toggleFullscreen];
-            }
+            vo_cocoa_fullscreen(vo);
+            resize(vo, vo->dwidth, vo->dheight);
             return VO_TRUE;
         case VOCTRL_GET_PANSCAN:
             return VO_TRUE;
@@ -461,27 +252,15 @@ static int control(struct vo *vo, uint32_t request, void *data)
             panscan_calc_windowed(vo);
             return VO_TRUE;
         case VOCTRL_UPDATE_SCREENINFO:
-            if (!shared_buffer) {
-                vo_cocoa_update_xinerama_info(vo);
-                return VO_TRUE;
-            } else {
-                return VO_NOTIMPL;
-            }
+            vo_cocoa_update_xinerama_info(vo);
+            return VO_TRUE;
         case VOCTRL_SET_YUV_COLORSPACE:
-            if (!shared_buffer) {
-                colorspace.format = ((struct mp_csp_details *)data)->format;
-                set_yuv_colorspace(vo);
-                return VO_TRUE;
-            } else {
-                return VO_NOTIMPL;
-            }
+            colorspace.format = ((struct mp_csp_details *)data)->format;
+            set_yuv_colorspace(vo);
+            return VO_TRUE;
         case VOCTRL_GET_YUV_COLORSPACE:
-            if (!shared_buffer) {
-                *(struct mp_csp_details *)data = colorspace;
-                return VO_TRUE;
-            } else {
-                return VO_NOTIMPL;
-            }
+            *(struct mp_csp_details *)data = colorspace;
+            return VO_TRUE;
     }
     return VO_NOTIMPL;
 }
