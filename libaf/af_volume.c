@@ -150,9 +150,9 @@ static af_data_t* play(struct af_instance_s* af, af_data_t* data)
   if(af->data->format == (AF_FORMAT_S16_NE)){
     int16_t*    a   = (int16_t*)c->audio;	// Audio data
     int         len = c->len/2;			// Number of samples
+    int         vol = (int)(256.0 * s->level[ch]);
     for(ch = 0; ch < nch ; ch++){
-      if(s->enable[ch]){
-	register int vol = (int)(255.0 * s->level[ch]);
+      if(s->enable[ch] && vol != 256){
 	for(i=ch;i<len;i+=nch){
 	  register int x = (a[i] * vol) >> 8;
 	  a[i]=clamp(x,SHRT_MIN,SHRT_MAX);
