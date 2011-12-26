@@ -75,6 +75,11 @@
 #include "subopt-helper.h"
 #endif
 
+#ifdef CONFIG_PNG
+#include <png.h>
+#include "mp_icon.h"
+#endif
+
 #include "input/input.h"
 #include "input/keycodes.h"
 
@@ -331,6 +336,7 @@ static void init_atoms(struct vo_x11_state *x11)
     XA_INIT(_NET_WM_PID);
     XA_INIT(_NET_WM_NAME);
     XA_INIT(_NET_WM_ICON_NAME);
+    XA_INIT(_NET_WM_ICON);
     XA_INIT(_WIN_PROTOCOLS);
     XA_INIT(_WIN_LAYER);
     XA_INIT(_WIN_HINTS);
@@ -1039,6 +1045,126 @@ static void vo_x11_update_window_title(struct vo *vo)
     vo_x11_set_property_utf8(vo, x11->XA_NET_WM_ICON_NAME, title);
 }
 
+#ifdef CONFIG_PNG
+struct read_png_state {
+    const unsigned char *data;
+    size_t size;
+};
+
+static void read_png_cb(png_structp png_ptr, png_bytep data, png_size_t length)
+{
+    struct read_png_state *state = png_ptr->io_ptr;
+    if (length > state->size)
+        png_error(png_ptr, "no data");
+    memcpy(data, state->data, length);
+    state->data += length;
+    state->size -= length;
+}
+
+
+static long *read_png_icon(const unsigned char *data, size_t data_size)
+{
+    png_structp png_ptr = NULL;
+    png_infop info = NULL;
+    struct read_png_state read_state = { data, data_size };
+    png_uint_32 width, height;
+    int bit_depth, color_type;
+    // Local variables changed between setjmp and longjmp are normally
+    // undefined when accessing them after longjmp, unless they are marked as
+    // volatile. Note that the variables itself must be volatile, not the data
+    // pointer variables point to.
+    long *volatile icon = NULL;
+    png_bytep *volatile row_pointers = NULL;
+
+    png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+    if (!png_ptr)
+        goto exit;
+
+    info = png_create_info_struct(png_ptr);
+    if (!info)
+        goto exit;
+
+    if (setjmp(png_jmpbuf(png_ptr))) {
+        if (icon)
+            talloc_free(icon);
+        icon = NULL;
+        goto exit;
+    }
+
+    png_set_read_fn(png_ptr, (void *)&read_state, read_png_cb);
+    png_read_info(png_ptr, info);
+    png_get_IHDR(png_ptr, info, &width, &height, &bit_depth, &color_type,
+                 NULL, NULL, NULL);
+
+    // convert to ARGB, packed into 32 bit (A in highest byte, B in lowest byte)
+    png_set_strip_16(png_ptr);                  // 16 bit -> 8 bit
+    png_set_packing(png_ptr);                   // packed bits to bytes
+    png_set_palette_to_rgb(png_ptr);            // paletted format to RGB
+    png_set_expand(png_ptr);                    // packed grayscale to RGB
+    png_set_tRNS_to_alpha(png_ptr);             // colorkey to alpha
+    png_set_gray_to_rgb(png_ptr);               // grayscale to RGB
+    png_set_add_alpha(png_ptr, 0xff, PNG_FILLER_AFTER); // force alpha channel
+    png_set_bgr(png_ptr);                       // _NET_WM_ICON bit order
+
+    png_read_update_info(png_ptr, info);
+
+    size_t rowsize = png_get_rowbytes(png_ptr, info);
+    size_t rowpointers_size = sizeof(png_bytep) * height;
+
+    row_pointers = png_malloc(png_ptr, rowpointers_size + rowsize * height);
+
+    for (png_uint_32 row = 0; row < height; row++)
+        row_pointers[row] = (void*)((char *)row_pointers + rowpointers_size +
+                            rowsize * row);
+
+    png_read_image(png_ptr, row_pointers);
+
+    icon = talloc_array(NULL, long, width * height + 2);
+
+    long *pixels = icon;
+
+    *pixels++ = width;
+    *pixels++ = height;
+
+    for (png_uint_32 y = 0; y < height; y++) {
+        png_bytep rowp = row_pointers[y];
+        for (png_uint_32 x = 0; x < width; x++) {
+            *pixels++ = *(uint32_t*)rowp;
+            rowp += 4;
+        }
+    }
+
+    png_read_end(png_ptr, info);
+
+exit:
+    if (row_pointers)
+        png_free(png_ptr, row_pointers);
+    if (png_ptr)
+        png_destroy_read_struct(&png_ptr, &info, NULL);
+    return icon;
+}
+
+static void vo_x11_set_wm_icon_png(struct vo_x11_state *x11,
+                                   const unsigned char *icon, size_t icon_size)
+{
+    long *pixels = read_png_icon(icon, icon_size);
+    if (!pixels)
+        return;
+    XChangeProperty(x11->display, x11->window, x11->XA_NET_WM_ICON,
+                    XA_CARDINAL, 32, PropModeReplace, (char *)pixels,
+                    MP_TALLOC_ELEMS(pixels));
+    talloc_free(pixels);
+}
+
+#else /* CONFIG_PNG */
+
+static void vo_x11_set_wm_icon_png(struct vo_x11_state *x11,
+                                   const unsigned char *icon, size_t icon_size)
+{
+}
+
+#endif /* CONFIG_PNG */
+
 //
 static Window vo_x11_create_smooth_window(struct vo_x11_state *x11, Window mRoot,
                                    Visual * vis, int x, int y,
@@ -1138,6 +1264,7 @@ void vo_x11_create_vo_window(struct vo *vo, XVisualInfo *vis, int x, int y,
     if (geometry_xy_changed)
       hint.flags |= PPosition;
     XSetWMNormalHints(mDisplay, x11->window, &hint);
+    vo_x11_set_wm_icon_png(x11, mp_icon, sizeof(mp_icon));
     if (!vo_border) vo_x11_decoration(vo, 0);
     // map window
     x11->xic = XCreateIC(x11->xim,

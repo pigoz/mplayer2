@@ -727,6 +727,9 @@ generated_ebml:
 	TOOLS/matroska.py --generate-header >libmpdemux/ebml_types.h
 	TOOLS/matroska.py --generate-definitions >libmpdemux/ebml_defs.c
 
+mp_icon.h: etc/mplayer.png
+	python bin_to_header.py etc/mplayer.png mp_icon.h
+
 ###### tests / tools #######
 
 TEST_OBJS = mp_msg.o mp_fifo.o osdep/$(GETCH) osdep/$(TIMER) -ltermcap -lm
