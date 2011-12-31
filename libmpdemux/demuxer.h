@@ -268,6 +268,8 @@ typedef struct demuxer {
     // teletext decoder private data, if demuxer stream contains teletext
     void *teletext;
 
+    int num_titles;
+
     struct demux_chapter *chapters;
     int num_chapters;
 
