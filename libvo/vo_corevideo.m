@@ -370,6 +370,9 @@ static int control(struct vo *vo, uint32_t request, void *data)
         case VOCTRL_UPDATE_SCREENINFO:
             mpglctx->update_xinerama_info(vo);
             return VO_TRUE;
+        case VOCTRL_REDRAW_FRAME:
+            do_render(vo);
+            return VO_TRUE;
         case VOCTRL_SET_YUV_COLORSPACE:
             colorspace.format = ((struct mp_csp_details *)data)->format;
             set_yuv_colorspace(vo);
