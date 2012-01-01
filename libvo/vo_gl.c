@@ -1549,6 +1549,31 @@ const struct vo_driver video_out_gl_nosw =
     .uninit = uninit,
 };
 
+#ifdef CONFIG_GL_X11
+static int preinit_x11(struct vo *vo, const char *arg)
+{
+    return preinit_internal(vo, arg, 1, GLTYPE_X11);
+}
+
+const struct vo_driver video_out_gl_x11 = {
+    .is_new = true,
+    .info = &(const vo_info_t) {
+        "OpenGL with X11",
+        "gl_x11",
+        "Reimar Doeffinger <Reimar.Doeffinger@gmx.de>",
+        ""
+    },
+    .preinit = preinit_x11,
+    .config = config,
+    .control = control,
+    .draw_slice = draw_slice,
+    .draw_osd = draw_osd,
+    .flip_page = flip_page,
+    .check_events = check_events,
+    .uninit = uninit,
+};
+#endif
+
 #ifdef CONFIG_GL_SDL
 static int preinit_sdl(struct vo *vo, const char *arg)
 {
