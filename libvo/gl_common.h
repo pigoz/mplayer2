@@ -44,7 +44,11 @@
 // This old-vo wrapper macro would conflict with the struct member
 #undef update_xinerama_info
 #endif
+#ifdef CONFIG_GL_COCOA
+#import <OpenGL/gl.h>
+#else
 #include <GL/gl.h>
+#endif
 
 // workaround for some gl.h headers
 #ifndef GLAPIENTRY
