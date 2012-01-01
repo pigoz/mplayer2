@@ -381,6 +381,7 @@ SRCS_COMMON = asxparser.c \
               libmpdemux/demux_nsv.c \
               libmpdemux/demux_pva.c \
               libmpdemux/demux_rawaudio.c \
+              libmpdemux/demux_bin.c \
               libmpdemux/demux_rawvideo.c \
               libmpdemux/demux_realaud.c \
               libmpdemux/demux_real.c \
