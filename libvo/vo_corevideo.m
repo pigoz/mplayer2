@@ -108,7 +108,7 @@ static int init_gl(struct vo *vo, uint32_t d_width, uint32_t d_height)
     resize(vo, d_width, d_height);
 
     gl->ClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-    gl->Clear(GL_COLOR_BUFFER_BIT);
+    gl->Clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     if (gl->SwapInterval)
         gl->SwapInterval(1);
     return 1;
@@ -236,12 +236,9 @@ static void do_render(struct vo *vo)
     GL *gl = mpglctx->gl;
     prepare_texture();
 
-    gl->Clear(GL_COLOR_BUFFER_BIT);
-
     gl->Enable(CVOpenGLTextureGetTarget(texture));
     gl->BindTexture(CVOpenGLTextureGetTarget(texture), CVOpenGLTextureGetName(texture));
 
-    gl->Color3f(1,1,1);
     gl->Begin(GL_QUADS);
     gl->TexCoord2f(upperLeft[0], upperLeft[1]); gl->Vertex2f(textureFrame.origin.x-(vo->panscan_x >> 1), textureFrame.origin.y-(vo->panscan_y >> 1));
     gl->TexCoord2f(lowerLeft[0], lowerLeft[1]); gl->Vertex2f(textureFrame.origin.x-(vo->panscan_x >> 1), NSMaxY(textureFrame)+(vo->panscan_y >> 1));
@@ -254,6 +251,7 @@ static void do_render(struct vo *vo)
 static void flip_page(struct vo *vo)
 {
     mpglctx->swapGlBuffers(mpglctx);
+    mpglctx->gl->Clear(GL_COLOR_BUFFER_BIT);
 }
 
 static uint32_t draw_image(struct vo *vo, mp_image_t *mpi)
