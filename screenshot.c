@@ -282,7 +282,7 @@ static void append_filename(char **s, const char *f)
 }
 
 static char *create_fname(struct MPContext *mpctx, char *template,
-                          const char *file_ext, int *frameno)
+                          const char *file_ext, int *sequence, int *frameno)
 {
     char *res = talloc_strdup(NULL, ""); //empty string, non-NULL context
 
@@ -300,19 +300,30 @@ static char *create_fname(struct MPContext *mpctx, char *template,
         template = next + 1;
         char fmt = *template++;
         switch (fmt) {
+        case '#':
         case '0':
         case 'n': {
             int digits = '4';
+            if (fmt == '#') {
+                if (!*sequence) {
+                    *frameno = 1;
+                }
+                fmt = *template++;
+            }
             if (fmt == '0') {
                 digits = *template++;
                 if (digits < '0' || digits > '9')
                     goto error_exit;
-                if (*template++ != 'n')
-                    goto error_exit;
+                fmt = *template++;
             }
+            if (fmt != 'n')
+                goto error_exit;
             char fmtstr[] = {'%', '0', digits, 'd', '\0'};
             res = talloc_asprintf_append(res, fmtstr, *frameno);
-            (*frameno) += 1;
+            if (*frameno < 100000 - 1) {
+                (*frameno) += 1;
+                (*sequence) += 1;
+            }
             break;
         }
         case 'f':
@@ -363,11 +374,13 @@ error_exit:
 
 static char *gen_fname(screenshot_ctx *ctx)
 {
+    int sequence = 0;
     for (;;) {
-        int prev_frameno = ctx->frameno;
+        int prev_sequence = sequence;
         char *fname = create_fname(ctx->mpctx,
                                    ctx->mpctx->opts.screenshot_template,
                                    get_writer(ctx)->file_ext,
+                                   &sequence,
                                    &ctx->frameno);
 
         if (!fname) {
@@ -382,7 +395,7 @@ static char *gen_fname(screenshot_ctx *ctx)
 
         talloc_free(fname);
 
-        if (ctx->frameno == prev_frameno || ctx->frameno == 100000) {
+        if (sequence == prev_sequence) {
             mp_msg(MSGT_CPLAYER, MSGL_ERR, "Can't save screenshot, file "
                    "already exists!\n");
             return NULL;
