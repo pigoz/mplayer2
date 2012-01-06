@@ -292,7 +292,7 @@ static char *create_fname(screenshot_ctx *ctx, int *out_uses_frameno)
     *out_uses_frameno = 0;
 
     if (!template || *template == '\0')
-        template = "shot%n4";
+        template = "shot%n";
 
     for (;;) {
         char *next = strchr(template, '%');
@@ -302,11 +302,17 @@ static char *create_fname(screenshot_ctx *ctx, int *out_uses_frameno)
         template = next + 1;
         char fmt = *template++;
         switch (fmt) {
+        case '0':
         case 'n': {
-            fmt = *template++;
-            if (fmt < '0' || fmt > '9')
-                goto error_exit;
-            char fmtstr[] = {'%', '0', fmt, 'd', '\0'};
+            int digits = '4';
+            if (fmt == '0') {
+                digits = *template++;
+                if (digits < '0' || digits > '9')
+                    goto error_exit;
+                if (*template++ != 'n')
+                    goto error_exit;
+            }
+            char fmtstr[] = {'%', '0', digits, 'd', '\0'};
             res = talloc_asprintf_append(res, fmtstr, ctx->frameno);
             *out_uses_frameno = 1;
             break;
