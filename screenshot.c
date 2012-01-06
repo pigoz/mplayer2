@@ -83,7 +83,7 @@ static screenshot_ctx *screenshot_get_ctx(MPContext *mpctx)
 static FILE *open_file(screenshot_ctx *ctx, char *fname) {
     FILE *fp = fopen(fname, "wb");
     if (fp == NULL)
-        mp_msg(MSGT_CPLAYER, MSGL_ERR, "Error opening %s for writing\n",
+        mp_msg(MSGT_CPLAYER, MSGL_ERR, "Error opening %s for writing!\n",
                fname);
     return fp;
 }
@@ -101,7 +101,7 @@ static int write_png(screenshot_ctx *ctx, struct mp_image *image,
 
     if (avcodec_open(avctx, avcodec_find_encoder(CODEC_ID_PNG))) {
         mp_msg(MSGT_CPLAYER, MSGL_INFO, "Could not open libavcodec PNG encoder"
-               " for saving screenshot\n");
+               " for saving screenshot!\n");
         goto error_exit;
     }
 
@@ -361,8 +361,8 @@ static char *create_fname(screenshot_ctx *ctx, int *out_uses_frameno)
     return talloc_asprintf_append(res, ".%s", ext);
 
 error_exit:
-    mp_msg(MSGT_CPLAYER, MSGL_ERR,
-           "Invalid template string for screenshot filename\n");
+    mp_msg(MSGT_CPLAYER, MSGL_ERR, "Invalid screenshot filename template!"
+           " Fix or remove the --screenshot-template option.\n");
     talloc_free(res);
     return NULL;
 }
@@ -383,7 +383,7 @@ static char *gen_fname(screenshot_ctx *ctx)
 
         if (!uses_frameno || ctx->frameno == 100000) {
             mp_msg(MSGT_CPLAYER, MSGL_ERR, "Can't save screenshot, file "
-                   "already exists\n");
+                   "already exists!\n");
             return NULL;
         }
 
@@ -417,7 +417,7 @@ void screenshot_save(struct MPContext *mpctx, struct mp_image *image)
     if (filename) {
         mp_msg(MSGT_CPLAYER, MSGL_INFO, "*** screenshot '%s' ***\n", filename);
         if (!writer->write(ctx, dst, filename))
-            mp_msg(MSGT_CPLAYER, MSGL_ERR, "Error writing screenshot\n");
+            mp_msg(MSGT_CPLAYER, MSGL_ERR, "Error writing screenshot!\n");
         talloc_free(filename);
     }
 
