@@ -496,6 +496,8 @@ void create_menu()
             buttonNumber = 1;
         switch ([theEvent type]) {
             case NSLeftMouseDown:
+                if ([theEvent clickCount] == 2)
+                    vo_cocoa_fullscreen(l_vo);
                 break;
             case NSRightMouseDown:
             case NSOtherMouseDown:
