@@ -34,6 +34,7 @@
 #include <math.h>
 #include <string.h>
 #include <alloca.h>
+#include <stdbool.h>
 
 #include "config.h"
 #include "subopt-helper.h"
@@ -668,6 +669,7 @@ static int init(int rate_hz, int channels, int format, int flags)
 
     } // end switch alsa_handler (spdif)
     alsa_can_pause = snd_pcm_hw_params_can_pause(alsa_hwparams);
+    global_ao->no_persistent_volume = true;
     return 1;
 } // end init
 
@@ -681,6 +683,9 @@ static void uninit(int immed)
 
     if (!immed)
       snd_pcm_drain(alsa_handler);
+
+    ao_control_vol_t vol = { 100, 100 };
+    control(AOCONTROL_SET_VOLUME, &vol);
 
     if ((err = snd_pcm_close(alsa_handler)) < 0)
       {
