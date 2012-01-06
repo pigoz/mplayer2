@@ -1697,7 +1697,7 @@ static void update_osd_msg(struct MPContext *mpctx)
     if (mpctx->add_osd_seek_info) {
         double percentage = get_percent_pos(mpctx);
         set_osd_bar(mpctx, 0, "Position", 0, 100, percentage);
-        if (mpctx->sh_video)
+        if (mpctx->sh_video && opts->term_osd != 1)
             mpctx->osd_show_percentage_until = (GetTimerMS() + 1000) | 1;
         mpctx->add_osd_seek_info = false;
     }
@@ -1706,7 +1706,7 @@ static void update_osd_msg(struct MPContext *mpctx)
     if ((msg = get_osd_msg(mpctx))) {
         if (strcmp(osd->osd_text, msg->msg)) {
             osd_set_text(osd, msg->msg);
-            if (mpctx->sh_video)
+            if (mpctx->sh_video && opts->term_osd != 1)
                 vo_osd_changed(OSDTYPE_OSD);
             else if (opts->term_osd)
                 mp_msg(MSGT_CPLAYER, MSGL_STATUS, "%s%s\n", opts->term_osd_esc,
@@ -1715,7 +1715,7 @@ static void update_osd_msg(struct MPContext *mpctx)
         return;
     }
 
-    if (mpctx->sh_video) {
+    if (mpctx->sh_video && opts->term_osd != 1) {
         // fallback on the timer
         if (opts->osd_level >= 2) {
             int len = get_time_length(mpctx);
