@@ -3008,6 +3008,7 @@ void pause_player(struct MPContext *mpctx)
     mpctx->paused = 1;
     mpctx->step_frames = 0;
     mpctx->time_frame -= get_relative_time(mpctx);
+    mpctx->osd_function = OSD_PAUSE;
 
     if (mpctx->video_out && mpctx->sh_video && mpctx->video_out->config_ok)
         vo_control(mpctx->video_out, VOCTRL_PAUSE, NULL);
@@ -3021,6 +3022,8 @@ void unpause_player(struct MPContext *mpctx)
     if (!mpctx->paused)
         return;
     mpctx->paused = 0;
+    if (!mpctx->step_frames)
+        mpctx->osd_function = OSD_PLAY;
 
     if (mpctx->ao && mpctx->sh_audio)
         ao_resume(mpctx->ao);
