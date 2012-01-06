@@ -281,15 +281,13 @@ static void append_filename(char **s, const char *f)
     talloc_free(append);
 }
 
-static char *create_fname(screenshot_ctx *ctx, int *out_uses_frameno)
+static char *create_fname(struct MPContext *mpctx, char *template,
+                          const char *file_ext, int *frameno)
 {
-    char *template = ctx->mpctx->opts.screenshot_template;
     char *res = talloc_strdup(NULL, ""); //empty string, non-NULL context
 
     time_t raw_time = time(NULL);
     struct tm *local_time = localtime(&raw_time);
-
-    *out_uses_frameno = 0;
 
     if (!template || *template == '\0')
         template = "shot%n";
@@ -313,14 +311,14 @@ static char *create_fname(screenshot_ctx *ctx, int *out_uses_frameno)
                     goto error_exit;
             }
             char fmtstr[] = {'%', '0', digits, 'd', '\0'};
-            res = talloc_asprintf_append(res, fmtstr, ctx->frameno);
-            *out_uses_frameno = 1;
+            res = talloc_asprintf_append(res, fmtstr, *frameno);
+            (*frameno) += 1;
             break;
         }
         case 'f':
         case 'F':
         {
-            char *video_file = get_metadata(ctx->mpctx, META_NAME);
+            char *video_file = get_metadata(mpctx, META_NAME);
             if (video_file) {
                 char *name = video_file;
                 if (fmt == 'F')
@@ -333,7 +331,7 @@ static char *create_fname(screenshot_ctx *ctx, int *out_uses_frameno)
         case 'p':
         case 'P':
             append_filename(&res,
-                    format_time(res, get_current_time(ctx->mpctx), fmt == 'P'));
+                    format_time(res, get_current_time(mpctx), fmt == 'P'));
             break;
         case 't': {
             char fmt = *template;
@@ -356,13 +354,9 @@ static char *create_fname(screenshot_ctx *ctx, int *out_uses_frameno)
     }
 
     res = talloc_strdup_append(res, template);
-
-    const char *ext = get_writer(ctx)->file_ext;
-    return talloc_asprintf_append(res, ".%s", ext);
+    return talloc_asprintf_append(res, ".%s", file_ext);
 
 error_exit:
-    mp_msg(MSGT_CPLAYER, MSGL_ERR, "Invalid screenshot filename template!"
-           " Fix or remove the --screenshot-template option.\n");
     talloc_free(res);
     return NULL;
 }
@@ -370,24 +364,29 @@ error_exit:
 static char *gen_fname(screenshot_ctx *ctx)
 {
     for (;;) {
-        int uses_frameno;
-        char *fname = create_fname(ctx, &uses_frameno);
+        int prev_frameno = ctx->frameno;
+        char *fname = create_fname(ctx->mpctx,
+                                   ctx->mpctx->opts.screenshot_template,
+                                   get_writer(ctx)->file_ext,
+                                   &ctx->frameno);
 
-        if (!fname)
+        if (!fname) {
+            mp_msg(MSGT_CPLAYER, MSGL_ERR, "Invalid screenshot filename "
+                   "template! Fix or remove the --screenshot-template option."
+                   "\n");
             return NULL;
+        }
 
         if (!fexists(fname))
             return fname;
 
         talloc_free(fname);
 
-        if (!uses_frameno || ctx->frameno == 100000) {
+        if (ctx->frameno == prev_frameno || ctx->frameno == 100000) {
             mp_msg(MSGT_CPLAYER, MSGL_ERR, "Can't save screenshot, file "
                    "already exists!\n");
             return NULL;
         }
-
-        ctx->frameno++;
     }
 }
 
