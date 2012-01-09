@@ -40,6 +40,7 @@
 
 //MPLAYER
 #include "config.h"
+#include "mpcommon.h"
 #include "fastmemcpy.h"
 #include "video_out.h"
 #include "video_out_internal.h"
@@ -552,7 +553,7 @@ static void quartz_CreateWindow(uint32_t d_width, uint32_t d_height, WindowAttri
     SetWindowGroup(theWindow, winGroup);
 
     // Set window title
-    titleKey = CFSTR("MPlayer - The Movie Player");
+    titleKey = CFSTR(MP_APP_LONG_TITLE);
     windowTitle = CFCopyLocalizedString(titleKey, NULL);
     result = SetWindowTitleWithCFString(theWindow, windowTitle);
     CFRelease(titleKey);

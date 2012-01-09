@@ -28,6 +28,7 @@
 #include <string.h>
 
 #include "config.h"
+#include "mpcommon.h"
 #include "video_out.h"
 #include "video_out_internal.h"
 #include "fastmemcpy.h"
@@ -320,7 +321,7 @@ preinit( const char *arg )
           if (show_help) {
                mp_msg( MSGT_VO, MSGL_ERR,
                        "\nvo_dfbmga command line help:\n"
-                       "Example: mplayer -vo dfbmga:nocrtc2:bes:buffermode=single\n"
+                       "Example: %s -vo dfbmga:nocrtc2:bes:buffermode=single\n"
                        "\nOptions (use 'no' prefix to disable):\n"
                        "  bes    Use Backend Scaler\n"
                        "  crtc1  Use CRTC1\n"
@@ -340,7 +341,7 @@ preinit( const char *arg )
                        "    pal      Force PAL\n"
                        "    ntsc     Force NTSC\n"
                        "    auto     Select according to FPS\n"
-                       "\n" );
+                       "\n", MP_EXECUTABLE_NAME );
                return -1;
           }
      }

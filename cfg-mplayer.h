@@ -28,6 +28,7 @@
 
 #include "options.h"
 #include "config.h"
+#include "mpcommon.h"
 #include "m_config.h"
 #include "m_option.h"
 #include "libmpdemux/demux_ts.h"
@@ -397,7 +398,7 @@ const m_option_t common_opts[] = {
     OPT_FLOATRANGE("cache-min", stream_cache_min_percent, 0, 0, 99),
     OPT_FLOATRANGE("cache-seek-min", stream_cache_seek_min_percent, 0, 0, 99),
 #else
-    {"cache", "MPlayer was compiled without cache2 support.\n", CONF_TYPE_PRINT, CONF_NOCFG, 0, 0, NULL},
+    {"cache", MP_APPNAME " was compiled without cache2 support.\n", CONF_TYPE_PRINT, CONF_NOCFG, 0, 0, NULL},
 #endif /* CONFIG_STREAM_CACHE */
     {"cdrom-device", &cdrom_device, CONF_TYPE_STRING, 0, 0, 0, NULL},
 #ifdef CONFIG_DVDREAD
@@ -405,9 +406,9 @@ const m_option_t common_opts[] = {
     {"dvd-speed", &dvd_speed, CONF_TYPE_INT, 0, 0, 0, NULL},
     {"dvdangle", &dvd_angle, CONF_TYPE_INT, CONF_RANGE, 1, 99, NULL},
 #else
-    {"dvd-device", "MPlayer was compiled without libdvdread support.\n", CONF_TYPE_PRINT, 0, 0, 0, NULL},
-    {"dvd-speed", "MPlayer was compiled without libdvdread support.\n", CONF_TYPE_PRINT, 0, 0, 0, NULL},
-    {"dvd", "MPlayer was compiled without libdvdread support.\n", CONF_TYPE_PRINT, CONF_NOCFG, 0, 0, NULL},
+    {"dvd-device", MP_APPNAME " was compiled without libdvdread support.\n", CONF_TYPE_PRINT, 0, 0, 0, NULL},
+    {"dvd-speed", MP_APPNAME " was compiled without libdvdread support.\n", CONF_TYPE_PRINT, 0, 0, 0, NULL},
+    {"dvd", MP_APPNAME " was compiled without libdvdread support.\n", CONF_TYPE_PRINT, CONF_NOCFG, 0, 0, NULL},
 #endif /* CONFIG_DVDREAD */
     OPT_INTPAIR("chapter", chapterrange, 0),
     OPT_INTRANGE("edition", edition_id, 0, -1, 8190),
@@ -416,9 +417,9 @@ const m_option_t common_opts[] = {
     {"bluray-angle",   &bluray_angle,   CONF_TYPE_INT,    CONF_RANGE, 0, 999, NULL},
     {"bluray-chapter", &bluray_chapter, CONF_TYPE_INT,    CONF_RANGE, 0, 999, NULL},
 #else
-    {"bluray-device",  "MPlayer was compiled without libbluray support.\n", CONF_TYPE_PRINT, 0, 0, 0, NULL},
-    {"bluray-angle",   "MPlayer was compiled without libbluray support.\n", CONF_TYPE_PRINT, 0, 0, 0, NULL},
-    {"bluray-chapter", "MPlayer was compiled without libbluray support.\n", CONF_TYPE_PRINT, CONF_NOCFG, 0, 0, NULL},
+    {"bluray-device",  MP_APPNAME " was compiled without libbluray support.\n", CONF_TYPE_PRINT, 0, 0, 0, NULL},
+    {"bluray-angle",   MP_APPNAME " was compiled without libbluray support.\n", CONF_TYPE_PRINT, 0, 0, 0, NULL},
+    {"bluray-chapter", MP_APPNAME " was compiled without libbluray support.\n", CONF_TYPE_PRINT, CONF_NOCFG, 0, 0, NULL},
 #endif /* CONFIG_LIBBLURAY */
 
     {"dvdauth", "libcss is obsolete. Try libdvdread instead.\n", CONF_TYPE_PRINT, CONF_NOCFG, 0, 0, NULL},
@@ -442,14 +443,14 @@ const m_option_t common_opts[] = {
 #ifdef HAVE_AF_INET6
     {"prefer-ipv6", &network_prefer_ipv4, CONF_TYPE_FLAG, 0, 1, 0, NULL},
 #else
-    {"prefer-ipv6", "MPlayer was compiled without IPv6 support.\n", CONF_TYPE_PRINT, 0, 0, 0, NULL},
+    {"prefer-ipv6", MP_APPNAME " was compiled without IPv6 support.\n", CONF_TYPE_PRINT, 0, 0, 0, NULL},
 #endif /* HAVE_AF_INET6 */
 
 #else
-    {"user", "MPlayer was compiled without streaming (network) support.\n", CONF_TYPE_PRINT, CONF_NOCFG, 0, 0, NULL},
-    {"passwd", "MPlayer was compiled without streaming (network) support.\n", CONF_TYPE_PRINT, CONF_NOCFG, 0, 0, NULL},
-    {"bandwidth", "MPlayer was compiled without streaming (network) support.\n", CONF_TYPE_PRINT, CONF_NOCFG, 0, 0, NULL},
-    {"user-agent", "MPlayer was compiled without streaming (network) support.\n", CONF_TYPE_PRINT, CONF_NOCFG, 0, 0, NULL},
+    {"user", MP_APPNAME " was compiled without streaming (network) support.\n", CONF_TYPE_PRINT, CONF_NOCFG, 0, 0, NULL},
+    {"passwd", MP_APPNAME " was compiled without streaming (network) support.\n", CONF_TYPE_PRINT, CONF_NOCFG, 0, 0, NULL},
+    {"bandwidth", MP_APPNAME " was compiled without streaming (network) support.\n", CONF_TYPE_PRINT, CONF_NOCFG, 0, 0, NULL},
+    {"user-agent", MP_APPNAME " was compiled without streaming (network) support.\n", CONF_TYPE_PRINT, CONF_NOCFG, 0, 0, NULL},
 #endif /* CONFIG_NETWORKING */
 
 #ifdef CONFIG_LIVE555
@@ -472,8 +473,8 @@ const m_option_t common_opts[] = {
     {"rtsp-port", &rtsp_port, CONF_TYPE_INT, CONF_RANGE, -1, 65535, NULL},
     {"rtsp-destination", &rtsp_destination, CONF_TYPE_STRING, CONF_MIN, 0, 0, NULL},
 #else
-    {"rtsp-port", "MPlayer was compiled without networking support.\n", CONF_TYPE_PRINT, CONF_NOCFG, 0, 0, NULL},
-    {"rtsp-destination", "MPlayer was compiled without networking support.\n", CONF_TYPE_PRINT, CONF_NOCFG, 0, 0, NULL},
+    {"rtsp-port", MP_APPNAME " was compiled without networking support.\n", CONF_TYPE_PRINT, CONF_NOCFG, 0, 0, NULL},
+    {"rtsp-destination", MP_APPNAME " was compiled without networking support.\n", CONF_TYPE_PRINT, CONF_NOCFG, 0, 0, NULL},
 #endif /* CONFIG_NETWORKING */
 
 // ------------------------- demuxer options --------------------
@@ -535,17 +536,17 @@ const m_option_t common_opts[] = {
 #ifdef CONFIG_RADIO
     {"radio", radioopts_conf, CONF_TYPE_SUBCONFIG, 0, 0, 0, NULL},
 #else
-    {"radio", "MPlayer was compiled without Radio interface support.\n", CONF_TYPE_PRINT, 0, 0, 0, NULL},
+    {"radio", MP_APPNAME " was compiled without Radio interface support.\n", CONF_TYPE_PRINT, 0, 0, 0, NULL},
 #endif /* CONFIG_RADIO */
 #ifdef CONFIG_TV
     {"tv", (void *) tvopts_conf, CONF_TYPE_SUBCONFIG, 0, 0, 0, NULL},
 #else
-    {"tv", "MPlayer was compiled without TV interface support.\n", CONF_TYPE_PRINT, 0, 0, 0, NULL},
+    {"tv", MP_APPNAME " was compiled without TV interface support.\n", CONF_TYPE_PRINT, 0, 0, 0, NULL},
 #endif /* CONFIG_TV */
 #ifdef CONFIG_PVR
     {"pvr", (void *) pvropts_conf, CONF_TYPE_SUBCONFIG, 0, 0, 0, NULL},
 #else
-    {"pvr", "MPlayer was compiled without V4L2/PVR interface support.\n", CONF_TYPE_PRINT, 0, 0, 0, NULL},
+    {"pvr", MP_APPNAME " was compiled without V4L2/PVR interface support.\n", CONF_TYPE_PRINT, 0, 0, 0, NULL},
 #endif /* CONFIG_PVR */
     {"vivo", (void *) vivoopts_conf, CONF_TYPE_SUBCONFIG, 0, 0, 0, NULL},
 #ifdef CONFIG_DVBIN
@@ -634,11 +635,11 @@ const m_option_t common_opts[] = {
     {"flip-hebrew-commas", &fribidi_flip_commas, CONF_TYPE_FLAG, 0, 1, 0, NULL},
     {"noflip-hebrew-commas", &fribidi_flip_commas, CONF_TYPE_FLAG, 0, 0, 1, NULL},
 #else
-    {"fribidi-charset", "MPlayer was compiled without FriBiDi support.\n", CONF_TYPE_PRINT, CONF_NOCFG, 0, 0, NULL},
-    {"flip-hebrew", "MPlayer was compiled without FriBiDi support.\n", CONF_TYPE_PRINT, CONF_NOCFG, 0, 0, NULL},
-    {"noflip-hebrew", "MPlayer was compiled without FriBiDi support.\n", CONF_TYPE_PRINT, CONF_NOCFG, 0, 0, NULL},
-    {"flip-hebrew-commas", "MPlayer was compiled without FriBiDi support.\n", CONF_TYPE_PRINT, CONF_NOCFG, 0, 0, NULL},
-    {"noflip-hebrew-commas", "MPlayer was compiled without FriBiDi support.\n", CONF_TYPE_PRINT, CONF_NOCFG, 0, 0, NULL},
+    {"fribidi-charset", MP_APPNAME " was compiled without FriBiDi support.\n", CONF_TYPE_PRINT, CONF_NOCFG, 0, 0, NULL},
+    {"flip-hebrew", MP_APPNAME " was compiled without FriBiDi support.\n", CONF_TYPE_PRINT, CONF_NOCFG, 0, 0, NULL},
+    {"noflip-hebrew", MP_APPNAME " was compiled without FriBiDi support.\n", CONF_TYPE_PRINT, CONF_NOCFG, 0, 0, NULL},
+    {"flip-hebrew-commas", MP_APPNAME " was compiled without FriBiDi support.\n", CONF_TYPE_PRINT, CONF_NOCFG, 0, 0, NULL},
+    {"noflip-hebrew-commas", MP_APPNAME " was compiled without FriBiDi support.\n", CONF_TYPE_PRINT, CONF_NOCFG, 0, 0, NULL},
 #endif /* CONFIG_FRIBIDI */
 #ifdef CONFIG_ICONV
     {"subcp", &sub_cp, CONF_TYPE_STRING, 0, 0, 0, NULL},
@@ -698,8 +699,8 @@ const m_option_t common_opts[] = {
     {"fontconfig", &font_fontconfig, CONF_TYPE_FLAG, 0, -1, 1, NULL},
     {"nofontconfig", &font_fontconfig, CONF_TYPE_FLAG, 0, 1, -1, NULL},
 #else
-    {"fontconfig", "MPlayer was compiled without fontconfig support.\n", CONF_TYPE_PRINT, CONF_NOCFG, 0, 0, NULL},
-    {"nofontconfig", "MPlayer was compiled without fontconfig support.\n", CONF_TYPE_PRINT, CONF_NOCFG, 0, 0, NULL},
+    {"fontconfig", MP_APPNAME " was compiled without fontconfig support.\n", CONF_TYPE_PRINT, CONF_NOCFG, 0, 0, NULL},
+    {"nofontconfig", MP_APPNAME " was compiled without fontconfig support.\n", CONF_TYPE_PRINT, CONF_NOCFG, 0, 0, NULL},
 #endif /* CONFIG_FONTCONFIG */
     {NULL, NULL, 0, 0, 0, 0, NULL}
 };
@@ -921,7 +922,7 @@ const m_option_t mplayer_opts[]={
 #ifdef CONFIG_TV
     {"tvscan", (void *) tvscan_conf, CONF_TYPE_SUBCONFIG, 0, 0, 0, NULL},
 #else
-    {"tvscan", "MPlayer was compiled without TV interface support.\n", CONF_TYPE_PRINT, 0, 0, 0, NULL},
+    {"tvscan", MP_APPNAME " was compiled without TV interface support.\n", CONF_TYPE_PRINT, 0, 0, 0, NULL},
 #endif /* CONFIG_TV */
 
     OPT_FLAG_ON("list-properties", list_properties, CONF_GLOBAL),

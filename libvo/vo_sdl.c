@@ -57,6 +57,7 @@
 #include <inttypes.h>
 
 #include "config.h"
+#include "mpcommon.h"
 #include "mp_msg.h"
 #include "mp_msg.h"
 #include "video_out.h"
@@ -766,7 +767,7 @@ config(uint32_t width, uint32_t height, uint32_t d_width, uint32_t d_height, uin
 	    return -1;
 
 	/* Set output window title */
-	SDL_WM_SetCaption (".: MPlayer : F = Fullscreen/Windowed : C = Cycle Fullscreen Resolutions :.", title);
+	SDL_WM_SetCaption (".: " MP_APPNAME " : F = Fullscreen/Windowed : C = Cycle Fullscreen Resolutions :.", title);
 	//SDL_WM_SetCaption (title, title);
 
     if(priv->X) {
@@ -1063,7 +1064,7 @@ static int draw_slice(uint8_t *image[], int stride[], int w,int h,int x,int y)
 
     break;
     default:
-	mp_tmsg(MSGT_VO,MSGL_WARN, "[VO_SDL] Unsupported image format in draw_slice, contact MPlayer developers!\n");
+	mp_tmsg(MSGT_VO,MSGL_WARN, "[VO_SDL] Unsupported image format in draw_slice, contact %s developers!\n", MP_APPNAME);
     }
 
 	SDL_OVR_UNLOCK

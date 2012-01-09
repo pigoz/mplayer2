@@ -52,6 +52,7 @@
 #include <unistd.h>
 
 #include "config.h"
+#include "mpcommon.h"
 #include "subopt-helper.h"
 #include "video_out.h"
 #include "video_out_internal.h"
@@ -117,13 +118,13 @@ static int preinit(const char *arg)
 	if (subopt_parse(arg, subopts) != 0) {
 		mp_msg(MSGT_VO, MSGL_FATAL,
 			"\n-vo gif89a command line help:\n"
-			"Example: mplayer -vo gif89a:output=file.gif:fps=4.9\n"
+			"Example: %s -vo gif89a:output=file.gif:fps=4.9\n"
 			"\nOptions:\n"
 			"  output=<filename>\n"
 			"    Specify the output file.  The default is out.gif.\n"
 			"  fps=<rate>\n"
 			"    Specify the target framerate.  The default is 5.0.\n"
-			"\n");
+			"\n", MP_EXECUTABLE_NAME);
 		return -1;
 	}
 
@@ -354,8 +355,8 @@ static void uninit(void)
 	if (new_gif != NULL) {
 		char temp[256];
 		// comment the gif and close it
-		snprintf(temp, 256, "MPlayer gif output v%2.2f-%d (c) %s\r\n",
-			MPLAYER_VERSION, VO_GIF_REVISION,
+		snprintf(temp, 256, "%s gif output v%2.2f-%d (c) %s\r\n",
+			MP_APPNAME, MPLAYER_VERSION, VO_GIF_REVISION,
 			"joey@nicewarrior.org");
 		EGifPutComment(new_gif, temp);
 		EGifCloseFile(new_gif); // also frees gif storage space.

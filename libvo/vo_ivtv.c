@@ -42,6 +42,7 @@
 #include <linux/ivtv.h>
 #include <linux/ioctl.h>
 
+#include "mpcommon.h"
 #include "mp_msg.h"
 #include "subopt-helper.h"
 #include "video_out.h"
@@ -135,15 +136,15 @@ preinit (const char *arg)
 
   if (subopt_parse (arg, subopts) != 0)
   {
-    mp_msg (MSGT_VO, MSGL_FATAL,
+    mp_tmsg(MSGT_VO, MSGL_FATAL,
             "\n-vo ivtv command line help:\n"
-            "Example: mplayer -vo ivtv:device=/dev/video16:output=2\n"
+            "Example: %s -vo ivtv:device=/dev/video16:output=2\n"
             "\nOptions:\n"
             "  device=/dev/videoX\n"
             "    Name of the MPEG decoder device file.\n"
             "  output=<0-...>\n"
             "    V4L2 id of the TV output.\n"
-            "\n" );
+            "\n", MP_EXECUTABLE_NAME );
     return -1;
   }
 

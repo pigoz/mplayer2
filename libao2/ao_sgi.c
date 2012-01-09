@@ -26,6 +26,7 @@
 #include <errno.h>
 #include <dmedia/audio.h>
 
+#include "mpcommon.h"
 #include "audio_out.h"
 #include "audio_out_internal.h"
 #include "mp_msg.h"
@@ -203,7 +204,7 @@ static int init(int rate, int channels, int format, int flags) {
     return 0;
   }
 
-  ao_port = alOpenPort("mplayer", "w", ao_config);
+  ao_port = alOpenPort(MP_APPNAME, "w", ao_config);
 
   if (!ao_port) {
     mp_tmsg(MSGT_AO, MSGL_ERR, "[AO SGI] init: Unable to open audio channel: %s\n", alGetErrorString(oserror()));

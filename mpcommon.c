@@ -17,5 +17,6 @@
  */
 
 #include "version.h"
+#include "mpcommon.h"
 
-const char *mplayer_version  = "MPlayer " VERSION;
+const char *mplayer_version  = MP_APPNAME " " VERSION;

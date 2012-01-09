@@ -32,6 +32,7 @@
 #include <dart.h>
 
 #include "config.h"
+#include "mpcommon.h"
 #include "libaf/af_format.h"
 #include "audio_out.h"
 #include "audio_out_internal.h"
@@ -127,15 +128,16 @@ static int control(int cmd, void *arg)
 
 static void print_help(void)
 {
-    mp_msg(MSGT_AO, MSGL_FATAL,
-           "\n-ao dart commandline help:\n"
-           "Example: mplayer -ao dart:noshare\n"
-           "    open DART in exclusive mode\n"
-           "\nOptions:\n"
-           "    (no)share\n"
-           "        Open DART in shareable or exclusive mode\n"
-           "    bufsize=<size>\n"
-           "        Set buffer size to <size> in samples(default: 2048)\n");
+    mp_msgt(MSGT_AO, MSGL_FATAL,
+            "\n-ao dart commandline help:\n"
+            "Example: %s -ao dart:noshare\n"
+            "    open DART in exclusive mode\n"
+            "\nOptions:\n"
+            "    (no)share\n"
+            "        Open DART in shareable or exclusive mode\n"
+            "    bufsize=<size>\n"
+            "        Set buffer size to <size> in samples(default: 2048)\n",
+            MP_EXECUTABLE_NAME);
 }
 
 // open & set up audio device

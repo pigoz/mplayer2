@@ -31,6 +31,7 @@
 #include <string.h>
 
 #include "config.h"
+#include "mpcommon.h"
 #include "mp_msg.h"
 
 #include "vesa_lvo.h"
@@ -116,7 +117,7 @@ int      vlvo_init(unsigned src_width,unsigned src_height,
 	if (ioctl(lvo_handler,MGA_VID_CONFIG,&mga_vid_config))
 	{
 		perror("vesa_lvo: Error in mga_vid_config ioctl()");
-                mp_tmsg(MSGT_VO,MSGL_WARN, "[VESA_LVO] Your fb_vid driver version is incompatible with this MPlayer version!\n");
+                mp_tmsg(MSGT_VO,MSGL_WARN, "[VESA_LVO] Your fb_vid driver version is incompatible with this %s version!\n", MP_APPNAME);
 		return -1;
 	}
 	ioctl(lvo_handler,MGA_VID_ON,0);

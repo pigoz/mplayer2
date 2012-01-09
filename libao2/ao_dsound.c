@@ -33,6 +33,7 @@
 #include <math.h>
 
 #include "config.h"
+#include "mpcommon.h"
 #include "libaf/af_format.h"
 #include "audio_out.h"
 #include "audio_out_internal.h"
@@ -178,13 +179,14 @@ static void UninitDirectSound(void)
 */
 static void print_help(void)
 {
-  mp_msg(MSGT_AO, MSGL_FATAL,
+  mp_msgt(MSGT_AO, MSGL_FATAL,
            "\n-ao dsound commandline help:\n"
-           "Example: mplayer -ao dsound:device=1\n"
+           "Example: %s -ao dsound:device=1\n"
            "  sets 1st device\n"
            "\nOptions:\n"
            "  device=<device-number>\n"
-           "    Sets device number, use -v to get a list\n");
+           "    Sets device number, use -v to get a list\n",
+           MP_EXECUTABLE_NAME);
 }
 
 

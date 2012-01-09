@@ -33,6 +33,7 @@
 #include <AL/al.h>
 #endif
 
+#include "mpcommon.h"
 #include "mp_msg.h"
 
 #include "audio_out.h"
@@ -84,11 +85,11 @@ static int control(int cmd, void *arg) {
  * \brief print suboption usage help
  */
 static void print_help(void) {
-  mp_msg(MSGT_AO, MSGL_FATAL,
+  mp_tmsg(MSGT_AO, MSGL_FATAL,
           "\n-ao openal commandline help:\n"
-          "Example: mplayer -ao openal\n"
-          "\nOptions:\n"
-        );
+          "Example: %s -ao openal\n"
+          "\nOptions:\n",
+          MP_EXECUTABLE_NAME);
 }
 
 static int init(int rate, int channels, int format, int flags) {

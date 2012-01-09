@@ -24,6 +24,7 @@
 #include <stdlib.h>
 #include <inttypes.h>
 #include <string.h>
+#include "mpcommon.h"
 #include "libvo/fastmemcpy.h"
 
 #include "reorder_ch.h"
@@ -34,6 +35,13 @@
 #include "mp_msg.h"
 #endif
 
+static void warn_samplesize(int samplesize)
+{
+    mp_msg(MSGT_GLOBAL, MSGL_WARN,
+           "[reorder_ch] Unsupported sample size: %d, please "
+           "report this error on the %s bug tracker.\n",
+           samplesize, MP_APPNAME);
+}
 
 #define REORDER_COPY_5(DEST,SRC,SAMPLES,S0,S1,S2,S3,S4) \
 for (i = 0; i < SAMPLES; i += 5) {\
@@ -102,9 +110,7 @@ static int reorder_copy_5ch(void *dest, const void *src,
         break;
     }
     default:
-        mp_msg(MSGT_GLOBAL, MSGL_WARN,
-               "[reorder_ch] Unsupported sample size: %d, please "
-               "report this error on the MPlayer mailing list.\n",samplesize);
+        warn_samplesize(samplesize);
         return 0;
     }
     return 1;
@@ -181,9 +187,7 @@ static int reorder_copy_6ch(void *dest, const void *src,
         break;
     }
     default:
-        mp_msg(MSGT_GLOBAL, MSGL_WARN,
-               "[reorder_ch] Unsupported sample size: %d, please "
-               "report this error on the MPlayer mailing list.\n",samplesize);
+        warn_samplesize(samplesize);
         return 0;
     }
     return 1;
@@ -269,9 +273,7 @@ static int reorder_copy_8ch(void *dest, const void *src,
         break;
     }
     default:
-        mp_msg(MSGT_GLOBAL, MSGL_WARN,
-               "[reorder_ch] Unsupported sample size: %d, please "
-               "report this error on the MPlayer mailing list.\n",samplesize);
+        warn_samplesize(samplesize);
         return 0;
     }
     return 1;
@@ -505,9 +507,7 @@ static int reorder_self_2(void *src, unsigned int samples,
         break;
     }
     default:
-        mp_msg(MSGT_GLOBAL, MSGL_WARN,
-               "[reorder_ch] Unsupported sample size: %d, please "
-               "report this error on the MPlayer mailing list.\n",samplesize);
+        warn_samplesize(samplesize);
         return 0;
     }
     return 1;
@@ -596,9 +596,7 @@ static int reorder_self_3(void *src, unsigned int samples,
         break;
     }
     default:
-        mp_msg(MSGT_GLOBAL, MSGL_WARN,
-               "[reorder_ch] Unsupported sample size: %d, please "
-               "report this error on the MPlayer mailing list.\n",samplesize);
+        warn_samplesize(samplesize);
         return 0;
     }
     return 1;
@@ -703,9 +701,7 @@ static int reorder_self_4_step_1(void *src, unsigned int samples,
         break;
     }
     default:
-        mp_msg(MSGT_GLOBAL, MSGL_WARN,
-               "[reorder_ch] Unsupported sample size: %d, please "
-               "report this error on the MPlayer mailing list.\n",samplesize);
+        warn_samplesize(samplesize);
         return 0;
     }
     return 1;
@@ -754,9 +750,7 @@ static int reorder_self_4_step_2(void *src, unsigned int samples,
         break;
     }
     default:
-        mp_msg(MSGT_GLOBAL, MSGL_WARN,
-               "[reorder_ch] Unsupported sample size: %d, please "
-               "report this error on the MPlayer mailing list.\n",samplesize);
+        warn_samplesize(samplesize);
         return 0;
     }
     return 1;
@@ -853,9 +847,7 @@ static int reorder_self_5_step_1(void *src, unsigned int samples,
         break;
     }
     default:
-        mp_msg(MSGT_GLOBAL, MSGL_WARN,
-               "[reorder_ch] Unsupported sample size: %d, please "
-               "report this error on the MPlayer mailing list.\n",samplesize);
+        warn_samplesize(samplesize);
         return 0;
     }
     return 1;
@@ -936,9 +928,7 @@ static int reorder_self_2_3(void *src, unsigned int samples,
         break;
     }
     default:
-        mp_msg(MSGT_GLOBAL, MSGL_WARN,
-               "[reorder_ch] Unsupported sample size: %d, please "
-               "report this error on the MPlayer mailing list.\n",samplesize);
+        warn_samplesize(samplesize);
         return 0;
     }
     return 1;
@@ -1023,9 +1013,7 @@ static int reorder_self_3_3(void *src, unsigned int samples,
         break;
     }
     default:
-        mp_msg(MSGT_GLOBAL, MSGL_WARN,
-               "[reorder_ch] Unsupported sample size: %d, please "
-               "report this error on the MPlayer mailing list.\n",samplesize);
+        warn_samplesize(samplesize);
         return 0;
     }
     return 1;
@@ -1126,9 +1114,7 @@ static int reorder_self_2_4(void *src, unsigned int samples,
         break;
     }
     default:
-        mp_msg(MSGT_GLOBAL, MSGL_WARN,
-               "[reorder_ch] Unsupported sample size: %d, please "
-               "report this error on the MPlayer mailing list.\n",samplesize);
+        warn_samplesize(samplesize);
         return 0;
     }
     return 1;

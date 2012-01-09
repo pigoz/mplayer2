@@ -32,6 +32,7 @@
 #include <string.h>
 #include <sys/stat.h>
 
+#include "mpcommon.h"
 #include "m_option.h"
 #include "libaf/af_format.h"
 #include "stream/stream.h"
@@ -142,7 +143,7 @@ static OutputPlugin xmms_output_plugin =
 {
     NULL,
     NULL,
-    "MPlayer output interface plugin ", /* Description */
+    MP_APPNAME " output interface plugin ", /* Description */
     disk_init,
     NULL,                   /* about */
     NULL,                   /* configure */

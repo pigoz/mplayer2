@@ -40,6 +40,7 @@
 #include <inttypes.h>
 
 #include "config.h"
+#include "mpcommon.h"
 #include "mp_msg.h"
 #include "mpbswap.h"
 #include "libavutil/common.h"
@@ -207,7 +208,7 @@ read_index:
 
     i = stream_read_word(demuxer->stream);
     if (i != 0)
-	mp_msg(MSGT_DEMUX, MSGL_WARN,"Hmm, index table with unknown version (%d), please report it to MPlayer developers!\n", i);
+	mp_msg(MSGT_DEMUX, MSGL_WARN,"Hmm, index table with unknown version (%d), please report it to %s developers!\n", i, MP_APPNAME);
 
     entries = stream_read_dword(demuxer->stream);
     mp_msg(MSGT_DEMUX, MSGL_V,"entries: %d\n", entries);
@@ -1306,12 +1307,12 @@ static demuxer_t* demux_open_real(demuxer_t* demuxer)
                     sh->format = stream_read_dword_le(demuxer->stream);
                     if (i != 4) {
                       mp_msg(MSGT_DEMUX,MSGL_WARN,"Audio FourCC size is not 4 (%d), please report to "
-                             "MPlayer developers\n", i);
+                             "%s developers\n", i, MP_APPNAME);
                       stream_skip(demuxer->stream, i - 4);
                     }
                     if (sh->format != mmioFOURCC('l','p','c','J')) {
                       mp_msg(MSGT_DEMUX,MSGL_WARN,"Version 3 audio with FourCC %8x, please report to "
-                             "MPlayer developers\n", sh->format);
+                             "%s developers\n", sh->format, MP_APPNAME);
                     }
                     sh->channels = 1;
                     sh->samplesize = 16;

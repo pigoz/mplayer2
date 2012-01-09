@@ -25,12 +25,13 @@
 #include <pulse/pulseaudio.h>
 
 #include "config.h"
+#include "mpcommon.h"
 #include "libaf/af_format.h"
 #include "mp_msg.h"
 #include "audio_out.h"
 #include "audio_out_internal.h"
 
-#define PULSE_CLIENT_NAME "MPlayer"
+#define PULSE_CLIENT_NAME MP_APPNAME
 
 /** General driver info */
 static const ao_info_t info = {

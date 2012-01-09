@@ -23,6 +23,7 @@
 #include <limits.h>
 
 #include "config.h"
+#include "mpcommon.h"
 #include "options.h"
 #include "mp_msg.h"
 #include "mp_fifo.h"
@@ -715,7 +716,7 @@ void vo_x11_classhint(struct vo *vo, Window window, const char *name)
     pid_t pid = getpid();
 
     wmClass.res_name = opts->vo_winname ? opts->vo_winname : (char *)name;
-    wmClass.res_class = "mplayer2";
+    wmClass.res_class = MP_APPNAME;
     XSetClassHint(x11->display, window, &wmClass);
     XChangeProperty(x11->display, window, x11->XA_NET_WM_PID, XA_CARDINAL,
                     32, PropModeReplace, (unsigned char *) &pid, 1);
@@ -1617,8 +1618,9 @@ void vo_x11_selectinput_witherr(Display * display, Window w,
     XSetErrorHandler(old_handler);
     if (selectinput_err)
     {
-        mp_msg(MSGT_VO, MSGL_ERR,
-               "X11 error: MPlayer discards mouse control (reconfiguring)\n");
+        mp_tmsg(MSGT_VO, MSGL_ERR,
+                "X11 error: %s discards mouse control (reconfiguring)\n",
+                MP_APPNAME);
         XSelectInput(display, w,
                      event_mask &
                      (~
@@ -2203,23 +2205,23 @@ static void vo_xv_print_ck_info(struct vo_x11_state *x11)
     case CK_SRC_USE:
       if ( x11->xv_ck_info.method == CK_METHOD_AUTOPAINT )
       {
-        mp_msg( MSGT_VO, MSGL_V,
-                "Ignoring colorkey from MPlayer (0x%06lx).\n",
-                x11->xv_colorkey );
+        mp_tmsg(MSGT_VO, MSGL_V,
+                "Ignoring colorkey from %s (0x%06lx).\n",
+                MP_APPNAME, x11->xv_colorkey );
       }
       else
       {
-        mp_msg( MSGT_VO, MSGL_V,
-                "Using colorkey from MPlayer (0x%06lx)."
+        mp_tmsg(MSGT_VO, MSGL_V,
+                "Using colorkey from %s (0x%06lx)."
                 " Use -colorkey to change.\n",
-                x11->xv_colorkey );
+                MP_APPNAME, x11->xv_colorkey );
       }
       break;
     case CK_SRC_SET:
-      mp_msg( MSGT_VO, MSGL_V,
-              "Setting and using colorkey from MPlayer (0x%06lx)."
+      mp_tmsg(MSGT_VO, MSGL_V,
+              "Setting and using colorkey from %s (0x%06lx)."
               " Use -colorkey to change.\n",
-              x11->xv_colorkey );
+              MP_APPNAME, x11->xv_colorkey );
       break;
   }
 }

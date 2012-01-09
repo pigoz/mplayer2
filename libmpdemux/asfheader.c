@@ -23,6 +23,7 @@
 #include <unistd.h>
 
 #include "config.h"
+#include "mpcommon.h"
 #include "libavutil/common.h"
 #include "ffmpeg_files/intreadwrite.h"
 #include "mp_msg.h"
@@ -399,8 +400,8 @@ int read_asf_header(demuxer_t *demuxer,struct asf_priv* asf){
   }
 
   if (hdr_len > 1024 * 1024) {
-    mp_tmsg(MSGT_HEADER, MSGL_ERR, "FATAL: header size bigger than 1 MB (%d)!\nPlease contact MPlayer authors, and upload/send this file.\n",
-			hdr_len);
+    mp_tmsg(MSGT_HEADER, MSGL_ERR, "FATAL: header size bigger than 1 MB (%d)!\nPlease contact %s authors, and upload/send this file.\n",
+			hdr_len, MP_APPNAME);
     hdr_skip = hdr_len - 1024 * 1024;
     hdr_len = 1024 * 1024;
   }
@@ -419,7 +420,7 @@ int read_asf_header(demuxer_t *demuxer,struct asf_priv* asf){
   }
 
   if (is_drm(hdr, hdr_len))
-    mp_tmsg(MSGT_HEADER, MSGL_FATAL, "This file has been encumbered with DRM encryption, it will not play in MPlayer!\n");
+    mp_tmsg(MSGT_HEADER, MSGL_FATAL, "This file has been encumbered with DRM encryption, it will not play in %s!\n", MP_APPNAME);
 
   if ((pos = find_asf_guid(hdr, asf_ext_stream_audio, 0, hdr_len)) >= 0)
   {

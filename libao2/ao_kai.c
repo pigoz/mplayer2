@@ -32,6 +32,7 @@
 #include <kai.h>
 
 #include "config.h"
+#include "mpcommon.h"
 #include "libaf/af_format.h"
 #include "audio_out.h"
 #include "audio_out_internal.h"
@@ -130,9 +131,9 @@ static int control(int cmd, void *arg)
 
 static void print_help(void)
 {
-    mp_msg(MSGT_AO, MSGL_FATAL,
+    mp_tmsg(MSGT_AO, MSGL_FATAL,
            "\n-ao kai commandline help:\n"
-           "Example: mplayer -ao kai:noshare\n"
+           "Example: %s -ao kai:noshare\n"
            "    open audio in exclusive mode\n"
            "\nOptions:\n"
            "    uniaud\n"
@@ -142,7 +143,8 @@ static void print_help(void)
            "    (no)share\n"
            "        Open audio in shareable or exclusive mode\n"
            "    bufsize=<size>\n"
-           "        Set buffer size to <size> in samples(default: 2048)\n");
+           "        Set buffer size to <size> in samples(default: 2048)\n",
+           MP_EXECUTABLE_NAME);
 }
 
 // open & set up audio device

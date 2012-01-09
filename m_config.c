@@ -30,6 +30,7 @@
 
 #include "talloc.h"
 
+#include "mpcommon.h"
 #include "m_config.h"
 #include "m_option.h"
 #include "mp_msg.h"
@@ -436,9 +437,9 @@ static int m_config_parse_option(const struct m_config *config,
         return M_OPT_UNKNOWN;
     if (co->disabled_feature) {
         mp_tmsg(MSGT_CFGPARSER, MSGL_ERR,
-                "Option \"%.*s\" is not available in this version of mplayer2, "
+                "Option \"%.*s\" is not available in this version of %s, "
                 "because it has been compiled with feature \"%s\" disabled.\n",
-                BSTR_P(name), co->disabled_feature);
+                BSTR_P(name), MP_APPNAME, co->disabled_feature);
         return M_OPT_UNKNOWN;
     }
 

@@ -21,6 +21,7 @@
 #include <windows.h>
 #include <windowsx.h>
 
+#include "mpcommon.h"
 // To get "#define vo_ontop global_vo->opts->vo_ontop" etc
 #include "old_vo_defines.h"
 #include "input/keycodes.h"
@@ -41,7 +42,7 @@
 #define MONITOR_DEFAULTTOPRIMARY 1
 #endif
 
-static const char classname[] = "MPlayer - The Movie Player";
+static const char classname[] = MP_APP_LONG_TITLE;
 int vo_vm = 0;
 
 static int depthonscreen;

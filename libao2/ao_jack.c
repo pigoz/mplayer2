@@ -27,6 +27,7 @@
 #include <unistd.h>
 
 #include "config.h"
+#include "mpcommon.h"
 #include "mp_msg.h"
 
 #include "audio_out.h"
@@ -188,7 +189,7 @@ static void print_help (void)
 {
   mp_msg (MSGT_AO, MSGL_FATAL,
            "\n-ao jack commandline help:\n"
-           "Example: mplayer -ao jack:port=myout\n"
+           "Example: %s -ao jack:port=myout\n"
            "  connects MPlayer to the jack ports named myout\n"
            "\nOptions:\n"
            "  port=<port name>\n"
@@ -198,7 +199,8 @@ static void print_help (void)
            "  estimate\n"
            "    Estimates the amount of data in buffers (experimental)\n"
            "  autostart\n"
-           "    Automatically start JACK server if necessary\n"
+           "    Automatically start JACK server if necessary\n",
+          MP_EXECUTABLE_NAME
          );
 }
 
@@ -228,7 +230,7 @@ static int init(int rate, int channels, int format, int flags) {
   }
   if (!client_name) {
     client_name = malloc(40);
-    sprintf(client_name, "MPlayer [%d]", getpid());
+    sprintf(client_name, "%s [%d]", MP_APPNAME, getpid());
   }
   if (!autostart)
     open_options |= JackNoStartServer;

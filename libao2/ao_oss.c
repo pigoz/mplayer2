@@ -31,6 +31,7 @@
 #include <string.h>
 
 #include "config.h"
+#include "mpcommon.h"
 #include "mp_msg.h"
 #include "mixer.h"
 
@@ -419,7 +420,7 @@ ac3_retry:
     }
     free(data);
     if(ao_data.buffersize==0){
-        mp_tmsg(MSGT_AO,MSGL_ERR,"[AO OSS]\n   ***  Your audio driver DOES NOT support select()  ***\n Recompile MPlayer with #undef HAVE_AUDIO_SELECT in config.h !\n\n");
+        mp_tmsg(MSGT_AO,MSGL_ERR,"[AO OSS]\n   ***  Your audio driver DOES NOT support select()  ***\n Recompile %s with #undef HAVE_AUDIO_SELECT in config.h !\n\n", MP_APPNAME);
         return 0;
     }
 #endif

@@ -33,6 +33,7 @@
 #include <unistd.h>
 
 #include "config.h"
+#include "mpcommon.h"
 #include "video_out.h"
 #include "video_out_internal.h"
 
@@ -218,7 +219,7 @@ static int config(uint32_t width, uint32_t height, uint32_t d_width,
   mp_colorkey_t colork;
   char _title[255];
 
-  sprintf(_title,"MPlayer %s X11 Overlay", sub_info->name);
+  sprintf(_title,"%s %s X11 Overlay", MP_APPNAME, sub_info->name);
   title = _title;
 
   panscan_init();

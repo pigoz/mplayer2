@@ -21,6 +21,7 @@
 #include <string.h>
 
 #include "config.h"
+#include "mpcommon.h"
 #include "video_out.h"
 #include "video_out_internal.h"
 #include "aspect.h"
@@ -320,7 +321,7 @@ static int config(uint32_t width, uint32_t height, uint32_t d_width,
     old_vo_dheight = -1;
 
     if (!title)
-        title = "MPlayer X11 (XImage/Shm) render";
+        title = MP_APPNAME " X11 (XImage/Shm) render";
 
     in_format = format;
     srcW = width;

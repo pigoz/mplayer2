@@ -51,6 +51,7 @@ TODO:
 #include <limits.h>
 
 #include "config.h"
+#include "mpcommon.h"
 #include "video_out.h"
 #include "video_out_internal.h"
 #include "fastmemcpy.h"
@@ -450,7 +451,7 @@ static int config(uint32_t width, uint32_t height, uint32_t d_width,
     }
     if(mode_capabilities&CAP_ACCEL_PUTIMAGE){
         mp_tmsg(MSGT_VO,MSGL_INFO, "[VO_SVGA] Video mode has hardware acceleration and put_image could be used.\n");
-        mp_tmsg(MSGT_VO,MSGL_INFO, "[VO_SVGA] If it works for you I would like to know.\n[VO_SVGA] (send log with `mplayer test.avi -v -v -v -v &> svga.log`). Thx!\n");
+        mp_tmsg(MSGT_VO,MSGL_INFO, "[VO_SVGA] If it works for you I would like to know.\n[VO_SVGA] (send log with `%s test.avi -v -v -v -v &> svga.log`). Thx!\n", MP_EXECUTABLE_NAME);
     }
 
 //here is the place to handle strides for accel_ modes;

@@ -23,6 +23,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
+#include "mpcommon.h"
 #include "options.h"
 #include "mp_msg.h"
 #include "osdep/timer.h"
@@ -628,7 +629,7 @@ static int open_s(stream_t *stream,int mode, void* opts, int* file_format) {
   if(!stream->pos && p->track > 0)
     mp_msg(MSGT_OPEN,MSGL_ERR, "INIT ERROR: couldn't get init pos %s\r\n", dvdnav_err_to_string(priv->dvdnav));
 
-  mp_msg(MSGT_OPEN,MSGL_INFO, "Remember to disable MPlayer's cache when playing dvdnav:// streams (adding -nocache to your command line)\r\n");
+  mp_msg(MSGT_OPEN,MSGL_INFO, "Remember to disable %s's cache when playing dvdnav:// streams (adding -nocache to your command line)\r\n", MP_APPNAME);
 
   return STREAM_OK;
 }

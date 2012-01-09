@@ -24,6 +24,7 @@
 #include <string.h>
 
 #include "config.h"
+#include "mpcommon.h"
 #include "mp_msg.h"
 
 #include <libgen.h>
@@ -998,7 +999,7 @@ fail:
       m_struct_free(&stream_opts, opts);
       return STREAM_UNSUPPORTED;
   }
-  mp_tmsg(MSGT_DVD,MSGL_ERR,"MPlayer was compiled without DVD support, exiting.\n");
+  mp_tmsg(MSGT_DVD,MSGL_ERR,"%s was compiled without DVD support, exiting.\n", MP_APPNAME);
   m_struct_free(&stream_opts,opts);
   return STREAM_UNSUPPORTED;
 }

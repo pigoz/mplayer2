@@ -33,6 +33,7 @@
 #include <errno.h>
 
 #include "config.h"
+#include "mpcommon.h"
 #include "video_out.h"
 #include "video_out_internal.h"
 #include "sub/sub.h"
@@ -318,7 +319,7 @@ static int preinit(const char *arg)
 	return ENOSYS;
     }
 
-    caca_set_window_title("MPlayer");
+    caca_set_window_title(MP_APPNAME);
 
     /* Default libcaca features */
     caca_set_feature(CACA_ANTIALIASING_PREFILTER);

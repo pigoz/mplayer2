@@ -28,6 +28,7 @@
 //#include <sys/mman.h>
 
 #include "config.h"
+#include "mpcommon.h"
 #include "options.h"
 #include "talloc.h"
 #include "video_out.h"
@@ -594,7 +595,7 @@ const char *vo_get_window_title(struct vo *vo)
     if (vo->opts->vo_wintitle) {
         return vo->opts->vo_wintitle;
     } else {
-        return "mplayer2";
+        return MP_APPNAME;
     }
 }
 

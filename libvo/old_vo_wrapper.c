@@ -18,6 +18,7 @@
 
 
 #include <stdint.h>
+#include "mpcommon.h"
 #include "old_vo_wrapper.h"
 #include "video_out.h"
 #include "sub/sub.h"
@@ -37,7 +38,7 @@ int old_vo_config(struct vo *vo, uint32_t width, uint32_t height,
                          uint32_t flags, uint32_t format)
 {
     return vo->driver->old_functions->config(width, height, d_width,
-                                             d_height, flags, "MPlayer",
+                                             d_height, flags, MP_APPNAME,
                                              format);
 }
 

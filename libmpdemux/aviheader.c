@@ -22,6 +22,7 @@
 #include <errno.h>
 
 #include "config.h"
+#include "mpcommon.h"
 #include "mp_msg.h"
 
 #include "stream/stream.h"
@@ -597,7 +598,7 @@ if (index_file_load) {
   }
   fread(&magic, 6, 1, fp);
   if (strncmp(magic, "MPIDX1", 6)) {
-    mp_tmsg(MSGT_HEADER,MSGL_ERR, "%s is not a valid MPlayer index file.\n", index_file_load);
+    mp_tmsg(MSGT_HEADER,MSGL_ERR, "%s is not a valid %s index file.\n", index_file_load, MP_APPNAME);
     goto gen_index;
   }
   fread(&priv->idx_size, sizeof(priv->idx_size), 1, fp);

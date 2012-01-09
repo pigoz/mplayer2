@@ -33,6 +33,7 @@
 #include <ws2tcpip.h>
 #endif
 
+#include "mpcommon.h"
 #include "http.h"
 #include "url.h"
 #include "mp_msg.h"
@@ -788,7 +789,7 @@ static int http_streaming_start(stream_t *stream, int* file_format) {
 					mp_msg(MSGT_NETWORK,MSGL_ERR,"Error: ICY-Server couldn't find requested stream, skipping!\n");
 					goto err_out;
 				default:
-					mp_msg(MSGT_NETWORK,MSGL_ERR,"Error: unhandled ICY-Errorcode, contact MPlayer developers!\n");
+					mp_msg(MSGT_NETWORK,MSGL_ERR,"Error: unhandled ICY-Errorcode, contact %s developers!\n", MP_APPNAME);
 					goto err_out;
 			}
 		}

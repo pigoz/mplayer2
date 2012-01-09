@@ -840,7 +840,7 @@ static void exit_sighandler(int x)
     }
     mp_msg(MSGT_CPLAYER, MSGL_FATAL, "\n");
     mp_tmsg(MSGT_CPLAYER, MSGL_FATAL,
-            "\nMPlayer interrupted by signal %d in module: %s\n", x,
+            "\n%s interrupted by signal %d in module: %s\n", MP_APPNAME, x,
             current_module ? current_module : "unknown");
     mp_msg(MSGT_IDENTIFY, MSGL_INFO, "ID_SIGNAL=%d\n", x);
     if (sig_count <= 1)
@@ -4040,7 +4040,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    print_version("MPlayer2");
+    print_version(MP_APPNAME);
 
 #if defined(__MINGW32__) || defined(__CYGWIN__)
     {
@@ -4458,10 +4458,11 @@ play_next_file:
     mpctx->initialized_flags |= INITIALIZED_STREAM;
 
     if (mpctx->file_format == DEMUXER_TYPE_PLAYLIST) {
-        mp_msg(MSGT_CPLAYER, MSGL_ERR, "\nThis looks like a playlist, but "
-               "playlist support will not be used automatically.\n"
-               "MPlayer's playlist code is unsafe and should only be used with "
-               "trusted sources.\nPlayback will probably fail.\n\n");
+        mp_tmsg(MSGT_CPLAYER, MSGL_ERR, "\nThis looks like a playlist, but "
+                "playlist support will not be used automatically.\n"
+                "%s's playlist code is unsafe and should only be used with "
+                "trusted sources.\nPlayback will probably fail.\n\n",
+                MP_APPNAME);
 #if 0
         play_tree_t *entry;
         // Handle playlist
@@ -5000,7 +5001,8 @@ goto_enable_cache:
 
     if (end_at.type == END_AT_SIZE) {
         mp_tmsg(MSGT_CPLAYER, MSGL_WARN,
-                "Option -endpos in MPlayer does not yet support size units.\n");
+                "Option -endpos in %s does not yet support size units.\n",
+                MP_APPNAME);
         end_at.type = END_AT_NONE;
     }
 

@@ -21,6 +21,7 @@
 #include "libswscale/swscale.h"
 #include <libavutil/imgutils.h>
 #include "libmpcodecs/vf_scale.h"
+#include "mpcommon.h"
 #include "mp_msg.h"
 #include "old_vo_wrapper.h"
 
@@ -408,7 +409,7 @@ static int mga_init(int width,int height,unsigned int format){
 				// there is a deeper problem
 				// we have a G550, but still couldn't configure mga_vid
 				perror("Error in mga_vid_config ioctl()");
-				mp_tmsg(MSGT_VO,MSGL_WARN, "[MGA] Your mga_vid driver version is incompatible with this MPlayer version!\n");
+				mp_tmsg(MSGT_VO,MSGL_WARN, "[MGA] Your mga_vid driver version is incompatible with this %s version!\n", MP_APPNAME);
 				return -1;
 			}
 			// if we arrived here, then we could successfully configure mga_vid
@@ -419,7 +420,7 @@ static int mga_init(int width,int height,unsigned int format){
 		if (ioctl(f,MGA_VID_CONFIG,&mga_vid_config))
 		{
 			perror("Error in mga_vid_config ioctl()");
-			mp_tmsg(MSGT_VO,MSGL_WARN, "[MGA] Your mga_vid driver version is incompatible with this MPlayer version!\n");
+			mp_tmsg(MSGT_VO,MSGL_WARN, "[MGA] Your mga_vid driver version is incompatible with this %s version!\n", MP_APPNAME);
 			return -1;
 		}
 	}
@@ -487,7 +488,7 @@ static int preinit(const char *vo_subdevice)
 	ioctl(f,MGA_VID_GET_VERSION,&ver);
 	if(MGA_VID_VERSION != ver)
 	{
-		mp_tmsg(MSGT_VO, MSGL_ERR, "[MGA] mismatch between kernel (%u) and MPlayer (%u) mga_vid driver versions\n", ver, MGA_VID_VERSION);
+		mp_tmsg(MSGT_VO, MSGL_ERR, "[MGA] mismatch between kernel (%u) and %s (%u) mga_vid driver versions\n", ver, MP_APPNAME, MGA_VID_VERSION);
 		return -1;
 	}
 

@@ -46,6 +46,7 @@
 #include <unistd.h>
 
 #include "config.h"
+#include "mpcommon.h"
 #include "mp_msg.h"
 
 #include "audio_out.h"
@@ -372,17 +373,18 @@ static void print_help(void)
     AudioDeviceID *devids;
     char *device_name;
 
-    mp_msg(MSGT_AO, MSGL_FATAL,
-           "\n-ao coreaudio commandline help:\n"
-           "Example: mplayer -ao coreaudio:device_id=266\n"
-           "    open Core Audio with output device ID 266.\n"
-           "\nOptions:\n"
-           "    device_id\n"
-           "        ID of output device to use (0 = default device)\n"
-           "    help\n"
-           "        This help including list of available devices.\n"
-           "\n"
-           "Available output devices:\n");
+    mp_tmsg(MSGT_AO, MSGL_FATAL,
+            "\n-ao coreaudio commandline help:\n"
+            "Example: %s -ao coreaudio:device_id=266\n"
+            "    open Core Audio with output device ID 266.\n"
+            "\nOptions:\n"
+            "    device_id\n"
+            "        ID of output device to use (0 = default device)\n"
+            "    help\n"
+            "        This help including list of available devices.\n"
+            "\n"
+            "Available output devices:\n",
+            MP_EXECUTABLE_NAME);
 
     i_param_size = GetGlobalAudioPropertyArray(kAudioObjectSystemObject, kAudioHardwarePropertyDevices, (void **)&devids);
 

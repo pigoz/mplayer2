@@ -43,6 +43,7 @@
 #include <stdint.h>
 
 #include "config.h"
+#include "mpcommon.h"
 #include "mp_msg.h"
 #ifdef CODECS2HTML
 #define mp_tmsg mp_msg
@@ -710,7 +711,7 @@ err_out_not_valid:
     mp_tmsg(MSGT_CODECCFG,MSGL_ERR,"Codec is not defined correctly.");
     goto err_out_print_linenum;
 err_out_release_num:
-    mp_tmsg(MSGT_CODECCFG,MSGL_ERR,"This codecs.conf is too old and incompatible with this MPlayer release!");
+    mp_tmsg(MSGT_CODECCFG,MSGL_ERR,"This codecs.conf is too old and incompatible with this %s release!", MP_APPNAME);
     goto err_out_print_linenum;
 }
 

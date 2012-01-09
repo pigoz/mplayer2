@@ -19,6 +19,7 @@
  */
 #include <stdlib.h>
 #include <stdio.h>
+#include "mpcommon.h"
 #include "stream/stream.h"
 #include "demuxer.h"
 #include "stheader.h"
@@ -245,8 +246,8 @@ static demuxer_t* demux_open_rtp(demuxer_t* demuxer)
                 sh_audio->format = get4CC(supported_audio, format_name);
                 if ( !(wf->wFormatTag) )
                     mp_msg(MSGT_DEMUX, MSGL_WARN,
-                           "Unknown MPlayer format code for MIME"
-                           " type \"audio/%s\"\n", format_name);
+                           "Unknown %s format code for MIME"
+                           " type \"audio/%s\"\n", MP_APPNAME, format_name);
             } else {
                 mp_msg(MSGT_DEMUX, MSGL_ERR,
                        "There is already an audio session registered,"
@@ -283,8 +284,8 @@ static demuxer_t* demux_open_rtp(demuxer_t* demuxer)
                 sh_video->format = get4CC(supported_video, format_name);
                 if ( !(bih->biCompression) ) {
                     mp_msg(MSGT_DEMUX, MSGL_WARN,
-                        "Unknown MPlayer format code for MIME"
-                        " type \"video/%s\"\n", format_name);
+                        "Unknown %s format code for MIME"
+                        " type \"video/%s\"\n", MP_APPNAME, format_name);
                 }
             } else {
                 mp_msg(MSGT_DEMUX, MSGL_ERR,

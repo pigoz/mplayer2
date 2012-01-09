@@ -54,6 +54,7 @@
 #include "loader/qtx/qtxsdk/components.h"
 #endif
 
+#include "mpcommon.h"
 #include "mp_msg.h"
 
 #include "stream/stream.h"
@@ -353,7 +354,7 @@ static int mov_check_file(demuxer_t* demuxer){
 	{
 #ifndef _LARGEFILE_SOURCE
 	    if (stream_read_dword(demuxer->stream) != 0)
-		mp_msg(MSGT_DEMUX, MSGL_WARN, "64bit file, but you've compiled MPlayer without LARGEFILE support!\n");
+		mp_tmsg(MSGT_DEMUX, MSGL_WARN, "64bit file, but you've compiled %s without LARGEFILE support!\n", MP_APPNAME);
 	    len = stream_read_dword(demuxer->stream);
 #else
 	    len = stream_read_qword(demuxer->stream);
@@ -1856,7 +1857,7 @@ static int lschunks_intrak(demuxer_t* demuxer, int level, unsigned int id,
       for (i = 0; i < trak->chunks_size; i++) {
 #ifndef	_LARGEFILE_SOURCE
         if (stream_read_dword(demuxer->stream) != 0)
-          mp_msg(MSGT_DEMUX, MSGL_WARN, "Chunk %d has got 64bit address, but you've MPlayer compiled without LARGEFILE support!\n", i);
+          mp_msg(MSGT_DEMUX, MSGL_WARN, "Chunk %d has got 64bit address, but you've %s compiled without LARGEFILE support!\n", i, MP_APPNAME);
         trak->chunks[i].pos = stream_read_dword(demuxer->stream);
 #else
         trak->chunks[i].pos = stream_read_qword(demuxer->stream);

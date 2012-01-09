@@ -30,6 +30,7 @@
 #include <libavutil/common.h>
 
 #include "config.h"
+#include "mpcommon.h"
 #include "video_out.h"
 #include "video_out_internal.h"
 #include "fastmemcpy.h"
@@ -181,7 +182,7 @@ static int preinit(const char *arg)
      if (subopt_parse(arg, subopts) != 0) {
                mp_msg( MSGT_VO, MSGL_ERR,
                        "\n-vo directfb command line help:\n"
-                       "Example: mplayer -vo directfb:layer=1:buffermode=single\n"
+                       "Example: %s -vo directfb:layer=1:buffermode=single\n"
                        "\nOptions (use 'no' prefix to disable):\n"
                        "  input  Use DirectFB for keyboard input\n"
                        "\nOther options:\n"
@@ -196,7 +197,7 @@ static int preinit(const char *arg)
                        "    bottom   Bottom field first\n"
 		       "  dfbopts=<str>\n"
 		       "    Specify a parameter list for DirectFB\n"
-                       "\n" );
+                       "\n", MP_EXECUTABLE_NAME );
                return -1;
      }
     if (mode_str.len)
@@ -591,7 +592,7 @@ static int config(uint32_t s_width, uint32_t s_height, uint32_t d_width,
 
         if (DFB_OK != ret) {
 	    mp_msg(MSGT_VO, MSGL_WARN,"DirectFB: Warning - cannot switch layer to exclusive mode. This could cause\nproblems. You may need to select correct pixel format manually!\n");
-	    DirectFBError("MPlayer - Switch layer to exlusive mode.",ret);
+	    DirectFBError(MP_APPNAME " - Switch layer to exlusive mode.",ret);
 	};
 	if (params.scale) {
             mp_msg(MSGT_VO, MSGL_DBG2,"DirectFB: Config - changing layer configuration (size)\n");
@@ -603,7 +604,7 @@ static int config(uint32_t s_width, uint32_t s_height, uint32_t d_width,
 
 	    if (ret) {
 		mp_msg(MSGT_VO, MSGL_ERR,"DirectFB: ConfigError in layer configuration (size)\n");
-		DirectFBError("MPlayer - Layer size change.",ret);
+		DirectFBError(MP_APPNAME " - Layer size change.",ret);
 	    };
 	}
 
@@ -634,7 +635,7 @@ static int config(uint32_t s_width, uint32_t s_height, uint32_t d_width,
 	    if (ret) {
 		unsigned int bpp;
 		mp_msg(MSGT_VO, MSGL_ERR,"DirectFB: ConfigError in layer configuration (format, flags=%x)\n",dlc.flags);
-		DirectFBError("MPlayer - layer pixelformat change",ret);
+		DirectFBError(MP_APPNAME " - layer pixelformat change",ret);
 
 		// ugly fbdev workaround - try to switch pixelformat via videomode change
 		switch (dlc.pixelformat) {
@@ -662,7 +663,7 @@ static int config(uint32_t s_width, uint32_t s_height, uint32_t d_width,
 					// try to set videomode
 				        mp_msg(MSGT_VO, MSGL_V,"DirectFB: Videomode  %ix%i BPP %i\n",dlc.width,dlc.height,bpp);
 				    	ret = dfb->SetVideoMode(dfb,dlc.width,dlc.height,bpp);
-					if (ret) DirectFBError("MPlayer - VM - pixelformat change",ret);
+					if (ret) DirectFBError(MP_APPNAME " - VM - pixelformat change",ret);
 
 				    };
 
@@ -670,7 +671,7 @@ static int config(uint32_t s_width, uint32_t s_height, uint32_t d_width,
 				    dlc.flags       = DLCONF_PIXELFORMAT;
 	    			    ret = layer->GetConfiguration(layer,&dlc);
 				    if (ret) {
-					DirectFBError("MPlayer - VM - Layer->GetConfiguration",ret);
+					DirectFBError(MP_APPNAME " - VM - Layer->GetConfiguration",ret);
 					} else {
 				        mp_msg(MSGT_VO, MSGL_DBG2,"DirectFB: Layer now has pixelformat [%x]\n",dlc.pixelformat);
 					};

@@ -39,6 +39,7 @@
 #include "subopt-helper.h"
 #include "mixer.h"
 #include "mp_msg.h"
+#include "mpcommon.h"
 
 #define ALSA_PCM_NEW_HW_PARAMS_API
 #define ALSA_PCM_NEW_SW_PARAMS_API
@@ -258,13 +259,14 @@ static void print_help (void)
 {
   mp_tmsg (MSGT_AO, MSGL_FATAL,
     "\n[AO_ALSA] -ao alsa commandline help:\n"\
-    "[AO_ALSA] Example: mplayer -ao alsa:device=hw=0.3\n"\
+    "[AO_ALSA] Example: %s -ao alsa:device=hw=0.3\n"\
     "[AO_ALSA]   Sets first card fourth hardware device.\n\n"\
     "[AO_ALSA] Options:\n"\
     "[AO_ALSA]   noblock\n"\
     "[AO_ALSA]     Opens device in non-blocking mode.\n"\
     "[AO_ALSA]   device=<device-name>\n"\
-    "[AO_ALSA]     Sets device (change , to . and : to =)\n");
+    "[AO_ALSA]     Sets device (change , to . and : to =)\n",
+    MP_EXECUTABLE_NAME);
 }
 
 static int str_maxlen(void *strp) {

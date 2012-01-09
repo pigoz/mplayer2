@@ -24,6 +24,7 @@
 #include <unistd.h>
 
 #include "config.h"
+#include "mpcommon.h"
 #include "mp_msg.h"
 
 #include "stream/stream.h"
@@ -180,7 +181,7 @@ static demuxer_t* demux_open_ra(demuxer_t* demuxer)
 	mp_msg(MSGT_DEMUX,MSGL_V,"[RealAudio] File version: %d\n", ra_priv->version);
 	if ((ra_priv->version < 3) || (ra_priv->version > 4)) {
 		mp_msg(MSGT_DEMUX,MSGL_WARN,"[RealAudio] ra version %d is not supported yet, please "
-			"contact MPlayer developers\n", ra_priv->version);
+			"contact %s developers\n", ra_priv->version, MP_APPNAME);
 		return 0;
 	}
 	if (ra_priv->version == 3) {
@@ -216,14 +217,14 @@ static demuxer_t* demux_open_ra(demuxer_t* demuxer)
 		ra_priv->intl_id = stream_read_dword_le(demuxer->stream);
 		if (i != 4) {
 			mp_msg(MSGT_DEMUX,MSGL_WARN,"[RealAudio] Interleaver Id size is not 4 (%d), please report to "
-				"MPlayer developers\n", i);
+				"%s developers\n", i, MP_APPNAME);
 			stream_skip(demuxer->stream, i - 4);
 		}
 		i = stream_read_char(demuxer->stream);
 		sh->format = stream_read_dword_le(demuxer->stream);
 		if (i != 4) {
 			mp_msg(MSGT_DEMUX,MSGL_WARN,"[RealAudio] FourCC size is not 4 (%d), please report to "
-				"MPlayer developers\n", i);
+				"%s developers\n", i, MP_APPNAME);
 			stream_skip(demuxer->stream, i - 4);
 		}
 		stream_skip(demuxer->stream, 3);
@@ -266,13 +267,13 @@ static demuxer_t* demux_open_ra(demuxer_t* demuxer)
 		sh->format = stream_read_dword_le(demuxer->stream);
 		if (i != 4) {
 			mp_msg(MSGT_DEMUX,MSGL_WARN,"[RealAudio] FourCC size is not 4 (%d), please report to "
-				"MPlayer developers\n", i);
+				"%s developers\n", i, MP_APPNAME);
 			stream_skip(demuxer->stream, i - 4);
 		}
 
 		if (sh->format != FOURCC_LPCJ) {
 			mp_msg(MSGT_DEMUX,MSGL_WARN,"[RealAudio] Version 3 with FourCC %8x, please report to "
-				"MPlayer developers\n", sh->format);
+				"%s developers\n", sh->format, MP_APPNAME);
 		}
 	    } else
 		// If a stream does not have fourcc, let's assume it's 14.4

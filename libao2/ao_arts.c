@@ -24,6 +24,7 @@
 #include <stdio.h>
 
 #include "config.h"
+#include "mpcommon.h"
 #include "audio_out.h"
 #include "audio_out_internal.h"
 #include "libaf/af_format.h"
@@ -89,7 +90,7 @@ static int init(int rate_hz, int channels, int format, int flags)
 	if(format != AF_FORMAT_U8 && format != AF_FORMAT_S8)
 		ao_data.bps*=2;
 
-	stream=arts_play_stream(rate_hz, OBTAIN_BITRATE(format), channels, "MPlayer");
+	stream=arts_play_stream(rate_hz, OBTAIN_BITRATE(format), channels, MP_APPNAME);
 
 	if(stream == NULL) {
 		mp_tmsg(MSGT_AO, MSGL_ERR, "[AO ARTS] Unable to open a stream.\n");

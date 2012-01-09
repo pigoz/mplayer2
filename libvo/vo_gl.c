@@ -28,6 +28,7 @@
 #include <stdbool.h>
 
 #include "config.h"
+#include "mpcommon.h"
 #include "talloc.h"
 #include "mp_msg.h"
 #include "subopt-helper.h"
@@ -1275,9 +1276,9 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
     };
 
     if (subopt_parse(arg, subopts) != 0) {
-        mp_msg(MSGT_VO, MSGL_FATAL,
+        mp_tmsg(MSGT_VO, MSGL_FATAL,
                "\n-vo gl command line help:\n"
-               "Example: mplayer -vo gl:slice-height=4\n"
+               "Example: %s -vo gl:slice-height=4\n"
                "\nOptions:\n"
                "  nomanyfmts\n"
                "    Disable extended color formats for OpenGL 1.2 and later\n"
@@ -1339,7 +1340,7 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
                "    1: side-by-side to red-cyan stereo\n"
                "    2: side-by-side to green-magenta stereo\n"
                "    3: side-by-side to quadbuffer stereo\n"
-               "\n");
+               "\n", MP_EXECUTABLE_NAME);
         return -1;
     }
     if (user_colorspace != 0 || levelconv != -1) {

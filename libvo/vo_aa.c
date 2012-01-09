@@ -34,6 +34,7 @@
 #include <errno.h>
 
 #include "config.h"
+#include "mpcommon.h"
 #include "video_out.h"
 #include "video_out_internal.h"
 #include "aspect.h"
@@ -274,7 +275,7 @@ config(uint32_t width, uint32_t height, uint32_t d_width,
     }
 
     /* say hello */
-    osdmessage(5, 1, "Welcome to ASCII ART MPlayer");
+    osdmessage(5, 1, "Welcome to ASCII ART %s", MP_APPNAME);
 
     mp_msg(MSGT_VO,MSGL_V,"VO: [aa] screendriver:   %s\n", c->driver->name);
     mp_msg(MSGT_VO,MSGL_V,"VO: [aa] keyboarddriver: %s\n", c->kbddriver->name);
@@ -287,7 +288,7 @@ config(uint32_t width, uint32_t height, uint32_t d_width,
 		"\tdriver    set recommended aalib driver (X11,curses,linux)\n"
 		"\thelp      to see all options provided by aalib\n"
 		"\n"
-		"AA-MPlayer Keys\n"
+		"AA-%s Keys\n"
 		"\t1 : contrast -\n"
 		"\t2 : contrast +\n"
 		"\t3 : brightness -\n"
@@ -295,10 +296,11 @@ config(uint32_t width, uint32_t height, uint32_t d_width,
 		"\t5 : fast rendering\n"
 		"\t6 : dithering\n"
 		"\t7 : invert image\n"
-	        "\ta : toggles between aa and mplayer control\n"
+	        "\ta : toggles between aa and %s control\n"
 
 		"\n"
-		"All other keys are MPlayer defaults.\n"
+		"All other keys are %s defaults.\n",
+           MP_APPNAME, MP_APPNAME, MP_APPNAME
 
 
 	  );

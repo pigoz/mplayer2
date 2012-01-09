@@ -24,6 +24,7 @@
 #include <string.h>
 
 #include "config.h"
+#include "mpcommon.h"
 #include "mpeg_hdr.h"
 #include "libavutil/attributes.h"
 #include "mp_msg.h"
@@ -148,9 +149,9 @@ float mpeg12_aspect_info(mp_mpeg_header_t *picture)
       default:
         mp_msg(MSGT_DECVIDEO,MSGL_ERR,"Detected unknown aspect_ratio_information in mpeg sequence header.\n"
                "Please report the aspect value (%i) along with the movie type (VGA,PAL,NTSC,"
-               "SECAM) and the movie resolution (720x576,352x240,480x480,...) to the MPlayer"
+               "SECAM) and the movie resolution (720x576,352x240,480x480,...) to the %s"
                " developers, so that we can add support for it!\nAssuming 1:1 aspect for now.\n",
-               picture->aspect_ratio_information);
+               picture->aspect_ratio_information, MP_APPNAME);
     }
 
     return aspect;

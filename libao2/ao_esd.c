@@ -51,6 +51,7 @@
 #include "audio_out_internal.h"
 #include "libaf/af_format.h"
 #include "mp_msg.h"
+#include "mpcommon.h"
 
 
 #define ESD_RESAMPLES 0
@@ -63,7 +64,7 @@
 #endif
 
 
-#define	ESD_CLIENT_NAME	"MPlayer"
+#define	ESD_CLIENT_NAME	MP_APPNAME
 #define	ESD_MAX_DELAY	(1.0f)	/* max amount of data buffered in esd (#sec) */
 
 static const ao_info_t info =

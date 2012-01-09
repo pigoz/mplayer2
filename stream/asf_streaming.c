@@ -24,6 +24,7 @@
 #include <limits.h>
 
 #include "config.h"
+#include "mpcommon.h"
 #include "mp_msg.h"
 #include "options.h"
 
@@ -509,7 +510,7 @@ static int asf_http_streaming_type(char *content_type, char *features, HTTP_head
 				mp_msg(MSGT_NETWORK,MSGL_V,"=====> ASF Plain text\n");
 				return ASF_PlainText_e;
 			} else if( (!strcasecmp(content_type, "text/html")) ) {
-				mp_msg(MSGT_NETWORK,MSGL_V,"=====> HTML, MPlayer is not a browser...yet!\n");
+				mp_tmsg(MSGT_NETWORK,MSGL_V,"=====> HTML, %s is not a browser...yet!\n", MP_APPNAME);
 				return ASF_Unknown_e;
 			} else {
 				mp_msg(MSGT_NETWORK,MSGL_V,"=====> ASF Redirector\n");
