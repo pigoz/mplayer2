@@ -36,6 +36,7 @@
 #include "keycodes.h"
 #include "osdep/timer.h"
 #include "libavutil/avstring.h"
+#include "libavutil/common.h"
 #include "mp_msg.h"
 #include "m_config.h"
 #include "m_option.h"
@@ -647,6 +648,17 @@ static const m_option_t mp_input_opts[] = {
 
 static int default_cmd_func(int fd, char *buf, int l);
 
+// Encode the unicode codepoint as UTF-8, and append to the end of the
+// talloc'ed buffer.
+static char *append_utf8_buffer(char *buffer, uint32_t codepoint)
+{
+    char data[8];
+    uint8_t tmp;
+    char *output = data;
+    PUT_UTF8(codepoint, tmp, *output++ = tmp;);
+    return talloc_strndup_append_buffer(buffer, data, output - data);
+}
+
 static char *get_key_name(int key, char *ret)
 {
     for (int i = 0; modifier_names[i].name; i++) {
@@ -661,8 +673,9 @@ static char *get_key_name(int key, char *ret)
             return talloc_asprintf_append_buffer(ret, "%s", key_names[i].name);
     }
 
-    if (isascii(key))
-        return talloc_asprintf_append_buffer(ret, "%c", key);
+    // printable, and valid unicode range
+    if (key >= 32 && key <= 0x10FFFF)
+        return append_utf8_buffer(ret, key);
 
     // Print the hex key code
     return talloc_asprintf_append_buffer(ret, "%#-8x", key);
@@ -1488,6 +1501,11 @@ int mp_input_get_key_from_name(const char *name)
         return -1;
 found:
         name = p + 1;
+    }
+    struct bstr bname = bstr(name);
+    int code = bstr_decode_utf8(&bname);
+    if (code >= 0 && bname.len == 0) {
+        return code + modifiers;
     }
     int len = strlen(name);
     if (len == 1)   // Direct key code
