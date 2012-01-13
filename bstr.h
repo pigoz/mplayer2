@@ -69,6 +69,18 @@ double bstrtod(struct bstr str, struct bstr *rest);
 void bstr_lower(struct bstr str);
 int bstr_sscanf(struct bstr str, const char *format, ...);
 
+// Decode the UTF-8 code point at the start of the string, advance to the next
+// code point, and return the character.
+// After calling this function, *str will point to the next character.
+// On error, -1 is returned, and *str is not modified.
+int bstr_decode_utf8(struct bstr *str);
+
+// Return the length of the UTF-8 sequence that is started with the given byte.
+// So given a string char *s, the next UTF-8 code point is to be expected at
+//      s + bstr_get_utf8_skip(s[0])
+// On error, -1 is returned. On success, it returns a value in the range [1, 4].
+int bstr_get_utf8_skip(unsigned char b);
+
 static inline struct bstr bstr_cut(struct bstr str, int n)
 {
     if (n > str.len)
