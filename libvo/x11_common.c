@@ -829,12 +829,7 @@ int vo_x11_check_events(struct vo *vo)
                                    || status == XLookupBoth)
                         {
                             struct bstr t = { buf, len };
-                            while (t.len) {
-                                int code = bstr_decode_utf8(&t);
-                                if (code < 0)
-                                    break;
-                                mplayer_put_key(vo->key_fifo, code | modifiers);
-                            }
+                            mplayer_put_key_utf8(vo->key_fifo, modifiers, t);
                         }
                     } else {
                         XLookupString(&Event.xkey, buf, sizeof(buf), &keySym,
