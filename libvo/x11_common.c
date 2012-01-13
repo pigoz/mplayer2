@@ -541,6 +541,7 @@ static const struct mp_keymap keymap[] = {
     // special keys
     {XK_Pause, KEY_PAUSE}, {XK_Escape, KEY_ESC}, {XK_BackSpace, KEY_BS},
     {XK_Tab, KEY_TAB}, {XK_Return, KEY_ENTER},
+    {XK_Menu, KEY_MENU}, {XK_Print, KEY_PRINT},
 
     // cursor keys
     {XK_Left, KEY_LEFT}, {XK_Right, KEY_RIGHT}, {XK_Up, KEY_UP}, {XK_Down, KEY_DOWN},
