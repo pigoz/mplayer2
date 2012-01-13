@@ -56,22 +56,6 @@
 #define KEY_DOWN (KEY_CRSR+2)
 #define KEY_UP (KEY_CRSR+3)
 
-/* Multimedia keyboard/remote keys */
-#define KEY_MM_BASE (MP_KEY_BASE+0x20)
-#define KEY_POWER (KEY_MM_BASE+0)
-#define KEY_MENU (KEY_MM_BASE+1)
-#define KEY_PLAY (KEY_MM_BASE+2)
-#define KEY_PAUSE (KEY_MM_BASE+3)
-#define KEY_PLAYPAUSE (KEY_MM_BASE+4)
-#define KEY_STOP (KEY_MM_BASE+5)
-#define KEY_FORWARD (KEY_MM_BASE+6)
-#define KEY_REWIND (KEY_MM_BASE+7)
-#define KEY_NEXT (KEY_MM_BASE+8)
-#define KEY_PREV (KEY_MM_BASE+9)
-#define KEY_VOLUME_UP (KEY_MM_BASE+10)
-#define KEY_VOLUME_DOWN (KEY_MM_BASE+11)
-#define KEY_MUTE (KEY_MM_BASE+12)
-
 /*  Function keys  */
 #define KEY_F (MP_KEY_BASE+0x40)
 
@@ -198,6 +182,30 @@
 /* Special keys */
 #define KEY_INTERN (MP_KEY_BASE+0x1000)
 #define KEY_CLOSE_WIN (KEY_INTERN+0)
+
+// Generic mapping of extension keys. This includes "modern" keys such as
+// multimedia keys, internet keys etc.
+// These match with the keys and numeric values defined in X11/XF86keysym.h.
+// The XF86 key codes are in the range 0x10080001 - 0x1008FFFF, we relocate
+// them to the range starting at KEY_MM_BASE:
+//   mplayer_keycode = XF86XK_something - 0x10080000 + KEY_MM_BASE;
+// See: http://cgit.freedesktop.org/xorg/proto/x11proto/tree/XF86keysym.h
+#define KEY_MM_BASE (MP_KEY_BASE+0x10000)
+
+#define KEY_POWER (KEY_MM_BASE+0xFF21)          // _PowerDown
+#define KEY_MENU (KEY_MM_BASE+0xFF65)           // _MenuKB
+#define KEY_PLAY (KEY_MM_BASE+0xFF14)           // _AudioPlay
+#define KEY_PAUSE (KEY_MM_BASE+0xFF31)          // _AudioPause
+#define KEY_STOP (KEY_MM_BASE+0xFF15)           // _AudioStop
+#define KEY_FORWARD (KEY_MM_BASE+0xFF3F)        // _BackForward
+#define KEY_REWIND (KEY_MM_BASE+0xFF3E)         // _AudioRewind
+#define KEY_NEXT (KEY_MM_BASE+0xFF17)           // _AudioNext
+#define KEY_PREV (KEY_MM_BASE+0xFF16)           // _AudioPrev
+#define KEY_VOLUME_UP (KEY_MM_BASE+0xFF13)      // _AudioRaiseVolume
+#define KEY_VOLUME_DOWN (KEY_MM_BASE+0xFF11)    // _AudioLowerVolume
+#define KEY_MUTE (KEY_MM_BASE+0xFF12)           // _AudioMute
+
+#define KEY_PLAYPAUSE (KEY_MM_BASE+0x10001)
 
 /* Modifiers added to individual keys */
 #define KEY_MODIFIER_SHIFT  (1<<22)
