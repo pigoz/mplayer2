@@ -199,6 +199,10 @@
 #define KEY_INTERN (MP_KEY_BASE+0x1000)
 #define KEY_CLOSE_WIN (KEY_INTERN+0)
 
+// X11 specific
+#define KEY_X11_START (MP_KEY_BASE+0x10000)
+#define KEY_X11_END (MP_KEY_BASE+0x30000)
+
 /* Modifiers added to individual keys */
 #define KEY_MODIFIER_SHIFT  (1<<22)
 #define KEY_MODIFIER_CTRL   (1<<23)

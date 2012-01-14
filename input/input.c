@@ -55,6 +55,10 @@
 #include <lirc/lircc.h>
 #endif
 
+#ifdef CONFIG_X11
+#include "libvo/x11_common.h"
+#endif
+
 #include "ar.h"
 
 #define MP_MAX_KEY_DOWN 32
@@ -673,6 +677,13 @@ static char *get_key_name(int key, char *ret)
         if (key_names[i].key == key)
             return talloc_asprintf_append_buffer(ret, "%s", key_names[i].name);
     }
+
+    char *res = NULL;
+#ifdef CONFIG_X11
+    res = vo_x11_keycode_to_string(ret, key);
+    if (res)
+        return talloc_asprintf_append_buffer(ret, "%s", res);
+#endif
 
     // printable, and valid unicode range
     if (key >= 32 && key <= 0x10FFFF)
@@ -1518,6 +1529,12 @@ found:
         if (strcasecmp(key_names[i].name, name) == 0)
             return key_names[i].key + modifiers;
     }
+
+#ifdef CONFIG_X11
+    code = vo_x11_string_to_keycode(name);
+    if (code > 0)
+        return code + modifiers;
+#endif
 
     return -1;
 }

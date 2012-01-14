@@ -187,6 +187,9 @@ void update_xinerama_info(struct vo *vo);
 int vo_find_depth_from_visuals(Display *dpy, int screen, Visual **visual_return);
 void xscreensaver_heartbeat(struct vo_x11_state *x11);
 
+int vo_x11_string_to_keycode(char *s);
+char *vo_x11_keycode_to_string(void *talloc_ctx, int key);
+
 // Old VOs use incompatible function calls, translate them to new
 // prototypes
 #ifdef IS_OLD_VO

@@ -582,6 +582,31 @@ static const struct mp_keymap keymap[] = {
     {0, 0}
 };
 
+static int vo_x11_to_mp_keycode(KeySym keysym)
+{
+    if (keysym < 0x10000)
+        return KEY_X11_START + keysym;
+    if (keysym >= 0x1000000 && keysym < 0x100FFFF)
+        return KEY_X11_START + 0x10000 + (keysym - 0x1000000);
+    if (keysym >= 0x10080000 && keysym < 0x1008FFFF)
+        return KEY_X11_START + 0x20000 + (keysym - 0x10080000);
+    return 0;
+}
+
+static KeySym vo_x11_from_mp_keycode(int key)
+{
+    if (key < KEY_X11_START)
+        return 0;
+    key -= KEY_X11_START;
+    if (key < 0x10000)
+        return key;
+    if (key < 0x20000)
+        return key - 0x10000 + 0x1000000;
+    if (key < 0x30000)
+        return key - 0x20000 + 0x10080000;
+    return 0;
+}
+
 static int vo_x11_lookupkey(int key)
 {
     static const char *passthrough_keys = " -+*/<>`~!@#$%^&()_{}:;\"\',.?\\|=[]";
@@ -595,7 +620,32 @@ static int vo_x11_lookupkey(int key)
     if (!mpkey)
         mpkey = lookup_keymap_table(keymap, key);
 
+    if (!mpkey)
+        mpkey = vo_x11_to_mp_keycode(key);
+
     return mpkey;
+}
+
+int vo_x11_string_to_keycode(char *s)
+{
+    if (bstr_startswith0(bstr(s), "X_")) {
+        s += 2;
+        KeySym sym = XStringToKeysym(s);
+        if (sym)
+            return vo_x11_to_mp_keycode(sym);
+    }
+    return -1;
+}
+
+char *vo_x11_keycode_to_string(void *talloc_ctx, int key)
+{
+    KeySym keysym = vo_x11_from_mp_keycode(key);
+    if (keysym) {
+        char *name = XKeysymToString(keysym);
+        if (name)
+            return talloc_asprintf(talloc_ctx, "X_%s", name);
+    }
+    return NULL;
 }
 
 
