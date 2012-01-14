@@ -1185,7 +1185,7 @@ static mp_cmd_t *interpret_key(struct input_ctx *ictx, int code)
      * shift modifier is still kept for special keys like arrow keys.
      */
     int unmod = code & ~KEY_MODIFIER_MASK;
-    if (unmod < 256 && unmod != KEY_ENTER && unmod != KEY_TAB)
+    if (unmod >= 32 && unmod < MP_KEY_BASE)
         code &= ~KEY_MODIFIER_SHIFT;
 
     if (code & MP_KEY_DOWN) {
