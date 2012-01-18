@@ -228,8 +228,9 @@ typedef struct MPContext {
 } MPContext;
 
 
-// should not be global
+// Most of these should not be globals
 extern FILE *edl_fd;
+extern int file_filter;
 // These appear in options list
 extern int forced_subs_only;
 

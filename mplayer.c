@@ -301,6 +301,7 @@ int dvdsub_lang_id;
 int vobsub_id = -1;
 static char *spudec_ifo = NULL;
 int forced_subs_only = 0;
+int file_filter = 1;
 
 // cache2:
 int stream_cache_size = -1;
@@ -335,6 +336,20 @@ char *current_module; // for debugging
 
 
 // ---
+
+#ifdef CONFIG_MENU
+#include "m_struct.h"
+#include "libmenu/menu.h"
+static const vf_info_t * const libmenu_vfs[] = {
+    &vf_info_menu,
+    NULL
+};
+static vf_instance_t *vf_menu;
+int use_menu;
+static char *menu_cfg;
+static char *menu_root = "main";
+#endif
+
 
 edl_record_ptr edl_records = NULL; ///< EDL entries memory area
 edl_record_ptr next_edl_record = NULL; ///< only for traversing edl_records
@@ -606,6 +621,9 @@ void uninit_player(struct MPContext *mpctx, unsigned int mask)
         if (mpctx->sh_video)
             uninit_video(mpctx->sh_video);
         mpctx->sh_video = NULL;
+#ifdef CONFIG_MENU
+        vf_menu = NULL;
+#endif
     }
 
     if (mask & INITIALIZED_DEMUXER) {
@@ -706,6 +724,10 @@ void exit_player_with_rc(struct MPContext *mpctx, enum exit_reason how, int rc)
 
     current_module = "uninit_input";
     mp_input_uninit(mpctx->input);
+#ifdef CONFIG_MENU
+    if (use_menu)
+        menu_uninit();
+#endif
 
 #ifdef CONFIG_FREETYPE
     current_module = "uninit_font";
@@ -2709,6 +2731,22 @@ int reinit_video_chain(struct MPContext *mpctx)
         };
         sh_video->vfilter = vf_open_filter(opts, NULL, "vo", vf_arg);
     }
+#ifdef CONFIG_MENU
+    if (use_menu) {
+        char *vf_arg[] = {
+            "_oldargs_", menu_root, NULL
+        };
+        vf_menu = vf_open_plugin(opts, libmenu_vfs, sh_video->vfilter, "menu",
+                                 vf_arg);
+        if (!vf_menu) {
+            mp_tmsg(MSGT_CPLAYER, MSGL_ERR, "Can't open libmenu video filter "
+                    "with root menu %s.\n", menu_root);
+            use_menu = 0;
+        }
+    }
+    if (vf_menu)
+        sh_video->vfilter = vf_menu;
+#endif
 
 #ifdef CONFIG_ASS
     if (opts->ass_enabled) {
@@ -4230,6 +4268,27 @@ int main(int argc, char *argv[])
         mp_input_add_key_fd(mpctx->input, 0, 1, read_keys, NULL, mpctx->key_fifo);
     // Set the libstream interrupt callback
     stream_set_interrupt_callback(mp_input_check_interrupt, mpctx->input);
+
+#ifdef CONFIG_MENU
+    if (use_menu) {
+        if (menu_cfg && menu_init(mpctx, mpctx->mconfig, mpctx->input, menu_cfg))
+            mp_tmsg(MSGT_CPLAYER, MSGL_V, "Menu initialized: %s\n", menu_cfg);
+        else {
+            menu_cfg = get_path("menu.conf");
+            if (menu_init(mpctx, mpctx->mconfig, mpctx->input, menu_cfg))
+                mp_tmsg(MSGT_CPLAYER, MSGL_V, "Menu initialized: %s\n", menu_cfg);
+            else {
+                if (menu_init(mpctx, mpctx->mconfig, mpctx->input,
+                              MPLAYER_CONFDIR "/menu.conf"))
+                    mp_tmsg(MSGT_CPLAYER, MSGL_V, "Menu initialized: %s\n", MPLAYER_CONFDIR "/menu.conf");
+                else {
+                    mp_tmsg(MSGT_CPLAYER, MSGL_ERR, "Menu init failed.\n");
+                    use_menu = 0;
+                }
+            }
+        }
+    }
+#endif
 
     current_module = NULL;
 
