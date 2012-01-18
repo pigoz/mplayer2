@@ -36,7 +36,7 @@
 
 #include "playtree.h"
 #include "input/input.h"
-#include "access_mpcontext.h"
+#include "mp_core.h"
 
 struct list_entry_s {
   struct list_entry p;
@@ -66,6 +66,11 @@ static const m_option_t cfg_fields[] = {
 };
 
 #define mpriv (menu->priv)
+
+static play_tree_iter_t* mpctx_get_playtree_iter(struct MPContext *ctx)
+{
+    return ctx->playtree_iter;
+}
 
 static void read_cmd(menu_t* menu,int cmd) {
   switch(cmd) {

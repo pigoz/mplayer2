@@ -31,10 +31,10 @@
 #include "m_struct.h"
 #include "m_option.h"
 #include "input/input.h"
+#include "mp_core.h"
 
 #include "stream/stream.h"
 #include "libmpdemux/demuxer.h"
-#include "access_mpcontext.h"
 
 #include "libmpcodecs/mp_image.h"
 
@@ -100,22 +100,20 @@ static char *fmt_replace(const char *fmt, const char *chapter_name,
 static int fill_menu (menu_t* menu)
 {
   list_entry_t* e;
-  int cid, chapter_num = 0;
+  int cid;
   int start_time;
-  demuxer_t* demuxer = mpctx_get_demuxer(menu->ctx);
 
-  if (demuxer)
-    chapter_num = demuxer_chapter_count(demuxer);
+  int chapter_num = get_chapter_count(menu->ctx);
   if (chapter_num > 0) {
     menu_list_init (menu);
     for (cid = 0; cid < chapter_num; ++cid)
       if ((e = calloc (1, sizeof (list_entry_t))) != NULL) {
-        e->cid = cid + 1;
+        e->cid = cid;
         e->p.next = NULL;
-        char *str = demuxer_chapter_display_name(demuxer, cid);
+        char *str = chapter_display_name(menu->ctx, cid);
         e->p.txt = strdup(str);
         talloc_free(str);
-        start_time = demuxer_chapter_time(demuxer, cid, NULL);
+        start_time = chapter_start_time(menu->ctx, cid);
         if (start_time >= 0) {
             char timestr[13];
             char *tmp;

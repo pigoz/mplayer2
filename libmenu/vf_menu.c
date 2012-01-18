@@ -35,9 +35,9 @@
 #include "sub/font_load.h"
 #include "sub/sub.h"
 #include "input/input.h"
+#include "mp_core.h"
 #include "m_struct.h"
 #include "menu.h"
-#include "access_mpcontext.h"
 
 
 static struct vf_priv_s* st_priv = NULL;
@@ -56,7 +56,7 @@ struct vf_priv_s {
 static int put_image(struct vf_instance *vf, mp_image_t *mpi, double pts);
 
 void vf_menu_pause_update(struct vf_instance *vf) {
-  struct vo *video_out = mpctx_get_video_out(vf->priv->current->ctx);
+  struct vo *video_out = vf->priv->current->ctx->video_out;
   if(pause_mpi) {
     put_image(vf,pause_mpi, MP_NOPTS_VALUE);
     // Don't draw the osd atm
@@ -166,7 +166,7 @@ static int put_image(struct vf_instance *vf, mp_image_t *mpi, double pts){
     pause_mpi = alloc_mpi(mpi->w,mpi->h,mpi->imgfmt);
     copy_mpi(pause_mpi,mpi);
   }
-  else if (mpctx_get_osd_function(vf->priv->root->ctx) == OSD_PAUSE)
+  else if (vf->priv->root->ctx->osd_function == OSD_PAUSE)
     copy_mpi(pause_mpi,mpi);
 
   if (vf->priv->current->show) {
