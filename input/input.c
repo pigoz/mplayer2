@@ -1519,7 +1519,7 @@ mp_cmd_t *mp_input_get_cmd(struct input_ctx *ictx, int time, int peek_only)
     for (struct cmd_filter *cf = cmd_filters; cf; cf = cf->next) {
         if (cf->filter(ret, cf->ctx)) {
             // The filter ate the cmd, so remove it from the queue
-            queue_pop(queue);
+            queue_remove(queue, ret);
             mp_cmd_free(ret);
             // Retry with next command
             return mp_input_get_cmd(ictx, 0, peek_only);
