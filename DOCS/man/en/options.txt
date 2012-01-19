@@ -618,12 +618,6 @@
     to -1 (the default), MPlayer will choose the first edition declared as a
     default, or if there is no default, the first edition defined.
 
---edl=<filename>
-    Enables edit decision list (EDL) actions during playback. Video will be
-    skipped over and audio will be muted and unmuted according to the entries
-    in the given file. See http://www.mplayerhq.hu/DOCS/HTML/en/edl.html for
-    details on how to use this.
-
 --edlout=<filename>
     Creates a new file and writes edit decision list (EDL) records to it.
     During playback, the user hits 'i' to mark the start or end of a skip

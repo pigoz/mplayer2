@@ -3387,7 +3387,7 @@ fixpts[=options]
         necessary to avoid confusing encoders.
 
     *NOTE*: Using this filter together with any sort of seeking (including
-    ``--ss`` and EDLs) may make demons fly out of your nose.
+    ``--ss``) may make demons fly out of your nose.
 
 
 ENVIRONMENT VARIABLES
