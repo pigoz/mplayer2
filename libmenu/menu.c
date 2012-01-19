@@ -33,11 +33,14 @@
 #include "stream/stream.h"
 #include "input/input.h"
 
-#include "libmpcodecs/img_format.h"
-#include "libmpcodecs/mp_image.h"
 #include "m_option.h"
 #include "m_struct.h"
 #include "menu.h"
+
+char *menu_root = "main";
+
+/// if nonzero display menu at startup
+int menu_startup = 0;
 
 extern menu_info_t menu_info_cmdlist;
 extern menu_info_t menu_info_chapsel;
@@ -93,6 +96,14 @@ static menu_def_t* menu_list = NULL;
 static int menu_count = 0;
 static menu_cmd_bindings_t *cmd_bindings = NULL;
 static int cmd_bindings_num = 0;
+
+struct menu_state {
+  menu_t* root;
+  menu_t* current;
+  bool last_visible;
+};
+
+static struct menu_state *global_menu_state;
 
 
 static menu_cmd_bindings_t *get_cmd_bindings(const char *name)
@@ -227,6 +238,96 @@ static int menu_parse_config(char* buffer, struct m_config *mconfig)
 
 }
 
+static int key_cb(int code)
+{
+  return menu_read_key(global_menu_state->current,code);
+}
+
+void menu_frame(void)
+{
+  struct menu_state *state = global_menu_state;
+  if (!global_menu_state)
+    return;
+  bool redraw = false;
+  // Close all menu who requested it
+  // (root menu is never closed?)
+  while(state->current->cl && state->current != state->root) {
+    menu_t* m = state->current;
+    state->current = m->parent ? m->parent :  state->root;
+    menu_close(m);
+  }
+
+  redraw |= state->current->show != state->last_visible;
+  state->last_visible = state->current->show;
+
+  if (state->current->show) {
+    if (!mp_input_key_cb)
+      mp_input_key_cb = key_cb;
+    redraw = true;
+
+  } else {
+    if(mp_input_key_cb)
+      mp_input_key_cb = NULL;
+  }
+  if (redraw)
+    vo_osd_changed(OSDTYPE_MENU);
+}
+
+static int cmd_filter(mp_cmd_t* cmd, void *ctx)
+{
+    struct menu_state *priv = ctx;
+
+  switch(cmd->id) {
+  case MP_CMD_MENU : {  // Convert txt cmd from the users into libmenu stuff
+    char* arg = cmd->args[0].v.s;
+
+    if (!priv->current->show && strcmp(arg,"hide"))
+      priv->current->show = 1;
+    else if(strcmp(arg,"up") == 0)
+      menu_read_cmd(priv->current,MENU_CMD_UP);
+    else if(strcmp(arg,"down") == 0)
+      menu_read_cmd(priv->current,MENU_CMD_DOWN);
+    else if(strcmp(arg,"left") == 0)
+      menu_read_cmd(priv->current,MENU_CMD_LEFT);
+    else if(strcmp(arg,"right") == 0)
+      menu_read_cmd(priv->current,MENU_CMD_RIGHT);
+    else if(strcmp(arg,"ok") == 0)
+      menu_read_cmd(priv->current,MENU_CMD_OK);
+    else if(strcmp(arg,"cancel") == 0)
+      menu_read_cmd(priv->current,MENU_CMD_CANCEL);
+    else if(strcmp(arg,"home") == 0)
+      menu_read_cmd(priv->current,MENU_CMD_HOME);
+    else if(strcmp(arg,"end") == 0)
+      menu_read_cmd(priv->current,MENU_CMD_END);
+    else if(strcmp(arg,"pageup") == 0)
+      menu_read_cmd(priv->current,MENU_CMD_PAGE_UP);
+    else if(strcmp(arg,"pagedown") == 0)
+      menu_read_cmd(priv->current,MENU_CMD_PAGE_DOWN);
+    else if(strcmp(arg,"click") == 0)
+      menu_read_cmd(priv->current,MENU_CMD_CLICK);
+    else if(strcmp(arg,"hide") == 0 || strcmp(arg,"toggle") == 0)
+      priv->current->show = 0;
+    else
+      mp_tmsg(MSGT_GLOBAL,MSGL_WARN,"[MENU] Unknown command: '%s'.\n",arg);
+    return 1;
+  }
+  case MP_CMD_SET_MENU : {
+    char* menu = cmd->args[0].v.s;
+    menu_t* l = priv->current;
+    priv->current = menu_open(menu);
+    if(!priv->current) {
+      mp_tmsg(MSGT_GLOBAL,MSGL_WARN,"[MENU] Failed to open menu: '%s'.\n",menu);
+      priv->current = l;
+      priv->current->show = 0;
+    } else {
+      priv->current->show = 1;
+      priv->current->parent = l;
+    }
+    return 1;
+  }
+  }
+  return 0;
+}
 
 /// This will build the menu_defs list from the cfg file
 #define BUF_STEP 1024
@@ -277,12 +378,27 @@ int menu_init(struct MPContext *mpctx, struct m_config *mconfig,
   menu_input = input_ctx;
   f = menu_parse_config(buffer, mconfig);
   free(buffer);
+
+  if (f) {
+    struct menu_state *state = talloc_zero(mpctx, struct menu_state);
+    state->root = state->current = menu_open(menu_root);
+    if(!state->current) {
+      mp_tmsg(MSGT_CPLAYER, MSGL_ERR, "Can't open libmenu "
+              "with root menu %s.\n", menu_root);
+      talloc_free(state);
+      return 0;
+    }
+    state->root->show = menu_startup;
+    mp_input_add_cmd_filter(cmd_filter, state);
+    global_menu_state = state;
+  }
   return f;
 }
 
 // Destroy all this stuff
 void menu_uninit(void) {
   int i;
+  global_menu_state = NULL;
   for(i = 0 ; menu_list && menu_list[i].name ; i++) {
     free(menu_list[i].name);
     m_struct_free(&menu_list[i].type->priv_st,menu_list[i].cfg);
@@ -349,9 +465,27 @@ menu_t* menu_open(char *name) {
   return NULL;
 }
 
-void menu_draw(menu_t* menu,mp_image_t* mpi) {
-  if(menu->show && menu->draw)
-    menu->draw(menu,mpi);
+int menu_want_draw(void)
+{
+  if (!global_menu_state)
+    return 0;
+  menu_t *menu = global_menu_state->current;
+  return menu->show && menu->draw;
+}
+
+int menu_draw(mp_osd_obj_t *osdobj)
+{
+  menu_t *menu = global_menu_state->current;
+  if(menu->show && menu->draw) {
+    struct menu_render mpi = {
+        osdobj,
+        osdobj->bbox.x2 - osdobj->bbox.x1,
+        osdobj->bbox.y2 - osdobj->bbox.y1,
+    };
+    menu->draw(menu, &mpi);
+    return 1;
+  }
+  return 0;
 }
 
 void menu_update_mouse_pos(double x, double y) {
@@ -381,42 +515,6 @@ int menu_read_key(menu_t* menu,int cmd) {
 }
 
 ///////////////////////////// Helpers ////////////////////////////////////
-
-typedef void (*draw_alpha_f)(int w,int h, unsigned char* src, unsigned char *srca, int srcstride, unsigned char* dstbase,int dststride);
-
-inline static draw_alpha_f get_draw_alpha(uint32_t fmt) {
-  switch(fmt) {
-  case IMGFMT_BGR12:
-  case IMGFMT_RGB12:
-    return vo_draw_alpha_rgb12;
-  case IMGFMT_BGR15:
-  case IMGFMT_RGB15:
-    return vo_draw_alpha_rgb15;
-  case IMGFMT_BGR16:
-  case IMGFMT_RGB16:
-    return vo_draw_alpha_rgb16;
-  case IMGFMT_BGR24:
-  case IMGFMT_RGB24:
-    return vo_draw_alpha_rgb24;
-  case IMGFMT_BGR32:
-  case IMGFMT_RGB32:
-    return vo_draw_alpha_rgb32;
-  case IMGFMT_YV12:
-  case IMGFMT_I420:
-  case IMGFMT_IYUV:
-  case IMGFMT_YVU9:
-  case IMGFMT_IF09:
-  case IMGFMT_Y800:
-  case IMGFMT_Y8:
-    return vo_draw_alpha_yv12;
-  case IMGFMT_YUY2:
-    return vo_draw_alpha_yuy2;
-  case IMGFMT_UYVY:
-    return vo_draw_alpha_uyvy;
-  }
-
-  return NULL;
-}
 
 // return the real height of a char:
 static inline int get_height(int c,int h){
@@ -485,14 +583,48 @@ static char *menu_fribidi(char *txt)
 }
 #endif
 
-void menu_draw_text(mp_image_t* mpi,char* txt, int x, int y) {
-  draw_alpha_f draw_alpha = get_draw_alpha(mpi->imgfmt);
-  int font;
+static void menu_draw_alpha(mp_osd_obj_t* obj, int x0,int y0, int w,int h, unsigned char* src, unsigned char *srca, int stride)
+{
+    int dststride = obj->stride;
+    int dstskip = obj->stride-w;
+    int srcskip = stride-w;
+    int i, j;
+    unsigned char *b = obj->bitmap_buffer + (y0-obj->bbox.y1)*dststride + (x0-obj->bbox.x1);
+    unsigned char *a = obj->alpha_buffer  + (y0-obj->bbox.y1)*dststride + (x0-obj->bbox.x1);
+    unsigned char *bs = src;
+    unsigned char *as = srca;
 
-  if(!draw_alpha) {
-    mp_tmsg(MSGT_GLOBAL,MSGL_WARN,"[MENU] Unsupported output format!!!!\n");
-    return;
-  }
+    if (x0 < obj->bbox.x1 || x0+w > obj->bbox.x2 || y0 < obj->bbox.y1 || y0+h > obj->bbox.y2) {
+        fprintf(stderr, "menu text out of range: bbox [%d %d %d %d], txt [%d %d %d %d]\n",
+                obj->bbox.x1, obj->bbox.x2, obj->bbox.y1, obj->bbox.y2,
+                x0, x0+w, y0, y0+h);
+        return;
+    }
+
+    for (i = 0; i < h; i++) {
+        for (j = 0; j < w; j++, b++, a++, bs++, as++) {
+            // NOTE: many special cases, because alpha=0 means transparency,
+            //       while alpha=1..255 is opaque..transparent
+            if (*as) {
+                *b=((*b**as)>>8)+*bs;
+                if (*a) {
+                    *a=(*a**as)>>8;
+                    if (*a < 1)
+                        *a = 1;
+                } else {
+                    *a=*as;
+                }
+            }
+        }
+        b+= dstskip;
+        a+= dstskip;
+        bs+= srcskip;
+        as+= srcskip;
+    }
+}
+
+void menu_draw_text(struct menu_render* mpi,char* txt, int x, int y) {
+  int font;
 
 #ifdef CONFIG_FRIBIDI
   txt = menu_fribidi(txt);
@@ -502,18 +634,18 @@ void menu_draw_text(mp_image_t* mpi,char* txt, int x, int y) {
   while (*txt) {
     int c=utf8_get_char((const char**)&txt);
     if ((font=vo_font->font[c])>=0 && (x + vo_font->width[c] <= mpi->w) && (y + vo_font->pic_a[font]->h <= mpi->h))
-      draw_alpha(vo_font->width[c], vo_font->pic_a[font]->h,
-		 vo_font->pic_b[font]->bmp+vo_font->start[c],
-		 vo_font->pic_a[font]->bmp+vo_font->start[c],
-		 vo_font->pic_a[font]->w,
-		 mpi->planes[0] + y * mpi->stride[0] + x * (mpi->bpp>>3),
-		 mpi->stride[0]);
+      menu_draw_alpha(mpi->osdobj,x,y,
+                      vo_font->width[c],
+                      vo_font->pic_a[font]->h,
+                      vo_font->pic_b[font]->bmp+vo_font->start[c],
+                      vo_font->pic_a[font]->bmp+vo_font->start[c],
+                      vo_font->pic_a[font]->w);
     x+=vo_font->width[c]+vo_font->charspace;
   }
 
 }
 
-void menu_draw_text_full(mp_image_t* mpi,char* txt,
+void menu_draw_text_full(struct menu_render* mpi,char* txt,
 			 int x, int y,int w, int h,
 			 int vspace, int warp, int align, int anchor) {
   int need_w,need_h;
@@ -521,12 +653,6 @@ void menu_draw_text_full(mp_image_t* mpi,char* txt,
   int sx, xmin, xmax, xmid, xrmin;
   int ll = 0;
   int font;
-  draw_alpha_f draw_alpha = get_draw_alpha(mpi->imgfmt);
-
-  if(!draw_alpha) {
-    mp_tmsg(MSGT_GLOBAL,MSGL_WARN,"[MENU] Unsupported output format!!!!\n");
-    return;
-  }
 
 #ifdef CONFIG_FRIBIDI
   txt = menu_fribidi(txt);
@@ -672,14 +798,14 @@ void menu_draw_text_full(mp_image_t* mpi,char* txt,
       if(font >= 0) {
  	int cs = (vo_font->pic_a[font]->h - vo_font->height) / 2;
 	if ((sx + vo_font->width[c] <= xmax) && (sy + vo_font->height <= ymax) )
-	  draw_alpha(vo_font->width[c], vo_font->height,
-		     vo_font->pic_b[font]->bmp+vo_font->start[c] +
-		     cs * vo_font->pic_a[font]->w,
-		     vo_font->pic_a[font]->bmp+vo_font->start[c] +
-		     cs * vo_font->pic_a[font]->w,
-		     vo_font->pic_a[font]->w,
-		     mpi->planes[0] + sy * mpi->stride[0] + sx * (mpi->bpp>>3),
-		     mpi->stride[0]);
+          menu_draw_alpha(mpi->osdobj,sx,sy,
+                          vo_font->width[c],
+                          vo_font->pic_a[font]->h, //vo_font->height?
+                          vo_font->pic_b[font]->bmp+vo_font->start[c] +
+                          cs * vo_font->pic_a[font]->w,
+                          vo_font->pic_a[font]->bmp+vo_font->start[c] +
+                          cs * vo_font->pic_a[font]->w,
+                          vo_font->pic_a[font]->w);
 	//	else
 	//printf("Can't draw '%c'\n",c);
       }
@@ -744,14 +870,8 @@ int menu_text_num_lines(char* txt, int max_width) {
 }
 
 
-void menu_draw_box(mp_image_t* mpi,unsigned char grey,unsigned char alpha, int x, int y, int w, int h) {
-  draw_alpha_f draw_alpha = get_draw_alpha(mpi->imgfmt);
+void menu_draw_box(struct menu_render* mpi,unsigned char grey,unsigned char alpha, int x, int y, int w, int h) {
   int g;
-
-  if(!draw_alpha) {
-    mp_tmsg(MSGT_GLOBAL,MSGL_WARN,"[MENU] Unsupported output format!!!!\n");
-    return;
-  }
 
   if(x > mpi->w || y > mpi->h) return;
 
@@ -768,9 +888,7 @@ void menu_draw_box(mp_image_t* mpi,unsigned char grey,unsigned char alpha, int x
     char pic[stride*h],pic_alpha[stride*h];
     memset(pic,g,stride*h);
     memset(pic_alpha,alpha,stride*h);
-    draw_alpha(w,h,pic,pic_alpha,stride,
-               mpi->planes[0] + y * mpi->stride[0] + x * (mpi->bpp>>3),
-               mpi->stride[0]);
+    menu_draw_alpha(mpi->osdobj, x, y, w, h, pic, pic_alpha, stride);
   }
 
 }

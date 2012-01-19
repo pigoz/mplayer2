@@ -23,9 +23,6 @@
 
 #include "config.h"
 
-#include "libmpcodecs/img_format.h"
-#include "libmpcodecs/mp_image.h"
-
 #include "m_struct.h"
 #include "menu.h"
 
@@ -44,7 +41,7 @@ static int selection_h;
 
 #define mpriv (menu->priv)
 
-void menu_list_draw(menu_t* menu,mp_image_t* mpi) {
+void menu_list_draw(menu_t* menu,struct menu_render* mpi) {
   int x = mpriv->x;
   int y = mpriv->y;
   int i;
@@ -61,8 +58,8 @@ void menu_list_draw(menu_t* menu,mp_image_t* mpi) {
   if(mpriv->count < 1)
     return;
 
-  if(h <= 0) h = mpi->height;
-  if(w <= 0) w = mpi->width;
+  if(h <= 0) h = mpi->h;
+  if(w <= 0) w = mpi->w;
   dh = h - 2*mpriv->minb;
   dw = w - 2*mpriv->minb;
   ptr_l = mpriv->ptr ? menu_text_length(mpriv->ptr) : 0;
@@ -154,8 +151,8 @@ void menu_list_draw(menu_t* menu,mp_image_t* mpi) {
 
   // If mouse moved, try to update selected menu item by the mouse position.
   if (menu_mouse_pos_updated) {
-    mouse_x = menu_mouse_x * mpi->width;
-    mouse_y = menu_mouse_y * mpi->height;
+    mouse_x = menu_mouse_x * mpi->w;
+    mouse_y = menu_mouse_y * mpi->h;
     if (mouse_x >= bx && mouse_x < bx + bg_w) {
       int by = dy + y - mpriv->vspace / 2;
       int max_by = dh + y + mpriv->vspace / 2;

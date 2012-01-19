@@ -36,8 +36,6 @@
 #include "stream/stream.h"
 #include "libmpdemux/demuxer.h"
 
-#include "libmpcodecs/mp_image.h"
-
 #include "menu.h"
 #include "menu_list.h"
 

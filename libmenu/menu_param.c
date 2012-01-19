@@ -34,8 +34,6 @@
 #include "m_property.h"
 #include "asxparser.h"
 
-#include "libmpcodecs/mp_image.h"
-
 #include "menu.h"
 #include "menu_list.h"
 #include "input/input.h"
@@ -265,7 +263,7 @@ static void closeMenu(menu_t* menu) {
   menu_list_uninit(menu,free_entry);
 }
 
-static void menu_pref_draw(menu_t* menu, mp_image_t* mpi) {
+static void menu_pref_draw(menu_t* menu, struct menu_render* mpi) {
   update_entries(menu, 1);
   menu_list_draw(menu, mpi);
 }

@@ -31,6 +31,7 @@ typedef struct mp_osd_bbox_s {
 #define OSDTYPE_SPU 4
 #define OSDTYPE_DVDNAV 5
 #define OSDTYPE_TELETEXT 6
+#define OSDTYPE_MENU 7
 
 #define OSDFLAG_VISIBLE 1
 #define OSDFLAG_CHANGED 2

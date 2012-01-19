@@ -476,7 +476,6 @@ SRCS_MPLAYER-$(LIBMENU)      += libmenu/menu.c \
                                 libmenu/menu_param.c \
                                 libmenu/menu_pt.c \
                                 libmenu/menu_txt.c \
-                                libmenu/vf_menu.c \
 
 SRCS_MPLAYER-$(LIBMENU_DVBIN) += libmenu/menu_dvbin.c
 SRCS_MPLAYER-$(LIRC)          += input/lirc.c

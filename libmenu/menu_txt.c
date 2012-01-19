@@ -23,9 +23,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "libmpcodecs/img_format.h"
-#include "libmpcodecs/mp_image.h"
-
 #include "m_struct.h"
 #include "m_option.h"
 #include "menu.h"
@@ -99,7 +96,7 @@ static void read_cmd(menu_t* menu,int cmd) {
 }
 
 
-static void draw(menu_t* menu,mp_image_t* mpi) {
+static void draw(menu_t* menu,struct menu_render* mpi) {
   int x = mpriv->minb;
   int y = mpriv->minb;
   //int th = 2*mpriv->hspace + vo_font->height;

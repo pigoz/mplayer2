@@ -41,6 +41,10 @@
 #include "spudec.h"
 #include "libavutil/common.h"
 
+#ifdef CONFIG_MENU
+#include "libmenu/menu.h"
+#endif
+
 #define NEW_SPLITTING
 
 
@@ -1178,6 +1182,19 @@ static int osd_update_ext(struct osd_state *osd, int dxs, int dys,
 	    } else
 		obj->flags&=~OSDFLAG_VISIBLE;
 	    break;
+#ifdef CONFIG_MENU
+        case OSDTYPE_MENU:
+            if (menu_want_draw()) {
+                obj->flags|=OSDFLAG_VISIBLE|OSDFLAG_CHANGED|OSDFLAG_BBOX;
+                obj->bbox.x1=obj->bbox.y1=0;
+                obj->bbox.x2=dxs;
+                obj->bbox.y2=dys;
+                alloc_buf(obj);
+                menu_draw(obj);
+            } else
+                obj->flags&=~OSDFLAG_VISIBLE;
+            break;
+#endif
 	}
 	// check bbox:
 	if(!(obj->flags&OSDFLAG_BBOX)){
@@ -1236,6 +1253,7 @@ struct osd_state *osd_create(void)
     new_osd_obj(OSDTYPE_DVDNAV);
 #endif
     new_osd_obj(OSDTYPE_TELETEXT);
+    new_osd_obj(OSDTYPE_MENU);
 #ifdef CONFIG_FREETYPE
     force_load_font = 1;
 #endif
@@ -1296,6 +1314,7 @@ void osd_draw_text_ext(struct osd_state *osd, int dxs, int dys,
         case OSDTYPE_DVDNAV:
 #endif
 	case OSDTYPE_TELETEXT:
+        case OSDTYPE_MENU:
 	case OSDTYPE_OSD:
 	case OSDTYPE_SUBTITLE:
 	case OSDTYPE_PROGBAR:

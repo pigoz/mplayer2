@@ -20,12 +20,18 @@
 #define MPLAYER_MENU_H
 
 #include "m_struct.h"
-#include "libmpcodecs/mp_image.h"
+
+extern char *menu_root;
 
 extern double menu_mouse_x;
 extern double menu_mouse_y;
 extern int menu_mouse_pos_updated;
 extern const struct vf_info vf_info_menu;
+
+struct menu_render {
+    struct mp_osd_obj_s *osdobj;
+    int w, h;
+};
 
 struct menu_priv_s;
 typedef struct  menu_s menu_t;
@@ -38,7 +44,7 @@ struct  menu_s {
   struct MPContext *ctx;
   struct m_config *mconfig;
   struct input_ctx *input_ctx;
-  void (*draw)(menu_t* menu,mp_image_t* mpi);
+  void (*draw)(menu_t* menu,struct menu_render * mpi);
   void (*read_cmd)(menu_t* menu,int cmd);
   int (*read_key)(menu_t* menu,int cmd);
   void (*close)(menu_t* menu);
@@ -84,10 +90,14 @@ void menu_uninit(void);
 /// Open a menu defined in the config file
 menu_t* menu_open(char *name);
 
-void menu_draw(menu_t* menu,mp_image_t* mpi);
 void menu_read_cmd(menu_t* menu,int cmd);
 void menu_close(menu_t* menu);
 int menu_read_key(menu_t* menu,int cmd);
+
+void menu_frame(void);
+int menu_want_draw(void);
+int menu_draw(struct mp_osd_obj_s *osdobj);
+
 
 //// Default implementation
 int menu_dflt_read_key(menu_t* menu,int cmd);
@@ -107,7 +117,7 @@ void menu_update_mouse_pos(double x, double y);
 #define MENU_TEXT_HMASK	(MENU_TEXT_LEFT|MENU_TEXT_HCENTER|MENU_TEXT_RIGHT)
 #define MENU_TEXT_CENTER	(MENU_TEXT_VCENTER|MENU_TEXT_HCENTER)
 
-void menu_draw_text(mp_image_t* mpi, char* txt, int x, int y);
+void menu_draw_text(struct menu_render* mpi, char* txt, int x, int y);
 int menu_text_length(char* txt);
 int menu_text_num_lines(char* txt, int max_width);
 
@@ -115,11 +125,11 @@ void menu_text_size(char* txt,int max_width,
 		    int vspace, int warp,
 		    int* _w, int* _h);
 
-void menu_draw_text_full(mp_image_t* mpi,char* txt,
+void menu_draw_text_full(struct menu_render* mpi,char* txt,
 			 int x, int y,int w, int h,
 			 int vspace, int warp, int align, int anchor);
 
-void menu_draw_box(mp_image_t* mpi, unsigned char grey, unsigned char alpha, int x, int y, int w, int h);
+void menu_draw_box(struct menu_render* mpi, unsigned char grey, unsigned char alpha, int x, int y, int w, int h);
 
 struct vf_instance;
 void vf_menu_pause_update(struct vf_instance *vf);

@@ -33,9 +33,6 @@
 #include "m_struct.h"
 #include "m_option.h"
 
-#include "libmpcodecs/img_format.h"
-#include "libmpcodecs/mp_image.h"
-
 #include "menu.h"
 #include "menu_list.h"
 #include "input/input.h"

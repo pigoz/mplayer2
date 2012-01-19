@@ -24,9 +24,6 @@
 #include <ctype.h>
 #include <string.h>
 
-#include "libmpcodecs/img_format.h"
-#include "libmpcodecs/mp_image.h"
-
 #include "m_option.h"
 #include "m_struct.h"
 #include "asxparser.h"

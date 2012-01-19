@@ -25,9 +25,6 @@
 #include "mp_msg.h"
 #include "path.h"
 
-#include "libmpcodecs/img_format.h"
-#include "libmpcodecs/mp_image.h"
-
 #include "m_struct.h"
 #include "m_option.h"
 #include "menu.h"

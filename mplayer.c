@@ -344,10 +344,8 @@ static const vf_info_t * const libmenu_vfs[] = {
     &vf_info_menu,
     NULL
 };
-static vf_instance_t *vf_menu;
 int use_menu;
 static char *menu_cfg;
-static char *menu_root = "main";
 #endif
 
 
@@ -621,9 +619,6 @@ void uninit_player(struct MPContext *mpctx, unsigned int mask)
         if (mpctx->sh_video)
             uninit_video(mpctx->sh_video);
         mpctx->sh_video = NULL;
-#ifdef CONFIG_MENU
-        vf_menu = NULL;
-#endif
     }
 
     if (mask & INITIALIZED_DEMUXER) {
@@ -2731,22 +2726,6 @@ int reinit_video_chain(struct MPContext *mpctx)
         };
         sh_video->vfilter = vf_open_filter(opts, NULL, "vo", vf_arg);
     }
-#ifdef CONFIG_MENU
-    if (use_menu) {
-        char *vf_arg[] = {
-            "_oldargs_", menu_root, NULL
-        };
-        vf_menu = vf_open_plugin(opts, libmenu_vfs, sh_video->vfilter, "menu",
-                                 vf_arg);
-        if (!vf_menu) {
-            mp_tmsg(MSGT_CPLAYER, MSGL_ERR, "Can't open libmenu video filter "
-                    "with root menu %s.\n", menu_root);
-            use_menu = 0;
-        }
-    }
-    if (vf_menu)
-        sh_video->vfilter = vf_menu;
-#endif
 
 #ifdef CONFIG_ASS
     if (opts->ass_enabled) {
@@ -3140,6 +3119,7 @@ static void pause_loop(struct MPContext *mpctx)
         if (mpctx->sh_video && mpctx->video_out)
             vo_check_events(mpctx->video_out);
         update_osd_msg(mpctx);
+        menu_frame();
         int hack = vo_osd_changed(0);
         vo_osd_changed(hack);
         if (hack || mpctx->sh_video && mpctx->video_out->want_redraw)
@@ -3704,6 +3684,7 @@ static void run_playloop(struct MPContext *mpctx)
             update_subtitles(mpctx, sh_video->pts, mpctx->video_offset, false);
             update_teletext(sh_video, mpctx->demuxer, 0);
             update_osd_msg(mpctx);
+            menu_frame();
             struct vf_instance *vf = sh_video->vfilter;
             mpctx->osd->pts = mpctx->video_pts;
             vf->control(vf, VFCTRL_DRAW_EOSD, mpctx->osd);
