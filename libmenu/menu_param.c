@@ -77,8 +77,14 @@ static const m_option_t cfg_fields[] = {
 #define mpriv (menu->priv)
 
 static void entry_set_text(menu_t* menu, list_entry_t* e) {
-  char* val = e->txt ? property_expand_string(menu->ctx, e->txt) :
-    mp_property_print(e->prop, menu->ctx);
+  char* val;
+  if (e->txt) {
+    val = property_expand_string(menu->ctx, e->txt);
+  } else {
+    char *t = mp_property_print(e->prop, menu->ctx);
+    val = t ? strdup(t) : NULL;
+    talloc_free(t);
+  }
   int l,edit = (mpriv->edit && e == mpriv->p.current);
   if(!val || !val[0]) {
     free(val);

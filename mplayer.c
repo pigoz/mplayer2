@@ -4255,7 +4255,9 @@ int main(int argc, char *argv[])
         if (menu_cfg && menu_init(mpctx, mpctx->mconfig, mpctx->input, menu_cfg))
             mp_tmsg(MSGT_CPLAYER, MSGL_V, "Menu initialized: %s\n", menu_cfg);
         else {
-            menu_cfg = get_path("menu.conf");
+            char *menupath = get_path("menu.conf");
+            menu_cfg = talloc_strdup(NULL, menupath);
+            free(menupath);
             if (menu_init(mpctx, mpctx->mconfig, mpctx->input, menu_cfg))
                 mp_tmsg(MSGT_CPLAYER, MSGL_V, "Menu initialized: %s\n", menu_cfg);
             else {
