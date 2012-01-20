@@ -3,6 +3,8 @@
 
 #include "video_out.h"
 
+void start_cocoa_app(void);
+
 int vo_cocoa_init(struct vo *vo);
 void vo_cocoa_uninit(struct vo *vo);
 

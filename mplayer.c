@@ -3964,8 +3964,29 @@ static void detach_ptw32(void)
 /* This preprocessor directive is a hack to generate a mplayer-nomain.o object
  * file for some tools to link against. */
 #ifndef DISABLE_MAIN
+#include <pthread.h>
+#include "libvo/cocoa_common.h"
+int *threaded_main(void);
+static int s_argc;
+static char **s_argv;
 int main(int argc, char *argv[])
 {
+    s_argc = argc;
+    s_argv = argv;
+    pthread_t app_thread;
+    int retv = pthread_create(&app_thread, NULL, (void *) threaded_main, NULL);
+    if (retv != 0) {
+        mp_tmsg(MSGT_CPLAYER, MSGL_ERR, "Failed to create thread\n");
+    }
+    start_cocoa_app();
+    pthread_join(app_thread, NULL);
+    return 0;
+}
+
+int *threaded_main(void)
+{
+    int argc = s_argc;
+    char **argv = s_argv;
 #ifdef PTW32_STATIC_LIB
     pthread_win32_process_attach_np();
     pthread_win32_thread_attach_np();

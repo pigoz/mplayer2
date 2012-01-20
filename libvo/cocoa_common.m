@@ -31,8 +31,14 @@
 @interface GLMPlayerOpenGLView : NSView
 @end
 
+@interface MPlayerApplication : NSObject
+- (int) uninitvo;
+- (int) createWindow;
+@end
+
 struct vo_cocoa_state {
     NSAutoreleasePool *pool;
+    MPlayerApplication *app;
     GLMPlayerWindow *window;
     NSOpenGLContext *glContext;
 
@@ -63,9 +69,13 @@ struct vo_cocoa_state {
     bool out_fs_resize;
 };
 
-struct vo_cocoa_state *s;
+struct vo_cocoa_state *s = nil;
 
 struct vo *l_vo;
+
+uint32_t a_d_width;
+uint32_t a_d_height;
+uint32_t a_flags;
 
 // local function definitions
 struct vo_cocoa_state *vo_cocoa_init_state(void);
@@ -88,23 +98,16 @@ struct vo_cocoa_state *vo_cocoa_init_state(void)
         .windowed_frame = {{0,0},{0,0}},
         .out_fs_resize = NO,
         .display_cursor = 1,
+        .pool = nil,
+        .window = nil,
+        .glContext = nil,
+        .app = nil
     };
     return s;
 }
 
-int vo_cocoa_init(struct vo *vo)
-{
-    s = vo_cocoa_init_state();
-    s->pool = [[NSAutoreleasePool alloc] init];
-    s->cursor_autohide_delay = vo->opts->cursor_autohide_delay;
-    NSApplicationLoad();
-    NSApp = [NSApplication sharedApplication];
-    [NSApp setActivationPolicy: NSApplicationActivationPolicyRegular];
-
-    return 1;
-}
-
-void vo_cocoa_uninit(struct vo *vo)
+@implementation MPlayerApplication
+- (int) uninitvo
 {
     CGDisplayShowCursor(kCGDirectMainDisplay);
     [s->window release];
@@ -114,7 +117,114 @@ void vo_cocoa_uninit(struct vo *vo)
     [s->pool release];
     s->pool = nil;
 
+    return 1;
+}
+
+- (int) createWindow
+{
+    struct MPOpts *opts = l_vo->opts;
+    if (s->current_video_size.width > 0 || s->current_video_size.height > 0)
+        s->previous_video_size = s->current_video_size;
+    s->current_video_size = NSMakeSize(a_d_width, a_d_height);
+
+    if (!(s->window || s->glContext)) { // keep using the same window
+        s->window = [[GLMPlayerWindow alloc] initWithContentRect:NSMakeRect(0, 0, a_d_width, a_d_height)
+                                             styleMask:s->windowed_mask
+                                             backing:NSBackingStoreBuffered defer:NO];
+
+        GLMPlayerOpenGLView *glView = [[GLMPlayerOpenGLView alloc] initWithFrame:NSMakeRect(0, 0, 100, 100)];
+
+        NSOpenGLPixelFormatAttribute attrs[] = {
+            NSOpenGLPFADoubleBuffer, // double buffered
+            NSOpenGLPFADepthSize, (NSOpenGLPixelFormatAttribute)16, // 16 bit depth buffer
+            (NSOpenGLPixelFormatAttribute)0
+        };
+
+        NSOpenGLPixelFormat *pixelFormat = [[NSOpenGLPixelFormat alloc] initWithAttributes:attrs];
+        s->glContext = [[NSOpenGLContext alloc] initWithFormat:pixelFormat shareContext:nil];
+
+        [s->window setContentView:glView];
+        [glView release];
+        [s->window setAcceptsMouseMovedEvents:YES];
+        [s->glContext setView:glView];
+        [s->glContext makeCurrentContext];
+
+        [NSApp setDelegate:s->window];
+        [s->window setDelegate:s->window];
+        [s->window setContentSize:s->current_video_size];
+        [s->window setContentAspectRatio:s->current_video_size];
+        [s->window center];
+
+        if (a_flags & VOFLAG_HIDDEN) {
+            [s->window orderOut:nil];
+        } else {
+            [s->window makeKeyAndOrderFront:nil];
+        }
+
+        if (a_flags & VOFLAG_FULLSCREEN)
+            vo_cocoa_fullscreen(l_vo);
+
+        vo_set_level(opts->vo_ontop);
+    } else {
+        if (s->current_video_size.width  != s->previous_video_size.width ||
+            s->current_video_size.height != s->previous_video_size.height) {
+            if (vo_fs) {
+                // we will resize as soon as we get out of fullscreen
+                s->out_fs_resize = YES;
+            } else {
+                // only if we are not in fullscreen and the video size did change
+                // we actually resize the window and set a new aspect ratio
+                [s->window setContentSize:s->current_video_size keepCentered:YES];
+                [s->window setContentAspectRatio:s->current_video_size];
+            }
+        }
+    }
+
+    resize_window(l_vo);
+
+    if (s->window_title)
+        [s->window_title release];
+
+    s->window_title = [[NSString alloc] initWithUTF8String:vo_get_window_title(l_vo)];
+    [s->window setTitle: s->window_title];
+
+    return 0;
+}
+@end
+
+void start_cocoa_app(void)
+{
+    [[NSAutoreleasePool alloc] init];
+    NSApplicationLoad();
+    NSApp = [NSApplication sharedApplication];
+    [NSApp setActivationPolicy: NSApplicationActivationPolicyRegular];
+    create_menu();
+    [NSApp activateIgnoringOtherApps:YES];
+    [NSApp run];
+}
+
+int vo_cocoa_init(struct vo *vo)
+{
+    [[NSAutoreleasePool alloc] init];
+    l_vo = vo;
+    s = vo_cocoa_init_state();
+    s->cursor_autohide_delay = l_vo->opts->cursor_autohide_delay;
+
+    if (!s->app)
+        s->app = [[MPlayerApplication alloc] init];
+
+    return 1;
+}
+
+void vo_cocoa_uninit(struct vo *vo)
+{
+    [s->app performSelectorOnMainThread:@selector(uninitvo)
+            withObject:nil waitUntilDone:YES];
+    [s->app release];
+    s->app = nil;
+
     talloc_free(s);
+    s = nil;
 }
 
 void update_screen_info(void)
@@ -150,7 +260,8 @@ void resize_window(struct vo *vo)
 {
     vo->dwidth = [[s->window contentView] frame].size.width;
     vo->dheight = [[s->window contentView] frame].size.height;
-    [s->glContext update];
+    [s->glContext performSelectorOnMainThread:@selector(update)
+                  withObject:nil waitUntilDone:YES];
 }
 
 void vo_set_level(int ontop)
@@ -175,74 +286,16 @@ void vo_cocoa_ontop(struct vo *vo)
 int vo_cocoa_create_window(struct vo *vo, uint32_t d_width,
                            uint32_t d_height, uint32_t flags)
 {
-    struct MPOpts *opts = vo->opts;
-    if (s->current_video_size.width > 0 || s->current_video_size.height > 0)
-        s->previous_video_size = s->current_video_size;
-    s->current_video_size = NSMakeSize(d_width, d_height);
+    [[NSAutoreleasePool alloc] init];
+    l_vo = vo;
+    a_d_width = d_width;
+    a_d_height = d_height;
+    a_flags = flags;
+    [s->app performSelectorOnMainThread:@selector(createWindow) withObject:nil waitUntilDone:YES];
 
-    if (!(s->window || s->glContext)) { // keep using the same window
-        s->window = [[GLMPlayerWindow alloc] initWithContentRect:NSMakeRect(0, 0, d_width, d_height)
-                                             styleMask:s->windowed_mask
-                                             backing:NSBackingStoreBuffered defer:NO];
-
-        GLMPlayerOpenGLView *glView = [[GLMPlayerOpenGLView alloc] initWithFrame:NSMakeRect(0, 0, 100, 100)];
-
-        NSOpenGLPixelFormatAttribute attrs[] = {
-            NSOpenGLPFADoubleBuffer, // double buffered
-            NSOpenGLPFADepthSize, (NSOpenGLPixelFormatAttribute)16, // 16 bit depth buffer
-            (NSOpenGLPixelFormatAttribute)0
-        };
-
-        NSOpenGLPixelFormat *pixelFormat = [[NSOpenGLPixelFormat alloc] initWithAttributes:attrs];
-        s->glContext = [[NSOpenGLContext alloc] initWithFormat:pixelFormat shareContext:nil];
-
-        create_menu();
-
-        [s->window setContentView:glView];
-        [glView release];
-        [s->window setAcceptsMouseMovedEvents:YES];
-        [s->glContext setView:glView];
-        [s->glContext makeCurrentContext];
-
-        [NSApp setDelegate:s->window];
-        [s->window setDelegate:s->window];
-        [s->window setContentSize:s->current_video_size];
-        [s->window setContentAspectRatio:s->current_video_size];
-        [s->window center];
-
-        if (flags & VOFLAG_HIDDEN) {
-            [s->window orderOut:nil];
-        } else {
-            [s->window makeKeyAndOrderFront:nil];
-            [NSApp activateIgnoringOtherApps:YES];
-        }
-
-        if (flags & VOFLAG_FULLSCREEN)
-            vo_cocoa_fullscreen(vo);
-
-        vo_set_level(opts->vo_ontop);
-    } else {
-        if (s->current_video_size.width  != s->previous_video_size.width ||
-            s->current_video_size.height != s->previous_video_size.height) {
-            if (vo_fs) {
-                // we will resize as soon as we get out of fullscreen
-                s->out_fs_resize = YES;
-            } else {
-                // only if we are not in fullscreen and the video size did change
-                // we actually resize the window and set a new aspect ratio
-                [s->window setContentSize:s->current_video_size keepCentered:YES];
-                [s->window setContentAspectRatio:s->current_video_size];
-            }
-        }
-    }
-
-    resize_window(vo);
-
-    if (s->window_title)
-        [s->window_title release];
-
-    s->window_title = [[NSString alloc] initWithUTF8String:vo_get_window_title(vo)];
-    [s->window setTitle: s->window_title];
+    // make opengl context just created the current one in the secondary mplayer2 thread so that
+    // it's possible to draw to it from the secondary thread
+    [s->glContext makeCurrentContext];
 
     return 0;
 }
@@ -269,7 +322,12 @@ void vo_cocoa_display_cursor(int requested_state)
 
 int vo_cocoa_check_events(struct vo *vo)
 {
-    NSEvent *event;
+    if (s->did_resize) {
+        s->did_resize = NO;
+        resize_window(vo);
+        return VO_EVENT_RESIZE;
+    }
+
     float curTime = TickCount()/60;
     int msCurTime = (int) (curTime * 1000);
 
@@ -287,36 +345,14 @@ int vo_cocoa_check_events(struct vo *vo)
         UpdateSystemActivity(UsrActivity);
         s->last_screensaver_update = (int)curTime;
     }
-
-    event = [NSApp nextEventMatchingMask:NSAnyEventMask untilDate:nil
-                   inMode:NSEventTrackingRunLoopMode dequeue:YES];
-    if (event == nil)
-        return 0;
-    l_vo = vo;
-    [NSApp sendEvent:event];
-    l_vo = nil;
-
-    if (s->did_resize) {
-        s->did_resize = NO;
-        resize_window(vo);
-        return VO_EVENT_RESIZE;
-    }
-    // Without SDL's bootstrap code (include SDL.h in mplayer.c),
-    // on Leopard, we have trouble to get the play window automatically focused
-    // when the app is actived. The Following code fix this problem.
-#ifndef CONFIG_SDL
-    if ([event type] == NSAppKitDefined
-            && [event subtype] == NSApplicationActivatedEventType) {
-        [s->window makeMainWindow];
-        [s->window makeKeyAndOrderFront:nil];
-    }
-#endif
     return 0;
 }
 
 void vo_cocoa_fullscreen(struct vo *vo)
 {
-    [s->window fullscreen];
+    // this must happen in the main thread since it modifies the NSWindow flags
+    [s->window performSelectorOnMainThread:@selector(fullscreen)
+               withObject:nil waitUntilDone:YES];
     resize_window(vo);
 }
 
