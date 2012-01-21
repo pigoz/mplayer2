@@ -438,24 +438,11 @@ void create_menu()
 - (BOOL) acceptsFirstResponder { return YES; }
 - (BOOL) becomeFirstResponder { return YES; }
 - (BOOL) resignFirstResponder { return YES; }
-- (BOOL) windowShouldClose:(id)sender
-{
-    mplayer_put_key(l_vo->key_fifo, KEY_CLOSE_WIN);
-    // We have to wait for MPlayer to handle this,
-    // otherwise we are in trouble if the
-    // KEY_CLOSE_WIN handler is disabled
-    return NO;
-}
 
 - (BOOL) isMovableByWindowBackground
 {
     // this is only valid as a starting value. it will be rewritten in the -fullscreen method.
     return !vo_fs;
-}
-
-- (void) handleQuitEvent:(NSAppleEventDescriptor*)e withReplyEvent:(NSAppleEventDescriptor*)r
-{
-    mplayer_put_key(l_vo->key_fifo, KEY_CLOSE_WIN);
 }
 
 - (void) keyDown:(NSEvent *)theEvent
