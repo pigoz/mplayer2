@@ -28,7 +28,7 @@
 - (void) setContentSize:(NSSize)newSize keepCentered:(BOOL)keepCentered;
 @end
 
-@interface GLMPlayerOpenGLView : NSView
+@interface GLMPlayerOpenGLView : NSOpenGLView
 @end
 
 struct create_window_args {
@@ -46,6 +46,7 @@ struct vo_cocoa_state {
     NSAutoreleasePool *pool;
     MPlayerApplication *app;
     GLMPlayerWindow *window;
+    GLMPlayerOpenGLView *glView;
     NSOpenGLContext *glContext;
 
     NSSize current_video_size;
@@ -104,6 +105,7 @@ struct vo_cocoa_state *vo_cocoa_init_state(void)
         .display_cursor = 1,
         .pool = nil,
         .window = nil,
+        .glView = nil,
         .glContext = nil,
         .app = nil,
         .last_ret_val = 0
@@ -125,22 +127,11 @@ struct vo_cocoa_state *vo_cocoa_init_state(void)
                                              styleMask:s->windowed_mask
                                              backing:NSBackingStoreBuffered defer:NO];
 
-        GLMPlayerOpenGLView *glView = [[GLMPlayerOpenGLView alloc] initWithFrame:NSMakeRect(0, 0, 100, 100)];
+        s->glView = [[GLMPlayerOpenGLView alloc] initWithFrame:NSMakeRect(0, 0, 100, 100)];
 
-        NSOpenGLPixelFormatAttribute attrs[] = {
-            NSOpenGLPFADoubleBuffer, // double buffered
-            NSOpenGLPFADepthSize, (NSOpenGLPixelFormatAttribute)16, // 16 bit depth buffer
-            (NSOpenGLPixelFormatAttribute)0
-        };
-
-        NSOpenGLPixelFormat *pixelFormat = [[NSOpenGLPixelFormat alloc] initWithAttributes:attrs];
-        s->glContext = [[NSOpenGLContext alloc] initWithFormat:pixelFormat shareContext:nil];
-
-        [s->window setContentView:glView];
-        [glView release];
+        [s->window setContentView:s->glView];
+        [s->glView release];
         [s->window setAcceptsMouseMovedEvents:YES];
-        [s->glContext setView:glView];
-        [s->glContext makeCurrentContext];
 
         [NSApp setDelegate:s->window];
         [s->window setDelegate:s->window];
@@ -268,8 +259,7 @@ void resize_window(struct vo *vo)
 {
     vo->dwidth = [[s->window contentView] frame].size.width;
     vo->dheight = [[s->window contentView] frame].size.height;
-    [s->glContext performSelectorOnMainThread:@selector(update)
-                  withObject:nil waitUntilDone:YES];
+    [s->glContext update];
 }
 
 void vo_set_level(int ontop)
@@ -303,8 +293,17 @@ int vo_cocoa_create_window(struct vo *vo, uint32_t d_width,
             withObject:[NSData dataWithBytes: &args length: sizeof(struct create_window_args)]
             waitUntilDone:YES];
 
-    // make opengl context just created the current one in the secondary mplayer2 thread so that
-    // it's possible to draw to it from the secondary thread
+    NSOpenGLPixelFormatAttribute attrs[] = {
+        NSOpenGLPFADoubleBuffer, // double buffered
+        NSOpenGLPFADepthSize, (NSOpenGLPixelFormatAttribute)16, // 16 bit depth buffer
+        (NSOpenGLPixelFormatAttribute)0
+    };
+
+    NSOpenGLPixelFormat *pixelFormat = [[NSOpenGLPixelFormat alloc] initWithAttributes:attrs];
+    s->glContext = [[NSOpenGLContext alloc] initWithFormat:pixelFormat shareContext:nil];
+
+    [s->glView setOpenGLContext:s->glContext];
+    [s->glContext setView:s->glView];
     [s->glContext makeCurrentContext];
 
     return s->last_ret_val;
@@ -396,13 +395,6 @@ void create_menu()
 }
 
 @implementation GLMPlayerWindow
-
-- (void) windowDidResize:(NSNotification *) notification
-{
-    if (l_vo)
-        s->did_resize = YES;
-}
-
 - (void) fullscreen
 {
     if (!vo_fs) {
@@ -622,5 +614,6 @@ void create_menu()
 {
     [[NSColor clearColor] set];
     NSRectFill([self bounds]);
+    s->did_resize = YES;
 }
 @end
