@@ -28,7 +28,7 @@
 - (void) setContentSize:(NSSize)newSize keepCentered:(BOOL)keepCentered;
 @end
 
-@interface GLMPlayerOpenGLView : NSOpenGLView
+@interface GLMPlayerOpenGLView : NSView
 @end
 
 struct create_window_args {
@@ -302,7 +302,6 @@ int vo_cocoa_create_window(struct vo *vo, uint32_t d_width,
     NSOpenGLPixelFormat *pixelFormat = [[NSOpenGLPixelFormat alloc] initWithAttributes:attrs];
     s->glContext = [[NSOpenGLContext alloc] initWithFormat:pixelFormat shareContext:nil];
 
-    [s->glView setOpenGLContext:s->glContext];
     [s->glContext setView:s->glView];
     [s->glContext makeCurrentContext];
 
