@@ -126,11 +126,6 @@ struct vo_cocoa_state *vo_cocoa_init_state(void)
         s->window = [[GLMPlayerWindow alloc] initWithContentRect:NSMakeRect(0, 0, args->d_width, args->d_height)
                                              styleMask:s->windowed_mask
                                              backing:NSBackingStoreBuffered defer:NO];
-
-        s->glView = [[GLMPlayerOpenGLView alloc] initWithFrame:NSMakeRect(0, 0, 100, 100)];
-
-        [s->window setContentView:s->glView];
-        [s->glView release];
         [s->window setAcceptsMouseMovedEvents:YES];
 
         [NSApp setDelegate:s->window];
@@ -292,6 +287,11 @@ int vo_cocoa_create_window(struct vo *vo, uint32_t d_width,
     [s->app performSelectorOnMainThread:@selector(createWindow:)
             withObject:[NSData dataWithBytes: &args length: sizeof(struct create_window_args)]
             waitUntilDone:YES];
+
+    s->glView = [[GLMPlayerOpenGLView alloc] initWithFrame:NSMakeRect(0, 0, 100, 100)];
+
+    [s->window setContentView:s->glView];
+    [s->glView release];
 
     NSOpenGLPixelFormatAttribute attrs[] = {
         NSOpenGLPFADoubleBuffer, // double buffered
