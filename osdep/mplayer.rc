@@ -20,6 +20,7 @@
 
 #include <winver.h>
 #include "version.h"
+#include "resource.h"
 
 1 VERSIONINFO
 FILEVERSION 2,0,0,0
@@ -49,7 +50,7 @@ FILETYPE VFT_APP
     }
 }
 
-IDI_ICON1 ICON DISCARDABLE  "etc/mplayer.ico"
+IDI_APPICON ICON DISCARDABLE  "etc/mplayer.ico"
 
 // for some reason RT_MANIFEST does not work
 1 24 "mplayer.exe.manifest"
