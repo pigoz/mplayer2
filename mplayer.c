@@ -3669,7 +3669,7 @@ static void run_playloop(struct MPContext *mpctx)
             current_module = "stop_xscreensaver";
             xscreensaver_heartbeat(mpctx->x11_state);
         }
-#elif _WIN32
+#elif defined(_WIN32)
         current_module = "stop_screensaver";
         SetThreadExecutionState(ES_DISPLAY_REQUIRED);
 #endif
