@@ -42,12 +42,12 @@
 #include <shlobj.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#if defined(__CYGWIN__)
-#include <sys/cygwin.h>
-#endif
 #elif defined(__OS2__)
 #define INCL_DOS
 #include <os2.h>
+#endif
+#if defined(__CYGWIN__)
+#include <sys/cygwin.h>
 #endif
 
 #include "talloc.h"
@@ -75,7 +75,7 @@ char *get_path(const char *filename){
 	if ((homedir = getenv("MPLAYER_HOME")) != NULL)
 		config_dir = "";
 	else if ((homedir = getenv("HOME")) == NULL)
-#if _WIN32
+#ifdef _WIN32
 	/* Hack to get fonts etc. loaded outside of Cygwin environment. */
 	{
 		int i,imax=0;
