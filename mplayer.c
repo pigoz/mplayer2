@@ -1102,6 +1102,18 @@ void add_subtitles(struct MPContext *mpctx, char *filename, float fps,
                 "Cannot load subtitles: %s\n", filename_recode(filename));
         return;
     }
+#ifdef _WIN32
+    if(filename) {
+        static char message[MAX_PATH + 1];
+        char *s = strrchr(filename, '\\');
+        if (!s) s = strrchr(filename, '/');
+        if (s) s++; else s = filename;
+        message[0] = 0;
+        snprintf(message, MAX_PATH, "MPlayer: %s", filename_recode(s));
+        message[MAX_PATH] = 0;
+        SetConsoleTitle(message);
+     }
+#endif
 
     mpctx->set_of_ass_tracks[mpctx->set_of_sub_size] = asst;
     mpctx->set_of_subtitles[mpctx->set_of_sub_size] = subd;
