@@ -27,6 +27,7 @@
 
 #if defined(__MINGW32__) || defined(__CYGWIN__)
 #define _UWIN 1  /*disable Non-underscored versions of non-ANSI functions as otherwise int eof would conflict with eof()*/
+#define _WIN32_WINNT 0x0500 /* enable SetThreadExecutionState for disabling screensaver. Breaks binary compatibility with pre-win2000. */
 #include <windows.h>
 #endif
 #include <string.h>
@@ -3668,6 +3669,9 @@ static void run_playloop(struct MPContext *mpctx)
             current_module = "stop_xscreensaver";
             xscreensaver_heartbeat(mpctx->x11_state);
         }
+#elif _WIN32
+        current_module = "stop_screensaver";
+        SetThreadExecutionState(ES_DISPLAY_REQUIRED);
 #endif
         if (heartbeat_cmd) {
             static unsigned last_heartbeat;
