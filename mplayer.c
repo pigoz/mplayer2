@@ -27,6 +27,7 @@
 
 #if defined(__MINGW32__) || defined(__CYGWIN__)
 #define _UWIN 1  /*disable Non-underscored versions of non-ANSI functions as otherwise int eof would conflict with eof()*/
+#define _WIN32_WINNT 0x0500 /* enable SetThreadExecutionState for disabling screensaver. Breaks binary compatibility with pre-win2000. */
 #include <windows.h>
 #endif
 #include <string.h>
@@ -1103,6 +1104,18 @@ void add_subtitles(struct MPContext *mpctx, char *filename, float fps,
                 "Cannot load subtitles: %s\n", filename_recode(filename));
         return;
     }
+#ifdef _WIN32
+    if(filename) {
+        static char message[MAX_PATH + 1];
+        char *s = strrchr(filename, '\\');
+        if (!s) s = strrchr(filename, '/');
+        if (s) s++; else s = filename;
+        message[0] = 0;
+        snprintf(message, MAX_PATH, "MPlayer: %s", filename_recode(s));
+        message[MAX_PATH] = 0;
+        SetConsoleTitle(message);
+     }
+#endif
 
     mpctx->set_of_ass_tracks[mpctx->set_of_sub_size] = asst;
     mpctx->set_of_subtitles[mpctx->set_of_sub_size] = subd;
@@ -1646,6 +1659,25 @@ void set_osd_subtitle(struct MPContext *mpctx, subtitle *subs)
     }
 }
 
+#ifdef _WIN32
+#include <io.h>
+static void term_osd_eraseline(void)
+{
+    DWORD wr;
+    COORD pos;
+    HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+    CONSOLE_SCREEN_BUFFER_INFO cinfo;
+    GetConsoleScreenBufferInfo(hOut, &cinfo);
+    pos.X = 0;
+    pos.Y = cinfo.dwCursorPosition.Y - 1;
+    FillConsoleOutputCharacter(hOut, ' ', cinfo.dwSize.X, pos, &wr);
+    FillConsoleOutputAttribute(hOut, cinfo.wAttributes, cinfo.dwSize.X, pos, &wr);
+    SetConsoleCursorPosition(hOut, pos);
+}
+#else
+#define term_osd_eraseline() printf("%s", opts->term_osd_esc)
+#endif
+
 /**
  * \brief Update the OSD message line.
  *
@@ -1681,8 +1713,8 @@ static void update_osd_msg(struct MPContext *mpctx)
             if (strcmp(mpctx->terminal_osd_text, msg->msg)) {
                 talloc_free(mpctx->terminal_osd_text);
                 mpctx->terminal_osd_text = talloc_strdup(mpctx, msg->msg);
-                mp_msg(MSGT_CPLAYER, MSGL_STATUS, "%s%s\n", opts->term_osd_esc,
-                       mpctx->terminal_osd_text);
+                term_osd_eraseline();
+                mp_msg(MSGT_CPLAYER, MSGL_STATUS, "%s%s\n", mpctx->terminal_osd_text);
             }
         }
         return;
@@ -1755,7 +1787,7 @@ static void update_osd_msg(struct MPContext *mpctx)
     // Clear the term osd line
     if (opts->term_osd && mpctx->terminal_osd_text[0]) {
         mpctx->terminal_osd_text[0] = '\0';
-        printf("%s\n", opts->term_osd_esc);
+        term_osd_eraseline();
     }
 }
 
@@ -3641,6 +3673,9 @@ static void run_playloop(struct MPContext *mpctx)
             current_module = "stop_xscreensaver";
             xscreensaver_heartbeat(mpctx->x11_state);
         }
+#elif defined(_WIN32)
+        current_module = "stop_screensaver";
+        SetThreadExecutionState(ES_DISPLAY_REQUIRED);
 #endif
         if (heartbeat_cmd) {
             static unsigned last_heartbeat;
@@ -3896,7 +3931,7 @@ static void print_version(const char *name)
     /* Test for CPU capabilities (and corresponding OS support) for optimizing */
     GetCpuCaps(&gCpuCaps);
 #if ARCH_X86
-    mp_msg(MSGT_CPLAYER, MSGL_V,
+    mp_msg(MSGT_CPLAYER, MSGL_INFO,
            "CPUflags:  MMX: %d MMX2: %d 3DNow: %d 3DNowExt: %d SSE: %d SSE2: %d SSSE3: %d\n",
            gCpuCaps.hasMMX, gCpuCaps.hasMMX2,
            gCpuCaps.has3DNow, gCpuCaps.has3DNowExt,

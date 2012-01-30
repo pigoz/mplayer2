@@ -347,6 +347,7 @@ SRCS_COMMON = asxparser.c \
               libmpcodecs/vf_stereo3d.c \
               libmpcodecs/vf_softskip.c \
               libmpcodecs/vf_swapuv.c \
+              libmpcodecs/vf_tcdump.c \
               libmpcodecs/vf_telecine.c \
               libmpcodecs/vf_test.c \
               libmpcodecs/vf_tfields.c \
