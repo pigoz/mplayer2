@@ -27,6 +27,7 @@
 
 #include <unistd.h>
 #include <string.h>
+#include <stdio.h>
 #include <inttypes.h>
 
 #include "mp_msg.h"
