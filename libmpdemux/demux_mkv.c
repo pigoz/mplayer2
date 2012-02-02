@@ -32,6 +32,8 @@
 #include <libavutil/intreadwrite.h>
 #include <libavutil/avstring.h>
 
+#include <libavformat/avio.h>
+
 #include "config.h"
 
 #if CONFIG_ZLIB
@@ -1566,15 +1568,16 @@ static int demux_mkv_open_audio(demuxer_t *demuxer, mkv_track_t *track,
             free_sh_audio(demuxer, track->tnum);
             return 1;
         }
-        ByteIOContext b;
-        init_put_byte(&b, sh_a->codecdata, sh_a->codecdata_len, 1,
-                NULL, NULL, NULL, NULL);
-        put_buffer(&b, "TTA1", 4);
-        put_le16(&b, 1);
-        put_le16(&b, sh_a->channels);
-        put_le16(&b, sh_a->wf->wBitsPerSample);
-        put_le32(&b, sh_a->samplerate);
-        put_le32(&b, (demuxer->movi_end - demuxer->movi_start) * sh_a->samplerate);
+        AVIOContext *b =
+            avio_alloc_context(sh_a->codecdata, sh_a->codecdata_len,
+                               1, NULL, NULL, NULL, NULL);
+        avio_write(b, "TTA1", 4);
+        avio_wl16(b, 1);
+        avio_wl16(b, sh_a->channels);
+        avio_wl16(b, sh_a->wf->wBitsPerSample);
+        avio_wl32(b, sh_a->samplerate);
+        avio_wl32(b, (demuxer->movi_end - demuxer->movi_start) * sh_a->samplerate);
+        av_free(b);
     } else if (!track->ms_compat) {
         goto error;
     }
