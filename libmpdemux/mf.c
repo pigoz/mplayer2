@@ -25,7 +25,6 @@
 #include <errno.h>
 #include <limits.h>
 #include <sys/types.h>
-#include <sys/stat.h>
 
 #include "config.h"
 
@@ -38,6 +37,7 @@
 
 #include "mp_msg.h"
 #include "stream/stream.h"
+#include "path.h"
 
 #include "mf.h"
 
@@ -49,7 +49,6 @@ char * mf_type = NULL; //"jpg";
 mf_t* open_mf(char * filename){
 #if defined(HAVE_GLOB) || defined(__MINGW32__)
  glob_t        gg;
- struct stat   fs;
  int           i;
  char        * fname;
  mf_t        * mf;
@@ -69,7 +68,7 @@ mf_t* open_mf(char * filename){
        /* remove spaces from end of fname */
        char *t=fname + strlen( fname ) - 1;
        while ( t > fname && isspace( *t ) ) *(t--)=0;
-       if ( stat( fname,&fs ) )
+       if ( !mp_path_exists( fname ) )
         {
          mp_msg( MSGT_STREAM,MSGL_V,"[mf] file not found: '%s'\n",fname );
         }
@@ -94,7 +93,7 @@ mf_t* open_mf(char * filename){
 
    while ( ( fname=strsep( &filename,"," ) ) )
     {
-     if ( stat( fname,&fs ) )
+     if ( !mp_path_exists( fname ) )
       {
        mp_msg( MSGT_STREAM,MSGL_V,"[mf] file not found: '%s'\n",fname );
       }
@@ -130,8 +129,11 @@ mf_t* open_mf(char * filename){
 
    for( i=0;i < gg.gl_pathc;i++ )
     {
-     stat( gg.gl_pathv[i],&fs );
-     if( S_ISDIR( fs.st_mode ) ) continue;
+     // the intention is to skip directories
+     FILE *tmp = fopen(gg.gl_pathv[i], "r");
+     if (!tmp)
+        continue;
+     fclose(tmp);
      mf->names[i]=strdup( gg.gl_pathv[i] );
 //     mp_msg( MSGT_STREAM,MSGL_DBG2,"[mf] added file %d.: %s\n",i,mf->names[i] );
     }
@@ -144,7 +146,7 @@ mf_t* open_mf(char * filename){
  while ( error_count < 5 )
   {
    sprintf( fname,filename,count++ );
-   if ( stat( fname,&fs ) )
+   if ( !mp_path_exists( fname ) )
     {
      error_count++;
      mp_msg( MSGT_STREAM,MSGL_V,"[mf] file not found: '%s'\n",fname );
