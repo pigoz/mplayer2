@@ -40,6 +40,7 @@
 #include "video_out.h"
 #include "video_out_internal.h"
 #include "mplayer.h"			/* for exit_player_bad() */
+#include "osdep/unicode-win.h"          /* for mp_stat */
 
 /* ------------------------------------------------------------------------- */
 
@@ -208,7 +209,7 @@ static void pnm_mkdir(char *buf, int verbose) {
         switch (errno) { /* use switch in case other errors need to be caught
                             and handled in the future */
             case EEXIST:
-                if ( stat(buf, &stat_p ) < 0 ) {
+                if ( mp_stat(buf, &stat_p ) < 0 ) {
                     mp_msg(MSGT_VO, MSGL_ERR, "%s: %s: %s\n", info.short_name,
                            _("This error has occurred"), strerror(errno) );
                     mp_msg(MSGT_VO, MSGL_ERR, "%s: %s %s\n", info.short_name,

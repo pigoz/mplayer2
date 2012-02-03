@@ -27,6 +27,7 @@
 
 #if defined(__MINGW32__) || defined(__CYGWIN__)
 #include <windows.h>
+#include "osdep/unicode-win.h"
 #endif
 #include <string.h>
 #include <unistd.h>
@@ -969,8 +970,7 @@ static void load_per_output_config(m_config_t *conf, char *cfg, char *out)
  */
 static int try_load_config(m_config_t *conf, const char *file)
 {
-    struct stat st;
-    if (stat(file, &st))
+    if (!mp_path_exists(file))
         return 0;
     mp_tmsg(MSGT_CPLAYER, MSGL_INFO, "Loading config '%s'\n", file);
     m_config_parse_config_file(conf, file);
@@ -3964,6 +3964,10 @@ int main(int argc, char *argv[])
     if (argc > 1 && (!strcmp(argv[1], "-leak-report")
                      || !strcmp(argv[1], "--leak-report")))
         talloc_enable_leak_report();
+
+#ifdef __MINGW32__
+    mp_get_converted_argv(&argc, &argv);
+#endif
 
     char *mem_ptr;
 
