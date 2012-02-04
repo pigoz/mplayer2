@@ -39,6 +39,17 @@ void main() {
     texcoord = vertex_texcoord;
 }
 
+#!section vertex_noscale
+
+in vec2 vertex_position;
+in vec2 vertex_texcoord;
+out vec2 texcoord;
+
+void main() {
+    gl_Position = vec4(vertex_position, 1, 1);
+    texcoord = vertex_texcoord;
+}
+
 #!section frag_eosd
 uniform sampler2D texture1;
 
@@ -71,6 +82,7 @@ uniform sampler2D lut_c_2d;
 uniform sampler2D lut_l_2d;
 uniform mat4x3 colormatrix;
 uniform vec3 inv_gamma;
+uniform float conv_gamma;
 uniform float filter_strength;
 
 in vec2 texcoord;
@@ -206,17 +218,20 @@ vec4 sample_unsharp5(sampler2D tex, vec2 texcoord) {
 }
 
 void main() {
-#if USE_PLANAR
+#ifdef USE_PLANAR
     vec3 color = vec3(SAMPLE_L(texture1, texcoord).r,
                       SAMPLE_C(texture2, texcoord).r,
                       SAMPLE_C(texture3, texcoord).r);
 #else
     vec3 color = SAMPLE_L(texture1, texcoord).rgb;
 #endif
-#if USE_COLORMATRIX
+#ifdef USE_COLORMATRIX
     color = mat3(colormatrix) * color + colormatrix[3];
 #endif
-#if USE_GAMMA_POW
+#ifdef USE_LINEAR_CONV
+    color = pow(color, vec3(conv_gamma));
+#endif
+#ifdef USE_GAMMA_POW
     color = pow(color, inv_gamma);
 #endif
     out_color = vec4(color, 1);
