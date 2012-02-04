@@ -53,6 +53,16 @@ enum mp_csp mp_csp_guess_colorspace(int width, int height)
     return width >= 1280 || height > 576 ? MP_CSP_BT_709 : MP_CSP_BT_601;
 }
 
+float mp_csp_gamma(enum mp_csp csp)
+{
+    switch (csp) {
+    case MP_CSP_BT_709:
+        //return 2.35;
+    default:
+        return 2.2;
+    }
+}
+
 /**
  * \brief little helper function to create a lookup table for gamma
  * \param map buffer to create map into

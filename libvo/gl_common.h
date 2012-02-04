@@ -481,6 +481,7 @@ struct GL {
     void (GLAPIENTRY *TexCoord2f)(GLfloat, GLfloat);
     void (GLAPIENTRY *Vertex2f)(GLfloat, GLfloat);
     void (GLAPIENTRY *GetIntegerv)(GLenum, GLint *);
+    void (GLAPIENTRY *GetBooleanv)(GLenum, GLboolean *);
     void (GLAPIENTRY *ColorMask)(GLboolean, GLboolean, GLboolean, GLboolean);
     void (GLAPIENTRY *ReadPixels)(GLint, GLint, GLsizei, GLsizei, GLenum,
                                   GLenum, GLvoid *);
@@ -554,6 +555,12 @@ struct GL {
     void (GLAPIENTRY *GetProgramiv)(GLenum, GLenum, GLint *);
     const GLubyte* (GLAPIENTRY *GetStringi)(GLenum, GLuint);
     void (GLAPIENTRY *BindAttribLocation)(GLuint, GLuint, const GLchar *);
+    void (GLAPIENTRY *BindFramebuffer)(GLenum, GLuint);
+    void (GLAPIENTRY *GenFramebuffers)(GLsizei, GLuint *);
+    void (GLAPIENTRY *DeleteFramebuffers)(GLsizei, const GLuint *);
+    GLenum (GLAPIENTRY *CheckFramebufferStatus)(GLenum);
+    void (GLAPIENTRY *FramebufferTexture2D)(GLenum, GLenum, GLenum, GLuint,
+                                            GLint);
 
     void (GLAPIENTRY *Uniform1f)(GLint, GLfloat);
     void (GLAPIENTRY *Uniform3f)(GLint, GLfloat, GLfloat, GLfloat);
@@ -562,6 +569,7 @@ struct GL {
                                         const GLfloat *);
     void (GLAPIENTRY *UniformMatrix4x3fv)(GLint, GLsizei, GLboolean,
                                           const GLfloat *);
+
 #ifdef CONFIG_GL_WIN32
     HGLRC (GLAPIENTRY *wglCreateContextAttribsARB)(HDC hDC, HGLRC hShareContext,
                                                    const int *attribList);
