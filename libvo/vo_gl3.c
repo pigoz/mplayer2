@@ -130,7 +130,6 @@ struct texplane {
 };
 
 struct vertex_array {
-    GLuint program;
     GLuint buffer;
     GLuint vao;
     int vertex_count;
@@ -155,7 +154,7 @@ struct gl_priv {
 
     struct vertex_array va_osd, va_eosd, va_video;
     int osd_program, eosd_program, video_program;
-    // used when doing separate YUV conversion step (on use_indirect && is_yuv)
+    // used when doing a separate YUV conversion step (use_indirect && is_yuv)
     int final_program;
 
     //! Textures for OSD
@@ -198,7 +197,7 @@ struct gl_priv {
     int plane_count;
     struct texplane planes[3];
 
-    // the RGB target when use_indirect is true
+    // RGB target (optional, see use_indirect and final_program)
     GLuint indirect_fbo;
     GLuint indirect_texture;
 
@@ -427,8 +426,11 @@ static void update_uniforms(struct vo *vo, GLuint program)
 
     loc = gl->GetUniformLocation(program, "inv_gamma");
     if (loc >= 0) {
-        gl->Uniform3f(loc, 1.0 / cparams.rgamma, 1.0 / cparams.ggamma,
-                      1.0 / cparams.bgamma);
+        float factor = 1.0;
+        if (p->use_srgb && p->is_yuv)
+            factor = mp_csp_gamma(p->colorspace.format) / 2.2;
+        gl->Uniform3f(loc, factor / cparams.rgamma, factor / cparams.ggamma,
+                      factor / cparams.bgamma);
     }
 
     loc = gl->GetUniformLocation(program, "conv_gamma");
@@ -1610,12 +1612,10 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
                "  srgb\n"
                "    Gamma-correct scaling by working in linear colorspace. This\n"
                "    makes use of sRGB textures and framebuffers.\n"
-               "    This option enables the option 'indirect' forcibly.\n"
+               "    This option forces the options 'indirect' and 'gamma'.\n"
                "  rectangle=<0,1,2>\n"
                "    0: use power-of-two textures\n"
                "    1 and 2: use texture_non_power_of_two\n"
-               "  ati-hack\n"
-               "    Workaround ATI bug with PBOs\n"
                "  force-pbo\n"
                "    Force use of PBO even if this involves an extra memcpy\n"
                "  glfinish\n"
@@ -1667,8 +1667,10 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
         return -1;
     }
 
-    if (p->use_srgb)
+    if (p->use_srgb) {
         p->use_indirect = 1;
+        p->use_gamma = 1;
+    }
 
     p->scalers[0].name = talloc_strdup(vo, lscale);
     p->scalers[1].name = talloc_strdup(vo, cscale);
