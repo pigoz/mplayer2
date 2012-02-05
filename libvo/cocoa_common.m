@@ -28,6 +28,12 @@
 - (void) setContentSize:(NSSize)newSize keepCentered:(BOOL)keepCentered;
 @end
 
+@interface MPlayerPlayLoop : NSObject
+- (void) call;
+//- (void) setFunction:(void)(*run_playloop)(struct MPContext *context)
+//- (void) setContext:(struct MPContext*) context;
+@end
+
 @interface GLMPlayerOpenGLView : NSView
 @end
 
@@ -65,8 +71,11 @@ struct vo_cocoa_state {
 };
 
 struct vo_cocoa_state *s;
-
+MPlayerPlayLoop *playLoop;
+NSTimer *playLoopTimer;
 struct vo *l_vo;
+void(*s_play_loop)(struct MPContext *);
+struct MPContext *s_context;
 
 // local function definitions
 struct vo_cocoa_state *vo_cocoa_init_state(void);
@@ -93,11 +102,37 @@ struct vo_cocoa_state *vo_cocoa_init_state(void)
     return s;
 }
 
+void vo_cocoa_run_runloop(struct vo *vo)
+{
+    [NSApp run];
+}
+
+void vo_cocoa_run_loop_schedule(
+     void(*play_loop)(struct MPContext *),
+     struct MPContext *context)
+{
+    playLoop = [MPlayerPlayLoop new];
+    s_play_loop = play_loop;
+    s_context = context;
+
+    playLoopTimer = [NSTimer timerWithTimeInterval:0.001   //a 1ms time interval
+                          target:playLoop
+                          selector:@selector(call)
+                          userInfo:nil
+                          repeats:YES];
+
+    [[NSRunLoop currentRunLoop] addTimer:playLoopTimer
+                                forMode:NSDefaultRunLoopMode];
+    [[NSRunLoop currentRunLoop] addTimer:playLoopTimer
+                                forMode:NSEventTrackingRunLoopMode];
+}
+
 int vo_cocoa_init(struct vo *vo)
 {
     s = vo_cocoa_init_state();
     s->pool = [[NSAutoreleasePool alloc] init];
     s->cursor_autohide_delay = vo->opts->cursor_autohide_delay;
+    l_vo = vo;
     NSApplicationLoad();
     NSApp = [NSApplication sharedApplication];
     [NSApp setActivationPolicy: NSApplicationActivationPolicyRegular];
@@ -272,7 +307,6 @@ void vo_cocoa_display_cursor(int requested_state)
 
 int vo_cocoa_check_events(struct vo *vo)
 {
-    NSEvent *event;
     float curTime = TickCount()/60;
     int msCurTime = (int) (curTime * 1000);
 
@@ -291,29 +325,11 @@ int vo_cocoa_check_events(struct vo *vo)
         s->last_screensaver_update = (int)curTime;
     }
 
-    event = [NSApp nextEventMatchingMask:NSAnyEventMask untilDate:nil
-                   inMode:NSEventTrackingRunLoopMode dequeue:YES];
-    if (event == nil)
-        return 0;
-    l_vo = vo;
-    [NSApp sendEvent:event];
-    l_vo = nil;
-
     if (s->did_resize) {
         s->did_resize = NO;
-        resize_window(vo);
         return VO_EVENT_RESIZE;
     }
-    // Without SDL's bootstrap code (include SDL.h in mplayer.c),
-    // on Leopard, we have trouble to get the play window automatically focused
-    // when the app is actived. The Following code fix this problem.
-#ifndef CONFIG_SDL
-    if ([event type] == NSAppKitDefined
-            && [event subtype] == NSApplicationActivatedEventType) {
-        [s->window makeMainWindow];
-        [s->window makeKeyAndOrderFront:nil];
-    }
-#endif
+
     return 0;
 }
 
@@ -366,8 +382,10 @@ void create_menu()
 
 - (void) windowDidResize:(NSNotification *) notification
 {
-    if (l_vo)
+    if (l_vo) {
+        resize_window(l_vo);
         s->did_resize = YES;
+    }
 }
 
 - (void) fullscreen
@@ -605,6 +623,13 @@ void create_menu()
     } else {
         [self setContentSize:ns];
     }
+}
+@end
+
+@implementation MPlayerPlayLoop
+- (void) call
+{
+  s_play_loop(s_context);
 }
 @end
 
