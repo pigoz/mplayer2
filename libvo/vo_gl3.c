@@ -728,16 +728,6 @@ static void uninitGL(struct vo *vo)
     p->eosd_texture = 0;
 }
 
-static GLint get_scale_type(struct vo *vo, int chroma)
-{
-    struct gl_priv *p = vo->priv;
-
-    int nearest = 0;
-    if (nearest)
-        return p->mipmap_gen ? GL_NEAREST_MIPMAP_NEAREST : GL_NEAREST;
-    return p->mipmap_gen ? GL_LINEAR_MIPMAP_NEAREST : GL_LINEAR;
-}
-
 // Return the high byte of the value that represents white in chroma (U/V)
 static int get_chroma_clear_val(int bit_depth)
 {
@@ -1027,6 +1017,8 @@ static void initVideo(struct vo *vo)
     texSize(vo, p->image_width, p->image_height,
             &p->texture_width, &p->texture_height);
 
+    int scale_type = p->mipmap_gen ? GL_LINEAR_MIPMAP_NEAREST : GL_LINEAR;
+
     for (int n = 0; n < p->plane_count; n++) {
         struct texplane *plane = &p->planes[n];
 
@@ -1039,12 +1031,8 @@ static void initVideo(struct vo *vo)
         gl->GenTextures(1, &plane->gl_texture);
         gl->BindTexture(GL_TEXTURE_2D, plane->gl_texture);
 
-        GLint scale_type = get_scale_type(vo, plane->is_chroma);
         glCreateClearTex(gl, GL_TEXTURE_2D, p->gl_internal_format, p->gl_format,
                          p->gl_type, scale_type, w, h, plane->clear_val);
-
-        if (p->mipmap_gen)
-            gl->TexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP, GL_TRUE);
     }
     gl->ActiveTexture(GL_TEXTURE0);
 
@@ -1430,6 +1418,13 @@ static uint32_t draw_image(struct vo *vo, mp_image_t *mpi)
     gl->ActiveTexture(GL_TEXTURE0);
     gl->BindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 skip_upload:
+    if (p->mipmap_gen) {
+        for (n = 0; n < p->plane_count; n++) {
+            gl->ActiveTexture(GL_TEXTURE0 + n);
+            gl->GenerateMipmap(GL_TEXTURE_2D);
+        }
+        gl->ActiveTexture(GL_TEXTURE0);
+    }
     do_render(vo);
     return VO_TRUE;
 }

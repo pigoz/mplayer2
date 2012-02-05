@@ -479,6 +479,7 @@ static const extfunc_desc_t extfuncs[] = {
     DEF_GL3_DESC(DeleteFramebuffers),
     DEF_GL3_DESC(CheckFramebufferStatus),
     DEF_GL3_DESC(FramebufferTexture2D),
+    DEF_GL3_DESC(GenerateMipmap),
     DEF_GL3_DESC(Uniform1f),
     DEF_GL3_DESC(Uniform3f),
     DEF_GL3_DESC(Uniform1i),
