@@ -3537,6 +3537,7 @@ int seek_chapter(struct MPContext *mpctx, int chapter, double *seek_pts)
     return chapter;
 }
 
+#include "libvo/cocoa_common.h"
 
 static void run_playloop(struct MPContext *mpctx)
 {
@@ -5024,8 +5025,13 @@ goto_enable_cache:
         vo_control(mpctx->video_out,
                    mpctx->paused ? VOCTRL_PAUSE : VOCTRL_RESUME, NULL);
 
-    while (!mpctx->stop_play)
-        run_playloop(mpctx);
+
+    vo_cocoa_run_loop_schedule(run_playloop, mpctx);
+
+    vo_cocoa_run_runloop(mpctx->video_out);
+
+//    while (!mpctx->stop_play)
+//        run_playloop(mpctx);
 
     mp_msg(MSGT_GLOBAL, MSGL_V, "EOF code: %d  \n", mpctx->stop_play);
 
