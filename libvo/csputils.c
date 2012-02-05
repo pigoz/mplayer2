@@ -57,7 +57,7 @@ float mp_csp_gamma(enum mp_csp csp)
 {
     switch (csp) {
     case MP_CSP_BT_709:
-        //return 2.35;
+        return 2.35;
     default:
         return 2.2;
     }
