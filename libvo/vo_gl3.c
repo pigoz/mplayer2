@@ -1133,7 +1133,7 @@ static int create_window(struct vo *vo, uint32_t d_width, uint32_t d_height,
     if (p->stereo_mode == GL_3D_QUADBUFFER)
         flags |= VOFLAG_STEREO;
 
-    int mpgl_version = p->force_gl2 ? MPGL_VER(2, 1) : MPGL_VER(3, 0);
+    int mpgl_version = p->force_gl2 ? MPGL_VER(2, 1) : MPGL_VER(3, 2);
     int mpgl_flags = 0;
     if (p->gl_debug)
         mpgl_flags |= MPGLFLAG_DEBUG;
