@@ -238,8 +238,14 @@ static int menu_parse_config(char* buffer, struct m_config *mconfig)
 
 }
 
+static void menu_redraw(void)
+{
+    vo_osd_changed(OSDTYPE_MENU);
+}
+
 static int key_cb(int code)
 {
+  menu_redraw();
   return menu_read_key(global_menu_state->current,code);
 }
 
@@ -263,19 +269,20 @@ void menu_frame(void)
   if (state->current->show) {
     if (!mp_input_key_cb)
       mp_input_key_cb = key_cb;
-    redraw = true;
 
   } else {
     if(mp_input_key_cb)
       mp_input_key_cb = NULL;
   }
   if (redraw)
-    vo_osd_changed(OSDTYPE_MENU);
+    menu_redraw();
 }
 
 static int cmd_filter(mp_cmd_t* cmd, void *ctx)
 {
-    struct menu_state *priv = ctx;
+  struct menu_state *priv = ctx;
+
+  menu_redraw();
 
   switch(cmd->id) {
   case MP_CMD_MENU : {  // Convert txt cmd from the users into libmenu stuff
