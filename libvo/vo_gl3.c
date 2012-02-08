@@ -21,10 +21,11 @@
  * version 2.1 of the License, or (at your option) any later version.
  */
 
-//xxx
-//#define USE_GLEW
-#ifdef USE_GLEW
-#include <GL/glew.h>
+//xxx hack for using GL functions without mplayer's function loader
+#if 0
+#define GL_GLEXT_PROTOTYPES
+#include <GL/gl.h>
+#include <GL/glext.h>
 #endif
 
 #include <stdio.h>
@@ -129,7 +130,6 @@ struct texplane {
 };
 
 struct vertex_array {
-    GLuint program;
     GLuint buffer;
     GLuint vao;
     int vertex_count;
@@ -153,6 +153,9 @@ struct gl_priv {
     int force_gl2;
 
     struct vertex_array va_osd, va_eosd, va_video;
+    int osd_program, eosd_program, video_program;
+    // used when doing a separate YUV conversion step (use_indirect && is_yuv)
+    int final_program;
 
     //! Textures for OSD
     GLuint osdtex[MAX_OSD_PARTS];
@@ -166,8 +169,10 @@ struct gl_priv {
     int osdtexCnt;
     int osd_color;
 
+    int use_indirect;           // convert YUV to RGB texture first
     int use_ycbcr;
     int use_gamma;
+    int use_srgb;
     struct mp_csp_details colorspace;
     int is_yuv;
     float filter_strength;
@@ -191,6 +196,10 @@ struct gl_priv {
 
     int plane_count;
     struct texplane planes[3];
+
+    // RGB target (optional, see use_indirect and final_program)
+    GLuint indirect_fbo;
+    GLuint indirect_texture;
 
     // state for luma and chroma scalers
     struct scaler scalers[2];
@@ -241,11 +250,11 @@ static bool can_use_filter_kernel(struct filter_kernel *kernel)
     return !!convolution_filters[kernel->size].shader_fn;
 }
 
-static void vertex_array_init(GL *gl, struct vertex_array * va, GLuint program)
+static void vertex_array_init(GL *gl, struct vertex_array * va)
 {
     size_t stride = sizeof(struct vertex);
 
-    *va = (struct vertex_array) { .program = program };
+    *va = (struct vertex_array) {0};
 
     gl->GenBuffers(1, &va->buffer);
     gl->GenVertexArrays(1, &va->vao);
@@ -288,11 +297,9 @@ static void vertex_array_upload(GL *gl, struct vertex_array *va,
 
 static void vertex_array_draw(GL *gl, struct vertex_array *va)
 {
-    gl->UseProgram(va->program);
     gl->BindVertexArray(va->vao);
     gl->DrawArrays(GL_TRIANGLES, 0, va->vertex_count);
     gl->BindVertexArray(0);
-    gl->UseProgram(0);
 
     glCheckError(gl, "after rendering");
 }
@@ -419,9 +426,16 @@ static void update_uniforms(struct vo *vo, GLuint program)
 
     loc = gl->GetUniformLocation(program, "inv_gamma");
     if (loc >= 0) {
-        gl->Uniform3f(loc, 1.0 / cparams.rgamma, 1.0 / cparams.ggamma,
-                      1.0 / cparams.bgamma);
+        float factor = 1.0;
+        if (p->use_srgb && p->is_yuv)
+            factor = mp_csp_gamma(p->colorspace.format) / 2.2;
+        gl->Uniform3f(loc, factor / cparams.rgamma, factor / cparams.ggamma,
+                      factor / cparams.bgamma);
     }
+
+    loc = gl->GetUniformLocation(program, "conv_gamma");
+    if (loc >= 0)
+        gl->Uniform1f(loc, mp_csp_gamma(p->colorspace.format));
 
     loc = gl->GetUniformLocation(program, "texture1");
     if (loc >= 0)
@@ -449,17 +463,17 @@ static void update_all_uniforms(struct vo *vo)
 {
     struct gl_priv *p = vo->priv;
 
-    update_uniforms(vo, p->va_osd.program);
-    update_uniforms(vo, p->va_eosd.program);
-    update_uniforms(vo, p->va_video.program);
+    update_uniforms(vo, p->osd_program);
+    update_uniforms(vo, p->eosd_program);
+    update_uniforms(vo, p->video_program);
+    update_uniforms(vo, p->final_program);
 }
 
-static void resize(struct vo *vo)
+static void reset_viewport(struct vo *vo)
 {
     struct gl_priv *p = vo->priv;
     GL *gl = p->gl;
 
-    mp_msg(MSGT_VO, MSGL_V, "[gl] Resize: %dx%d\n", vo->dwidth, vo->dheight);
     int left = 0, top = 0;
     if (WinID >= 0) {
         int w = vo->dwidth, h = vo->dheight;
@@ -468,6 +482,15 @@ static void resize(struct vo *vo)
         top = old_y - h - top;
     }
     gl->Viewport(left, top, vo->dwidth, vo->dheight);
+}
+
+static void resize(struct vo *vo)
+{
+    struct gl_priv *p = vo->priv;
+    GL *gl = p->gl;
+
+    mp_msg(MSGT_VO, MSGL_V, "[gl] Resize: %dx%d\n", vo->dwidth, vo->dheight);
+    reset_viewport(vo);
 
     struct vo_rect borders;
     calc_src_dst_rects(vo, p->image_width, p->image_height, &p->src_rect,
@@ -632,7 +655,9 @@ static void draw_eosd(struct vo *vo, mp_eosd_images_t *imgs)
     gl->Enable(GL_BLEND);
     gl->BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     gl->BindTexture(GL_TEXTURE_2D, p->eosd_texture);
+    gl->UseProgram(p->eosd_program);
     vertex_array_draw(gl, &p->va_eosd);
+    gl->UseProgram(0);
     gl->BindTexture(GL_TEXTURE_2D, 0);
     gl->Disable(GL_BLEND);
 }
@@ -642,12 +667,14 @@ static void delete_shaders(struct vo *vo)
     struct gl_priv *p = vo->priv;
     GL *gl = p->gl;
 
-    gl->DeleteProgram(p->va_osd.program);
-    p->va_osd.program = 0;
-    gl->DeleteProgram(p->va_eosd.program);
-    p->va_eosd.program = 0;
-    gl->DeleteProgram(p->va_video.program);
-    p->va_video.program = 0;
+    gl->DeleteProgram(p->osd_program);
+    p->osd_program = 0;
+    gl->DeleteProgram(p->eosd_program);
+    p->eosd_program = 0;
+    gl->DeleteProgram(p->video_program);
+    p->video_program = 0;
+    gl->DeleteProgram(p->final_program);
+    p->final_program = 0;
 }
 
 // Free video resources etc.
@@ -673,6 +700,11 @@ static void uninitVideo(struct vo *vo)
         plane->buffer_ptr = NULL;
         plane->buffer_size = 0;
     }
+
+    gl->DeleteFramebuffers(1, &p->indirect_fbo);
+    p->indirect_fbo = 0;
+    gl->DeleteTextures(1, &p->indirect_texture);
+    p->indirect_texture = 0;
 }
 
 /**
@@ -754,14 +786,17 @@ static GLuint create_shader(GL *gl, GLenum type, const char *header,
     GLint log_length;
     gl->GetShaderiv(shader, GL_INFO_LOG_LENGTH, &log_length);
 
-    if (!status || log_length > 1) {
-        int pri = status ? MSGL_V : MSGL_ERR;
-        mp_msg(MSGT_VO, pri, "[gl] Shader source:\n");
+    int pri = status ? (log_length > 1 ? MSGL_V : MSGL_DBG2) : MSGL_ERR;
+    const char *typestr = type == GL_VERTEX_SHADER ? "vertex" : "fragment";
+    if (mp_msg_test(MSGT_VO, pri)) {
+        mp_msg(MSGT_VO, pri, "[gl] %s shader source:\n", typestr);
         mp_log_source(MSGT_VO, pri, full_source);
+    }
+    if (log_length > 1) {
         GLchar *log = talloc_zero_size(ctx, log_length + 1);
         gl->GetShaderInfoLog(shader, log_length, NULL, log);
-        mp_msg(MSGT_VO, pri,
-               "[gl] shader compile log (status=%d):\n%s\n", status, log);
+        mp_msg(MSGT_VO, pri, "[gl] %s shader compile log (status=%d):\n%s\n",
+               typestr, status, log);
     }
 
     talloc_free(ctx);
@@ -792,18 +827,20 @@ static void link_shader(GL *gl, GLuint program)
     GLint log_length;
     gl->GetProgramiv(program, GL_INFO_LOG_LENGTH, &log_length);
 
-    if (!status || log_length > 1) {
+    int pri = status ? (log_length > 1 ? MSGL_V : MSGL_DBG2) : MSGL_ERR;
+    if (mp_msg_test(MSGT_VO, pri)) {
         GLchar *log = talloc_zero_size(NULL, log_length + 1);
         gl->GetProgramInfoLog(program, log_length, NULL, log);
-        mp_msg(MSGT_VO, status ? MSGL_V : MSGL_ERR,
-               "[gl] shader link log (status=%d): %s\n", status, log);
+        mp_msg(MSGT_VO, pri, "[gl] shader link log (status=%d): %s\n",
+               status, log);
         talloc_free(log);
     }
 }
 
-static GLuint create_program(GL *gl, const char *header, const char *vertex,
-                             const char *frag)
+static GLuint create_program(GL *gl, const char *name, const char *header,
+                             const char *vertex, const char *frag)
 {
+    mp_msg(MSGT_VO, MSGL_V, "[gl] compiling shader program '%s'\n", name);
     GLuint prog = gl->CreateProgram();
     prog_create_shader(gl, prog, GL_VERTEX_SHADER, header, vertex);
     prog_create_shader(gl, prog, GL_FRAGMENT_SHADER, header, frag);
@@ -818,9 +855,10 @@ static void shader_def(char **shader, const char *name,
     *shader = talloc_asprintf_append(*shader, "#define %s %s\n", name, value);
 }
 
-static void shader_def_b(char **shader, const char *name, bool b)
+static void shader_def_opt(char **shader, const char *name, bool b)
 {
-    shader_def(shader, name, b ? "1" : "0");
+    if (b)
+        shader_def(shader, name, "1");
 }
 
 static void shader_setup_scaler(char **shader, struct scaler *scaler)
@@ -839,39 +877,56 @@ static void compile_shaders(struct vo *vo)
 {
     struct gl_priv *p = vo->priv;
     GL *gl = p->gl;
-    void *tmp = talloc_new(NULL);
 
+    delete_shaders(vo);
+
+    void *tmp = talloc_new(NULL);
     struct bstr src = { (char*)vo_gl3_shaders, sizeof(vo_gl3_shaders) };
 
     char *vertex_shader = get_section(tmp, src, "vertex_all");
     char *shader_prelude = get_section(tmp, src, "prelude");
 
-    char *header = talloc_strdup(tmp, "");
+    char *header = talloc_strdup(tmp, shader_prelude);
 
-    shader_def_b(&header, "USE_PLANAR", p->is_yuv);
-    shader_def_b(&header, "USE_COLORMATRIX", p->is_yuv);
-    shader_def_b(&header, "USE_GAMMA_POW", p->use_gamma);
-
-    shader_setup_scaler(&header, &p->scalers[0]);
-    shader_setup_scaler(&header, &p->scalers[1]);
-
-    mp_msg(MSGT_VO, MSGL_V, "[gl] shader config:\n%s", header);
-
-    header = talloc_asprintf(tmp, "%s%s", shader_prelude, header);
-
-    delete_shaders(vo);
-
-    p->va_eosd.program =
-        create_program(gl, header, vertex_shader,
+    p->eosd_program =
+        create_program(gl, "eosd", header, vertex_shader,
             get_section(tmp, src, "frag_eosd"));
 
-    p->va_osd.program =
-        create_program(gl, header, vertex_shader,
+    p->osd_program =
+        create_program(gl, "osd", header, vertex_shader,
             get_section(tmp, src, "frag_osd"));
 
-    p->va_video.program =
-        create_program(gl, header, vertex_shader,
-            get_section(tmp, src, "frag_video"));
+    char *header_conv = talloc_strdup(tmp, "");
+    char *header_final = talloc_strdup(tmp, "");
+
+    shader_def_opt(&header_conv, "USE_PLANAR", p->is_yuv);
+    shader_def_opt(&header_conv, "USE_COLORMATRIX", p->is_yuv);
+    shader_def_opt(&header_final, "USE_GAMMA_POW", p->use_gamma);
+
+    shader_setup_scaler(&header_final, &p->scalers[0]);
+    shader_setup_scaler(&header_conv, &p->scalers[1]);
+
+    if (p->use_indirect && p->is_yuv) {
+        // We don't use filtering for the Y-plane (luma), because it's never
+        // scaled in this scenario.
+        shader_def(&header_conv, "SAMPLE_L", "sample_bilinear");
+        shader_def_opt(&header_conv, "USE_LINEAR_CONV", p->use_srgb);
+        header_conv = talloc_asprintf(tmp, "%s%s", header, header_conv);
+        header_final = talloc_asprintf(tmp, "%s%s", header, header_final);
+        p->video_program =
+            create_program(gl, "video", header_conv,
+                get_section(tmp, src, "vertex_noscale"),
+                get_section(tmp, src, "frag_video"));
+        p->final_program =
+            create_program(gl, "final", header_final, vertex_shader,
+                get_section(tmp, src, "frag_video"));
+    } else {
+        header = talloc_asprintf(tmp, "%s%s%s", header, header_conv,
+                                 header_final);
+        p->video_program =
+            create_program(gl, "video", header, vertex_shader,
+                get_section(tmp, src, "frag_video"));
+    }
 
     glCheckError(gl, "shader compilation");
 
@@ -884,22 +939,6 @@ static int initGL(struct vo *vo)
 {
     struct gl_priv *p = vo->priv;
     GL *gl = p->gl;
-
-#ifdef USE_GLEW
-    // NOTE: needs a GL context
-    GLenum err = glewInit();
-    if (err != GLEW_OK) {
-        printf("glew error: %s\n", glewGetErrorString(err));
-        abort();
-        return 0;
-    }
-
-    if (!glewIsSupported("GL_VERSION_3_3")) {
-        printf("OpenGL 3.3 not available\n");
-        abort();
-        return 0;
-    }
-#endif
 
     glCheckError(p->gl, "before initGL");
 
@@ -915,9 +954,9 @@ static int initGL(struct vo *vo)
     gl->Disable(GL_CULL_FACE);
     gl->DrawBuffer(GL_BACK);
 
-    vertex_array_init(gl, &p->va_eosd, 0);
-    vertex_array_init(gl, &p->va_osd, 0);
-    vertex_array_init(gl, &p->va_video, 0);
+    vertex_array_init(gl, &p->va_eosd);
+    vertex_array_init(gl, &p->va_osd);
+    vertex_array_init(gl, &p->va_video);
 
     GLint max_texture_size;
     gl->GetIntegerv(GL_MAX_TEXTURE_SIZE, &max_texture_size);
@@ -927,6 +966,16 @@ static int initGL(struct vo *vo)
     gl->Clear(GL_COLOR_BUFFER_BIT);
     if (gl->SwapInterval && p->swap_interval >= 0)
         gl->SwapInterval(p->swap_interval);
+
+    if (p->use_srgb) {
+        GLboolean b = 0;
+        gl->GetBooleanv(GL_FRAMEBUFFER_SRGB_CAPABLE_EXT, &b);
+        if (!b) {
+            mp_msg(MSGT_VO, MSGL_ERR, "[gl]no sRGB framebuffer! Disabling any "
+                                      "sRGB use.\n");
+            p->use_srgb = 0;
+        }
+    }
 
     glCheckError(gl, "after initGL");
 
@@ -950,6 +999,9 @@ static void initVideo(struct vo *vo)
     if (p->gl_internal_format == 4) p->gl_internal_format = GL_RGBA;
     if (p->gl_format == GL_LUMINANCE)
         p->gl_format = GL_RED;
+
+    if (!p->is_yuv && p->use_srgb)
+        p->gl_internal_format = GL_SRGB;
 
     if (!p->is_yuv) {
         // xxx mp_image_setfmt calculates this as well
@@ -1006,6 +1058,29 @@ static void initVideo(struct vo *vo)
     gl->ActiveTexture(GL_TEXTURE0);
 
     glCheckError(gl, "after video texture creation");
+
+    if (p->final_program) {
+        gl->GenFramebuffers(1, &p->indirect_fbo);
+        gl->GenTextures(1, &p->indirect_texture);
+        gl->BindTexture(GL_TEXTURE_2D, p->indirect_texture);
+        // We use a 16 bit format, because 8 bit is not really enough for
+        // storing linear RGB without loss.
+        glCreateClearTex(gl, GL_TEXTURE_2D, GL_RGBA16, GL_RGB, GL_UNSIGNED_BYTE,
+                         GL_LINEAR, p->texture_width, p->texture_height, 0);
+        gl->BindFramebuffer(GL_FRAMEBUFFER, p->indirect_fbo);
+        gl->FramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                                 GL_TEXTURE_2D, p->indirect_texture, 0);
+        gl->BindFramebuffer(GL_FRAMEBUFFER, 0);
+
+        if (gl->CheckFramebufferStatus(GL_FRAMEBUFFER)
+            != GL_FRAMEBUFFER_COMPLETE)
+        {
+            mp_msg(MSGT_VO, MSGL_ERR, "[gl] Error: framebuffer completeness "
+                                      "check failed!\n");
+        }
+
+        glCheckError(gl, "after binding framebuffer for indirect scaling");
+    }
 }
 
 
@@ -1151,7 +1226,7 @@ static void draw_osd(struct vo *vo, struct osd_state *osd)
         // OSD bitmaps use premultiplied alpha.
         gl->BlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
-        gl->UseProgram(p->va_osd.program);
+        gl->UseProgram(p->osd_program);
         gl->BindVertexArray(p->va_osd.vao);
 
         for (int n = 0; n < p->osdtexCnt; n++) {
@@ -1175,7 +1250,33 @@ static void do_render(struct vo *vo)
     struct vertex vb[VERTICES_PER_QUAD * 2];
     bool is_flipped = p->mpi_flipped ^ p->vo_flipped;
 
-    gl->BindTexture(GL_TEXTURE_2D, p->planes[0].gl_texture);
+    if (p->final_program) {
+        gl->Viewport(0, 0, p->texture_width, p->texture_height);
+
+        gl->BindTexture(GL_TEXTURE_2D, p->planes[0].gl_texture);
+        gl->BindFramebuffer(GL_FRAMEBUFFER, p->indirect_fbo);
+
+        write_quad(vb, -1, -1, 1, 1, 0, 0, 1, 1, 1, 1, NULL, false);
+
+        vertex_array_upload(gl, &p->va_video, vb, VERTICES_PER_QUAD);
+        gl->UseProgram(p->video_program);
+        vertex_array_draw(gl, &p->va_video);
+        gl->UseProgram(0);
+
+        gl->BindFramebuffer(GL_FRAMEBUFFER, 0);
+        reset_viewport(vo);
+    }
+
+    if (p->final_program) {
+        gl->BindTexture(GL_TEXTURE_2D, p->indirect_texture);
+        gl->UseProgram(p->final_program);
+    } else {
+        gl->BindTexture(GL_TEXTURE_2D, p->planes[0].gl_texture);
+        gl->UseProgram(p->video_program);
+    }
+
+    if (p->use_srgb)
+        gl->Enable(GL_FRAMEBUFFER_SRGB);
 
     if (p->stereo_mode) {
         int w = p->src_rect.width;
@@ -1197,7 +1298,6 @@ static void do_render(struct vo *vo)
 
         vertex_array_upload(gl, &p->va_video, vb, VERTICES_PER_QUAD * 2);
 
-        gl->UseProgram(p->va_video.program);
         gl->BindVertexArray(p->va_video.vao);
 
         glEnable3DLeft(gl, p->stereo_mode);
@@ -1207,7 +1307,6 @@ static void do_render(struct vo *vo)
         glDisable3D(gl, p->stereo_mode);
 
         gl->BindVertexArray(0);
-        gl->UseProgram(0);
     } else {
         write_quad(vb,
                    p->dst_rect.left, p->dst_rect.top,
@@ -1220,6 +1319,11 @@ static void do_render(struct vo *vo)
         vertex_array_upload(gl, &p->va_video, vb, VERTICES_PER_QUAD);
         vertex_array_draw(gl, &p->va_video);
     }
+
+    if (p->use_srgb)
+        gl->Disable(GL_FRAMEBUFFER_SRGB);
+
+    gl->UseProgram(0);
 }
 
 static void flip_page(struct vo *vo)
@@ -1480,6 +1584,7 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
 
     const opt_t subopts[] = {
         {"gamma",        OPT_ARG_BOOL, &p->use_gamma,    NULL},
+        {"srgb",         OPT_ARG_BOOL, &p->use_srgb,     NULL},
         {"ycbcr",        OPT_ARG_BOOL, &p->use_ycbcr,    NULL},
         {"rectangle",    OPT_ARG_INT,  &p->use_rectangle,int_non_neg},
         {"filter-strength", OPT_ARG_FLOAT, &p->filter_strength, NULL},
@@ -1493,6 +1598,7 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
         {"cscale",       OPT_ARG_MSTRZ,&cscale,          NULL},
         {"debug",        OPT_ARG_BOOL, &p->gl_debug,     NULL},
         {"force-gl2",    OPT_ARG_BOOL, &p->force_gl2,    NULL},
+        {"indirect",     OPT_ARG_BOOL, &p->use_indirect, NULL},
         {NULL}
     };
 
@@ -1503,11 +1609,13 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
                "\nOptions:\n"
                "  gamma\n"
                "    Enable gamma control.\n"
+               "  srgb\n"
+               "    Gamma-correct scaling by working in linear colorspace. This\n"
+               "    makes use of sRGB textures and framebuffers.\n"
+               "    This option forces the options 'indirect' and 'gamma'.\n"
                "  rectangle=<0,1,2>\n"
                "    0: use power-of-two textures\n"
                "    1 and 2: use texture_non_power_of_two\n"
-               "  ati-hack\n"
-               "    Workaround ATI bug with PBOs\n"
                "  force-pbo\n"
                "    Force use of PBO even if this involves an extra memcpy\n"
                "  glfinish\n"
@@ -1544,11 +1652,24 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
                "    1: side-by-side to red-cyan stereo\n"
                "    2: side-by-side to green-magenta stereo\n"
                "    3: side-by-side to quadbuffer stereo\n"
+               "  indirect\n"
+               "    Do YUV conversion and scaling as separate passes. This will\n"
+               "    first render the video into a video-sized RGB texture, and\n"
+               "    draw the result on screen. The luma scaler is used to scale\n"
+               "    the RGB image when rendering to screen. The chroma scaler\n"
+               "    is used only on YUV conversion, and only if the video uses\n"
+               "    chroma-subsampling.\n"
+               "    This mechanism is disabled on RGB input.\n"
                "  force-gl2\n"
                "    Create a legacy GL context. This will randomly malfunction\n"
                "    if the proper extensions are not supported.\n"
                "\n");
         return -1;
+    }
+
+    if (p->use_srgb) {
+        p->use_indirect = 1;
+        p->use_gamma = 1;
     }
 
     p->scalers[0].name = talloc_strdup(vo, lscale);

@@ -112,6 +112,8 @@ int mp_csp_equalizer_get(struct mp_csp_equalizer *eq, const char *property,
 
 enum mp_csp mp_csp_guess_colorspace(int width, int height);
 
+float mp_csp_gamma(enum mp_csp csp);
+
 void mp_gen_gamma_map(unsigned char *map, int size, float gamma);
 #define ROW_R 0
 #define ROW_G 1
