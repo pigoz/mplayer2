@@ -182,7 +182,7 @@ struct gl_priv {
     uint32_t image_format;
     uint32_t image_d_width;
     uint32_t image_d_height;
-    int force_pbo;
+    int use_pbo;
     int use_glFinish;
     int swap_interval;
 
@@ -586,11 +586,12 @@ static void genEOSD(struct vo *vo, mp_eosd_images_t *imgs)
                                      * sizeof(struct vertex)
                                      * VERTICES_PER_QUAD);
 
-    if (need_upload) {
+    if (need_upload && p->use_pbo) {
         gl->BindBuffer(GL_PIXEL_UNPACK_BUFFER, p->eosd_buffer);
         char *data = gl->MapBuffer(GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY);
         if (!data) {
-            assert(0);
+            mp_msg(MSGT_VO, MSGL_FATAL, "[gl] Error: can't upload subtitles! "
+                                        "Subtitles will look corrupted.\n");
         } else {
             for (int n = 0; n < p->eosd->targets_count; n++) {
                 struct eosd_target *target = &p->eosd->targets[n];
@@ -610,6 +611,16 @@ static void genEOSD(struct vo *vo, mp_eosd_images_t *imgs)
                         rc.x1 - rc.x0, rc.y1 - rc.y0, 0);
         }
         gl->BindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+    } else if (need_upload) {
+        // non-PBO upload
+        for (int n = 0; n < p->eosd->targets_count; n++) {
+            struct eosd_target *target = &p->eosd->targets[n];
+            ASS_Image *i = target->ass_img;
+
+            glUploadTex(gl, GL_TEXTURE_2D, GL_RED, GL_UNSIGNED_BYTE, i->bitmap,
+                        i->stride, target->source.x0, target->source.y0,
+                        i->w, i->h, 0);
+        }
     }
 
     gl->BindTexture(GL_TEXTURE_2D, 0);
@@ -619,13 +630,6 @@ static void genEOSD(struct vo *vo, mp_eosd_images_t *imgs)
     for (int n = 0; n < p->eosd->targets_count; n++) {
         struct eosd_target *target = &p->eosd->targets[n];
         ASS_Image *i = target->ass_img;
-/*
-        if (need_upload) {
-            glUploadTex(gl, GL_TEXTURE_2D, GL_RED, GL_UNSIGNED_BYTE, i->bitmap,
-                        i->stride, target->source.x0, target->source.y0,
-                        i->w, i->h, 0);
-        }
-*/
         uint8_t color[4] = { i->color >> 24, (i->color >> 16) & 0xff,
                             (i->color >> 8) & 0xff, 255 - (i->color & 0xff) };
 
@@ -1344,6 +1348,9 @@ static uint32_t get_image(struct vo *vo, mp_image_t *mpi)
     struct gl_priv *p = vo->priv;
     GL *gl = p->gl;
 
+    if (!p->use_pbo)
+        return VO_FALSE;
+
     assert(mpi->num_planes == p->plane_count);
 
     if (mpi->flags & MP_IMGFLAG_READABLE)
@@ -1388,7 +1395,8 @@ static uint32_t draw_image(struct vo *vo, mp_image_t *mpi)
     mpi2.type = MP_IMGTYPE_TEMP;
     mpi2.width = mpi2.w;
     mpi2.height = mpi2.h;
-    if (p->force_pbo && !(mpi->flags & MP_IMGFLAG_DIRECT) && !p->planes[0].buffer_ptr
+    if (!(mpi->flags & MP_IMGFLAG_DIRECT)
+        && !p->planes[0].buffer_ptr
         && get_image(vo, &mpi2) == VO_TRUE)
     {
         for (n = 0; n < p->plane_count; n++) {
@@ -1556,7 +1564,7 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
         .colorspace = MP_CSP_DETAILS_DEFAULTS,
         .filter_strength = 0.5,
         .use_rectangle = 1,
-        .force_pbo = 0,
+        .use_pbo = 1,
         .swap_interval = 1,
         .osd_color = 0xffffff,
         .scalers = {
@@ -1576,7 +1584,7 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
         {"ycbcr",        OPT_ARG_BOOL, &p->use_ycbcr,    NULL},
         {"rectangle",    OPT_ARG_INT,  &p->use_rectangle,int_non_neg},
         {"filter-strength", OPT_ARG_FLOAT, &p->filter_strength, NULL},
-        {"force-pbo",    OPT_ARG_BOOL, &p->force_pbo,    NULL},
+        {"pbo",          OPT_ARG_BOOL, &p->use_pbo,      NULL},
         {"glfinish",     OPT_ARG_BOOL, &p->use_glFinish, NULL},
         {"swapinterval", OPT_ARG_INT,  &p->swap_interval,NULL},
         {"mipmapgen",    OPT_ARG_BOOL, &p->mipmap_gen,   NULL},
@@ -1604,8 +1612,8 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
                "  rectangle=<0,1,2>\n"
                "    0: use power-of-two textures\n"
                "    1 and 2: use texture_non_power_of_two\n"
-               "  force-pbo\n"
-               "    Force use of PBO even if this involves an extra memcpy\n"
+               "  no-pbo\n"
+               "    Disable use of PBOs.\n"
                "  glfinish\n"
                "    Call glFinish() before swapping buffers\n"
                "  swapinterval=<n>\n"
