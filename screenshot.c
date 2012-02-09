@@ -70,16 +70,13 @@ struct img_writer {
     int (*write)(screenshot_ctx *ctx, mp_image_t *image, char *filename);
 };
 
-static screenshot_ctx *screenshot_get_ctx(MPContext *mpctx)
+void screenshot_init(struct MPContext *mpctx)
 {
-    if (!mpctx->screenshot_ctx) {
-        mpctx->screenshot_ctx = talloc(mpctx, screenshot_ctx);
-        *mpctx->screenshot_ctx = (screenshot_ctx) {
-            .mpctx = mpctx,
-            .frameno = 1,
-        };
-    }
-    return mpctx->screenshot_ctx;
+    mpctx->screenshot_ctx = talloc(mpctx, screenshot_ctx);
+    *mpctx->screenshot_ctx = (screenshot_ctx) {
+        .mpctx = mpctx,
+        .frameno = 1,
+    };
 }
 
 static FILE *open_file(screenshot_ctx *ctx, char *fname) {
@@ -190,7 +187,8 @@ static int write_jpeg(screenshot_ctx *ctx, mp_image_t *image, char *filename)
 
     while (cinfo.next_scanline < cinfo.image_height) {
         JSAMPROW row_pointer[1];
-        row_pointer[0] = image->planes[0] + cinfo.next_scanline * image->stride[0];
+        row_pointer[0] = image->planes[0] +
+                         cinfo.next_scanline * image->stride[0];
         jpeg_write_scanlines(&cinfo, row_pointer,1);
     }
 
@@ -364,7 +362,7 @@ static char *create_fname(struct MPContext *mpctx, char *template,
                 goto error_exit;
             template++;
             char fmtstr[] = {'%', fmt, '\0'};
-            char buffer[20];
+            char buffer[80];
             if (strftime(buffer, sizeof(buffer), fmtstr, local_time) == 0)
                 buffer[0] = '\0';
             append_filename(&res, buffer);
@@ -431,7 +429,7 @@ static char *gen_fname(screenshot_ctx *ctx)
 
 void screenshot_save(struct MPContext *mpctx, struct mp_image *image)
 {
-    screenshot_ctx *ctx = screenshot_get_ctx(mpctx);
+    screenshot_ctx *ctx = mpctx->screenshot_ctx;
     const struct img_writer *writer = get_writer(ctx);
     struct mp_image *dst = alloc_mpi(image->w, image->h, IMGFMT_RGB24);
 
@@ -466,7 +464,7 @@ void screenshot_save(struct MPContext *mpctx, struct mp_image *image)
 static void vf_screenshot_callback(void *pctx, struct mp_image *image)
 {
     struct MPContext *mpctx = (struct MPContext *)pctx;
-    screenshot_ctx *ctx = screenshot_get_ctx(mpctx);
+    screenshot_ctx *ctx = mpctx->screenshot_ctx;
     screenshot_save(mpctx, image);
     if (ctx->each_frame)
         screenshot_request(mpctx, 0, ctx->full_window);
@@ -489,7 +487,7 @@ void screenshot_request(struct MPContext *mpctx, bool each_frame,
                         bool full_window)
 {
     if (mpctx->video_out && mpctx->video_out->config_ok) {
-        screenshot_ctx *ctx = screenshot_get_ctx(mpctx);
+        screenshot_ctx *ctx = mpctx->screenshot_ctx;
 
         ctx->using_vf_screenshot = 0;
 
@@ -525,7 +523,7 @@ void screenshot_request(struct MPContext *mpctx, bool each_frame,
 
 void screenshot_flip(struct MPContext *mpctx)
 {
-    screenshot_ctx *ctx = screenshot_get_ctx(mpctx);
+    screenshot_ctx *ctx = mpctx->screenshot_ctx;
 
     if (!ctx->each_frame)
         return;
