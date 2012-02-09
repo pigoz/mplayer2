@@ -164,7 +164,6 @@ struct gl_priv {
     int osd_color;
 
     int use_indirect;           // convert YUV to RGB texture first
-    int use_ycbcr;
     int use_gamma;
     int use_srgb;
     struct mp_csp_details colorspace;
@@ -1481,8 +1480,6 @@ static mp_image_t *get_window_screenshot(struct vo *vo)
 
 static int query_format(struct vo *vo, uint32_t format)
 {
-    struct gl_priv *p = vo->priv;
-
     int depth;
     int caps = VFCAP_CSP_SUPPORTED | VFCAP_CSP_SUPPORTED_BY_HW | VFCAP_FLIP |
                VFCAP_HWSCALE_UP | VFCAP_HWSCALE_DOWN | VFCAP_ACCEPT_STRIDE |
@@ -1490,7 +1487,8 @@ static int query_format(struct vo *vo, uint32_t format)
     if (mp_get_chroma_shift(format, NULL, NULL, &depth) &&
         (IMGFMT_IS_YUVP16_NE(format) || !IMGFMT_IS_YUVP16(format)))
         return caps;
-    if (!p->use_ycbcr && (format == IMGFMT_UYVY || format == IMGFMT_YVYU))
+    // xxx glFindFormat reports this as supported
+    if (format == IMGFMT_UYVY || format == IMGFMT_YVYU)
         return 0;
     if (glFindFormat(format, true, NULL, NULL, NULL, NULL))
         return caps;
@@ -1575,7 +1573,6 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
     const opt_t subopts[] = {
         {"gamma",        OPT_ARG_BOOL, &p->use_gamma,    NULL},
         {"srgb",         OPT_ARG_BOOL, &p->use_srgb,     NULL},
-        {"ycbcr",        OPT_ARG_BOOL, &p->use_ycbcr,    NULL},
         {"rectangle",    OPT_ARG_INT,  &p->use_rectangle,int_non_neg},
         {"filter-strength", OPT_ARG_FLOAT, &p->filter_strength, NULL},
         {"pbo",          OPT_ARG_BOOL, &p->use_pbo,      NULL},
@@ -1614,8 +1611,6 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
                "    Interval in displayed frames between to buffer swaps.\n"
                "    1 is equivalent to enable VSYNC, 0 to disable VSYNC.\n"
                "    Requires GLX_SGI_swap_control support to work.\n"
-               "  ycbcr\n"
-               "    also try to use the GL_MESA_ycbcr_texture extension\n"
                "  lscale=<filter>\n"
                "    bilinear: use standard bilinear scaling for luma.\n"
                "    bicubic_fast: bicubic filter (without lookup texture).\n"
