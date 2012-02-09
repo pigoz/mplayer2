@@ -926,8 +926,10 @@ static int initGL(struct vo *vo)
     const char *vendor     = gl->GetString(GL_VENDOR);
     const char *version    = gl->GetString(GL_VERSION);
     const char *renderer   = gl->GetString(GL_RENDERER);
+    const char *glsl       = gl->GetString(GL_SHADING_LANGUAGE_VERSION);
     mp_msg(MSGT_VO, MSGL_V, "[gl] GL_RENDERER='%s', GL_VENDOR='%s', "
-                            "GL_VERSION='%s'\n", renderer, vendor, version);
+                            "GL_VERSION='%s', GL_SHADING_LANGUAGE_VERSION='%s'"
+                            "\n", renderer, vendor, version, glsl);
 
     gl->Disable(GL_BLEND);
     gl->Disable(GL_DEPTH_TEST);
