@@ -39,6 +39,8 @@
 #include "talloc.h"
 #include "screenshot.h"
 #include "mp_core.h"
+#include "m_property.h"
+#include "bstr.h"
 #include "mp_msg.h"
 #include "metadata.h"
 #include "libmpcodecs/img_format.h"
@@ -254,6 +256,19 @@ static char *format_time(void *talloc_ctx, double time, bool sub_seconds)
     return res;
 }
 
+static char *do_format_property(struct MPContext *mpctx, struct bstr s) {
+    struct bstr prop_name = s;
+    int fallbackpos = bstrchr(s, ':');
+    if (fallbackpos >= 0)
+        prop_name = bstr_splice(prop_name, 0, fallbackpos);
+    char *pn = bstrdup0(NULL, prop_name);
+    char *res = mp_property_print(pn, mpctx);
+    talloc_free(pn);
+    if (!res && fallbackpos >= 0)
+        res = bstrdup0(NULL, bstr_cut(s, fallbackpos + 1));
+    return res;
+}
+
 #ifdef _WIN32
 #define ILLEGAL_FILENAME_CHARS "?\"/\\<>*|:"
 #else
@@ -327,8 +342,7 @@ static char *create_fname(struct MPContext *mpctx, char *template,
             break;
         }
         case 'f':
-        case 'F':
-        {
+        case 'F': {
             char *video_file = get_metadata(mpctx, META_NAME);
             if (video_file) {
                 char *name = video_file;
@@ -354,6 +368,18 @@ static char *create_fname(struct MPContext *mpctx, char *template,
             if (strftime(buffer, sizeof(buffer), fmtstr, local_time) == 0)
                 buffer[0] = '\0';
             append_filename(&res, buffer);
+            break;
+        }
+        case '{': {
+            char *end = strchr(template, '}');
+            if (!end)
+                goto error_exit;
+            struct bstr prop = bstr_splice(bstr(template), 0, end - template);
+            template = end + 1;
+            char *s = do_format_property(mpctx, prop);
+            if (s)
+                append_filename(&res, s);
+            talloc_free(s);
             break;
         }
         case '%':
