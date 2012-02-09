@@ -76,12 +76,6 @@ static const string2 fixed_scale_filters[] = {
     {"bicubic_fast", "sample_bicubic"},
     {"sharpen3", "sample_unsharp3"},
     {"sharpen5", "sample_unsharp5"},
-    {"0", "sample_bilinear"},
-    {"1", "sample_bicubic"}, // was bicubic scaling with lookup texture
-    {"2", "sample_bicubic"}, // was like 1, but linear in Y direction (faster)
-    {"3", "sample_bicubic"},
-    {"4", "sample_unsharp3"},
-    {"5", "sample_unsharp5"},
     {0}
 };
 
@@ -1630,11 +1624,6 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
                "    lanczos2: Lanczos with radius=2.\n"
                "    lanczos3: Lanczos with radius=3.\n"
                "  There are more filters - print a list with lscale=help.\n"
-               "  Old filter values for lscale:\n"
-               "    0: bilinear\n"
-               "    1,2,3: bicubic_fast\n"
-               "    4: sharpen3\n"
-               "    5: sharpen5\n"
                "  cscale=<n>\n"
                "    as lscale but for chroma (2x slower with little visible effect).\n"
                "  filter-strength=<value>\n"
