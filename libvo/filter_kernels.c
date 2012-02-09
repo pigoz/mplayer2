@@ -220,7 +220,7 @@ static double blackman(kernel *k, double x)
 }
 
 const struct filter_kernel mp_filter_kernels[] = {
-    {"bilinear_conv",  2 * 1,  bilinear},
+    {"bilinear_slow",  2 * 1,  bilinear},
     {"hanning",        2 * 1,  hanning},
     {"hamming",        2 * 1,  hamming},
     {"hermite",        2 * 1,  hermite},

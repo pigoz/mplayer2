@@ -35,6 +35,8 @@
 #include <stdbool.h>
 #include <assert.h>
 
+#include <libavutil/avutil.h>
+
 #include "config.h"
 #include "talloc.h"
 #include "bstr.h"
@@ -64,23 +66,18 @@
 // Pixel width of 1D lookup textures.
 #define LOOKUP_TEXTURE_SIZE 256
 
-typedef struct string2 {
-    const char *a, *b;
-} string2;
-
-// Map command line lscale/cscale arguments to shader filter routines.
-// Note that there are convolution filters additional to this list; the filters
-// listed here are called "fixed" to distinguish them from filter-based ones.
-static const string2 fixed_scale_filters[] = {
-    {"bilinear", "sample_bilinear"},
-    {"bicubic_fast", "sample_bicubic"},
-    {"sharpen3", "sample_unsharp3"},
-    {"sharpen5", "sample_unsharp5"},
-    {0}
+// lscale/cscale arguments that map directly to shader filter routines.
+// Note that the convolution filters are not included in this list.
+static const char *fixed_scale_filters[] = {
+    "bilinear",
+    "bicubic_fast",
+    "sharpen3",
+    "sharpen5",
+    NULL
 };
 
 struct convolution_filters {
-    const char *shader_fn;
+    char *shader_fn;
     bool use_2d;
     GLint internal_format;
     GLenum format;
@@ -132,7 +129,7 @@ struct vertex_array {
 struct scaler {
     int id;
     char *name;
-    const char *shader_fn;
+    char *shader_fn;
     struct filter_kernel *kernel;
     GLuint gl_lut;
     int texunit;
@@ -224,21 +221,11 @@ static void matrix_ortho2d(float m[3][3], float x0, float x1,
     m[2][2] = 1.0f;
 }
 
-// Return the shader routine for the given scaler, or NULL if not found.
-static char *find_fixed_scaler(const char *name)
-{
-    for (const string2 *entry = &fixed_scale_filters[0]; entry->a; entry++) {
-        if (strcmp(entry->a, name) == 0)
-            return (char *)entry->b;
-    }
-    return NULL;
-}
-
 static bool can_use_filter_kernel(struct filter_kernel *kernel)
 {
     if (!kernel)
         return false;
-    if (kernel->size >= sizeof(convolution_filters) / sizeof(convolution_filters[0]))
+    if (kernel->size >= FF_ARRAY_ELEMS(convolution_filters))
         return false;
     return !!convolution_filters[kernel->size].shader_fn;
 }
@@ -1357,9 +1344,8 @@ static uint32_t get_image(struct vo *vo, mp_image_t *mpi)
     mpi->flags &= ~MP_IMGFLAG_COMMON_PLANE;
     for (int n = 0; n < p->plane_count; n++) {
         struct texplane *plane = &p->planes[n];
-        int w = mpi->width >> plane->shift_x, h = mpi->height >> plane->shift_y;
-        mpi->stride[n] = w * p->plane_bytes;
-        int needed_size = mpi->stride[n] * h;
+        mpi->stride[n] = (mpi->width >> plane->shift_x) * p->plane_bytes;
+        int needed_size = (mpi->height >> plane->shift_y) * mpi->stride[n];
         if (!plane->gl_buffer)
             gl->GenBuffers(1, &plane->gl_buffer);
         gl->BindBuffer(GL_PIXEL_UNPACK_BUFFER, plane->gl_buffer);
@@ -1369,7 +1355,8 @@ static uint32_t get_image(struct vo *vo, mp_image_t *mpi)
                            NULL, GL_DYNAMIC_DRAW);
         }
         if (!plane->buffer_ptr)
-            plane->buffer_ptr = gl->MapBuffer(GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY);
+            plane->buffer_ptr = gl->MapBuffer(GL_PIXEL_UNPACK_BUFFER,
+                                              GL_WRITE_ONLY);
         mpi->planes[n] = plane->buffer_ptr;
         gl->BindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
     }
@@ -1525,20 +1512,27 @@ static bool handle_scaler_opt(struct vo *vo, struct scaler *scaler)
     if (!scaler->name || scaler->name[0] == '\0')
         scaler->name = talloc_strdup(vo, "bilinear");
 
+    talloc_free(scaler->shader_fn);
+    scaler->shader_fn = NULL;
+
     if (strcmp(scaler->name, "help") == 0) {
         mp_msg(MSGT_VO, MSGL_INFO, "Available scalers:\n");
-        for (const string2 *e = &fixed_scale_filters[0]; e->a; e++) {
-            mp_msg(MSGT_VO, MSGL_INFO, "    %s\n", e->a);
+        for (const char **e = fixed_scale_filters; *e; e++) {
+            mp_msg(MSGT_VO, MSGL_INFO, "    %s\n", *e);
         }
-        for (const struct filter_kernel *e = &mp_filter_kernels[0]; e->name; e++)
-        {
+        for (const struct filter_kernel *e = mp_filter_kernels; e->name; e++) {
             mp_msg(MSGT_VO, MSGL_INFO, "    %s\n", e->name);
         }
         return false;
     }
 
     scaler->kernel = NULL;
-    scaler->shader_fn = find_fixed_scaler(scaler->name);
+    for (const char **filter = fixed_scale_filters; *filter; filter++) {
+        if (strcmp(*filter, scaler->name) == 0) {
+            scaler->shader_fn = talloc_asprintf(vo, "sample_%s", scaler->name);
+            break;
+        }
+    }
     if (scaler->shader_fn)
         return true;
 
@@ -1546,7 +1540,7 @@ static bool handle_scaler_opt(struct vo *vo, struct scaler *scaler)
     if (can_use_filter_kernel(scaler->kernel)) {
         const struct convolution_filters *entry =
             &convolution_filters[scaler->kernel->size];
-        scaler->shader_fn = entry->shader_fn;
+        scaler->shader_fn = talloc_strdup(vo, entry->shader_fn);
         bool is_luma = scaler->id == 0;
         scaler->lut_name = entry->use_2d
                            ? (is_luma ? "lut_l_2d" : "lut_c_2d")
@@ -1635,7 +1629,7 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
                "  cscale=<n>\n"
                "    as lscale but for chroma (2x slower with little visible effect).\n"
                "  filter-strength=<value>\n"
-               "    set the effect strength for some sharpen4/sharpen5 filters\n"
+               "    set the effect strength for the sharpen4/sharpen5 filters\n"
                "  mipmapgen\n"
                "    generate mipmaps for the video image (helps with downscaling)\n"
                "  osdcolor=<0xAARRGGBB>\n"

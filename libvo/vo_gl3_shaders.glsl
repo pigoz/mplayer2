@@ -95,7 +95,7 @@ vec4 sample_bilinear(sampler2D tex, vec2 texcoord) {
 // Explanation how bicubic scaling with only 4 texel fetches is done:
 //   http://www.mate.tue.nl/mate/pdfs/10318.pdf
 //   'Efficient GPU-Based Texture Interpolation using Uniform B-Splines'
-// Explanation why cubic scaling normally always blurs, even with unit scaling:
+// Explanation why this algorithm normally always blurs, even with unit scaling:
 //   http://bigwww.epfl.ch/preprints/ruijters1001p.pdf
 //   'GPU Prefilter for Accurate Cubic B-spline Interpolation'
 vec4 calcweights(float s) {
@@ -109,7 +109,7 @@ vec4 calcweights(float s) {
     return t;
 }
 
-vec4 sample_bicubic(sampler2D tex, vec2 texcoord) {
+vec4 sample_bicubic_fast(sampler2D tex, vec2 texcoord) {
     vec2 texsize = textureSize(tex, 0);
     vec2 pt = 1 / texsize;
     vec2 fcoord = fract(texcoord * texsize + vec2(0.5, 0.5));
@@ -187,7 +187,8 @@ SAMPLE_CONVOLUTION_N(sample_convolution6, 6, sampler2D, convolution6, weights6)
 SAMPLE_CONVOLUTION_N(sample_convolution8, 8, sampler2D, convolution8, weights8)
 
 
-vec4 sample_unsharp3(sampler2D tex, vec2 texcoord) {
+// Unsharp masking
+vec4 sample_sharpen3(sampler2D tex, vec2 texcoord) {
     vec2 texsize = textureSize(tex, 0);
     vec2 pt = 1 / texsize;
     vec2 st = pt * 0.5;
@@ -199,7 +200,7 @@ vec4 sample_unsharp3(sampler2D tex, vec2 texcoord) {
     return p + (p - 0.25 * sum) * filter_strength;
 }
 
-vec4 sample_unsharp5(sampler2D tex, vec2 texcoord) {
+vec4 sample_sharpen5(sampler2D tex, vec2 texcoord) {
     vec2 texsize = textureSize(tex, 0);
     vec2 pt = 1 / texsize;
     vec2 st1 = pt * 1.2;
