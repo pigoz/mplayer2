@@ -170,6 +170,7 @@ const struct vo_driver *video_out_drivers[] =
 #endif
 #ifdef CONFIG_X11
 #ifdef CONFIG_GL
+        &video_out_gl3,
         &video_out_gl_nosw,
 #endif
         &video_out_x11,
@@ -180,7 +181,6 @@ const struct vo_driver *video_out_drivers[] =
 #endif
 #ifdef CONFIG_GL
         &video_out_gl,
-        &video_out_gl3,
 #endif
 #ifdef CONFIG_DGA
         &video_out_dga,
