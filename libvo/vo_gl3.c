@@ -877,7 +877,8 @@ static void compile_shaders(struct vo *vo)
     char *header_conv = talloc_strdup(tmp, "");
     char *header_final = talloc_strdup(tmp, "");
 
-    shader_def_opt(&header_conv, "USE_PLANAR", p->is_yuv);
+    shader_def_opt(&header_conv, "USE_PLANAR", p->plane_count > 1);
+    shader_def_opt(&header_conv, "USE_YGRAY", p->is_yuv && p->plane_count == 1);
     shader_def_opt(&header_conv, "USE_COLORMATRIX", p->is_yuv);
     shader_def_opt(&header_final, "USE_GAMMA_POW", p->use_gamma);
 
@@ -992,6 +993,8 @@ static void initVideo(struct vo *vo)
     p->plane_bytes = (depth + 7) / 8;
 
     p->plane_count = p->is_yuv ? 3 : 1;
+    if (p->image_format == IMGFMT_Y800)
+        p->plane_count = 1;
 
     for (int n = 0; n < p->plane_count; n++) {
         struct texplane *plane = &p->planes[n];
@@ -1344,7 +1347,7 @@ static uint32_t get_image(struct vo *vo, mp_image_t *mpi)
     if (!p->use_pbo)
         return VO_FALSE;
 
-    assert(mpi->num_planes == p->plane_count);
+    assert(mpi->num_planes >= p->plane_count);
 
     if (mpi->flags & MP_IMGFLAG_READABLE)
         return VO_FALSE;
@@ -1379,6 +1382,8 @@ static uint32_t draw_image(struct vo *vo, mp_image_t *mpi)
     struct gl_priv *p = vo->priv;
     GL *gl = p->gl;
     int n;
+
+    assert(mpi->num_planes >= p->plane_count);
 
     mp_image_t mpi2 = *mpi;
     int w = mpi->w, h = mpi->h;
@@ -1439,7 +1444,15 @@ static mp_image_t *get_screenshot(struct vo *vo)
 
     mp_image_t *image = alloc_mpi(p->texture_width, p->texture_height,
                                   p->image_format);
-    assert(image->num_planes == p->plane_count);
+    assert(image->num_planes >= p->plane_count);
+    // Account for alpha plane.
+    // NOTE about image formats with alpha plane: we don't even have the alpha
+    // anymore. We never upload it to any texture, as it would be a waste of
+    // time. On the other hand, we can't find a "similar", non-alpha image
+    // format easily. So we just leave the alpha plane of the newly allocated
+    // image as-is, and hope that the alpha is ignored by the receiver of the
+    // screenshot. (If not, code should be added to make it fully opaque.)
+    assert(image->num_planes <= p->plane_count + 1);
 
     for (int n = 0; n < p->plane_count; n++) {
         gl->ActiveTexture(GL_TEXTURE0 + n);

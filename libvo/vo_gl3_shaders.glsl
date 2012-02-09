@@ -225,6 +225,9 @@ void main() {
 #else
     vec3 color = SAMPLE_L(texture1, texcoord).rgb;
 #endif
+#ifdef USE_YGRAY
+    color.gb = vec2(0.5);
+#endif
 #ifdef USE_COLORMATRIX
     color = mat3(colormatrix) * color + colormatrix[3];
 #endif
