@@ -34,19 +34,12 @@ in vec2 vertex_texcoord;
 out vec2 texcoord;
 
 void main() {
-    gl_Position = vec4(transform * vec3(vertex_position, 1), 1);
+    vec3 position = vec3(vertex_position, 1);
+#ifndef FIXED_SCALE
+    position = transform * position;
+#endif
+    gl_Position = vec4(position, 1);
     color = vertex_color;
-    texcoord = vertex_texcoord;
-}
-
-#!section vertex_noscale
-
-in vec2 vertex_position;
-in vec2 vertex_texcoord;
-out vec2 texcoord;
-
-void main() {
-    gl_Position = vec4(vertex_position, 1, 1);
     texcoord = vertex_texcoord;
 }
 
@@ -151,6 +144,39 @@ float[8] weights8(sampler2D lookup, float f) {
     vec4 c2 = texture(lookup, vec2(0.75, f));
     return float[8](c1.r, c1.g, c1.b, c1.a, c2.r, c2.g, c2.b, c2.a);
 }
+
+
+#define CONVOLUTION_SEP_N(NAME, N)                                           \
+    vec4 NAME(sampler2D tex, vec2 texcoord, vec2 pt, float weights[N]) {     \
+        vec4 res = vec4(0);                                                  \
+        for (int n = 0; n < N; n++) {                                        \
+            res += weights[n] * texture(tex, texcoord + pt * n);             \
+        }                                                                    \
+        return res;                                                          \
+    }
+
+CONVOLUTION_SEP_N(convolution_sep2, 2)
+CONVOLUTION_SEP_N(convolution_sep4, 4)
+CONVOLUTION_SEP_N(convolution_sep6, 6)
+CONVOLUTION_SEP_N(convolution_sep8, 8)
+
+// The dir parameter is (0, 1) or (1, 0), and we expect the shader compiler to
+// remove all the redundant multiplications and additions.
+#define SAMPLE_CONVOLUTION_SEP_N(NAME, N, SAMPLERT, CONV_FUNC, WEIGHTS_FUNC)\
+    vec4 NAME(vec2 dir, SAMPLERT lookup, sampler2D tex, vec2 texcoord) {    \
+        vec2 texsize = textureSize(tex, 0);                                 \
+        vec2 pt = (1 / texsize) * dir;                                      \
+        float fcoord = dot(fract(texcoord * texsize - 0.5), dir);           \
+        vec2 base = texcoord - fcoord * pt;                                 \
+        return CONV_FUNC(tex, base - pt * (N / 2 - 1), pt,                  \
+                         WEIGHTS_FUNC(lookup, fcoord));                     \
+    }
+
+SAMPLE_CONVOLUTION_SEP_N(sample_convolution_sep2, 2, sampler1D, convolution_sep2, weights2)
+SAMPLE_CONVOLUTION_SEP_N(sample_convolution_sep4, 4, sampler1D, convolution_sep4, weights4)
+SAMPLE_CONVOLUTION_SEP_N(sample_convolution_sep6, 6, sampler2D, convolution_sep6, weights6)
+SAMPLE_CONVOLUTION_SEP_N(sample_convolution_sep8, 8, sampler2D, convolution_sep8, weights8)
+
 
 #define CONVOLUTION_N(NAME, N)                                               \
     vec4 NAME(sampler2D tex, vec2 texcoord, vec2 pt, float taps_x[N],        \

@@ -77,7 +77,7 @@ static const char *fixed_scale_filters[] = {
 };
 
 struct convolution_filters {
-    char *shader_fn;
+    char *shader_fn, *shader_fn_sep;
     bool use_2d;
     GLint internal_format;
     GLenum format;
@@ -85,10 +85,10 @@ struct convolution_filters {
 
 // indexed with filter_kernel->size
 struct convolution_filters convolution_filters[] = {
-    [2] = {"sample_convolution2", false, GL_RG16F,   GL_RG},
-    [4] = {"sample_convolution4", false, GL_RGBA16F, GL_RGBA},
-    [6] = {"sample_convolution6", true,  GL_RGB16F,  GL_RGB},
-    [8] = {"sample_convolution8", true,  GL_RGBA16F, GL_RGBA},
+    [2] = {"sample_convolution2", "sample_convolution_sep2", false, GL_RG16F,   GL_RG},
+    [4] = {"sample_convolution4", "sample_convolution_sep4", false, GL_RGBA16F, GL_RGBA},
+    [6] = {"sample_convolution6", "sample_convolution_sep6", true,  GL_RGB16F,  GL_RGB},
+    [8] = {"sample_convolution8", "sample_convolution_sep8", true,  GL_RGBA16F, GL_RGBA},
 };
 
 struct vertex {
@@ -129,11 +129,17 @@ struct vertex_array {
 struct scaler {
     int id;
     char *name;
-    char *shader_fn;
     struct filter_kernel *kernel;
     GLuint gl_lut;
     int texunit;
     const char *lut_name;
+};
+
+struct fbotex {
+    GLuint fbo;
+    GLuint texture;
+    int tex_w, tex_h;           // size of .texture
+    int vp_w, vp_h;             // viewport of fbo / used part of the texture
 };
 
 struct gl_priv {
@@ -143,10 +149,9 @@ struct gl_priv {
     int gl_debug;
     int force_gl2;
 
-    struct vertex_array va_osd, va_eosd, va_video;
-    int osd_program, eosd_program, video_program;
-    // used when doing a separate YUV conversion step (use_indirect && is_yuv)
-    int final_program;
+    struct vertex_array va_osd, va_eosd, va_tmp;
+    GLuint osd_program, eosd_program;
+    GLuint indirect_program, scale_sep_program, final_program;
 
     //! Textures for OSD
     GLuint osdtex[MAX_OSD_PARTS];
@@ -163,6 +168,7 @@ struct gl_priv {
     int use_indirect;           // convert YUV to RGB texture first
     int use_gamma;
     int use_srgb;
+    int use_scale_sep;
     struct mp_csp_details colorspace;
     int is_yuv;
     float filter_strength;
@@ -187,9 +193,8 @@ struct gl_priv {
     int plane_count;
     struct texplane planes[3];
 
-    // RGB target (optional, see use_indirect and final_program)
-    GLuint indirect_fbo;
-    GLuint indirect_texture;
+    struct fbotex indirect_fbo;         // RGB target
+    struct fbotex scale_sep_fbo;        // first pass when doing 2 pass scaling
 
     // state for luma and chroma scalers
     struct scaler scalers[2];
@@ -207,8 +212,26 @@ struct gl_priv {
     struct vo_rect src_rect;    // displayed part of the source video
     struct vo_rect dst_rect;    // video rectangle on output window
     int border_x, border_y;     // OSD borders
+    int vp_x, vp_y, vp_w, vp_h; // GL viewport
 };
 
+
+static void texSize(struct vo *vo, int w, int h, int *texw, int *texh)
+{
+    struct gl_priv *p = vo->priv;
+
+    if (p->use_rectangle) {
+        *texw = w;
+        *texh = h;
+    } else {
+        *texw = 32;
+        while (*texw < w)
+            *texw *= 2;
+        *texh = 32;
+        while (*texh < h)
+            *texh *= 2;
+    }
+}
 
 static void matrix_ortho2d(float m[3][3], float x0, float x1,
                            float y0, float y1)
@@ -287,8 +310,8 @@ static void vertex_array_draw(GL *gl, struct vertex_array *va)
 // Write a textured quad to a vertex array.
 // va = destination vertex array, VERTICES_PER_QUAD entries will be overwritten
 // x0, y0, x1, y1 = destination coordinates of the quad
-// tx0, ty0, tx1, ty1 = source texture coordinates (in pixels)
-// texture_w, texture_h = size of the texture
+// tx0, ty0, tx1, ty1 = source texture coordinates (usually in pixels)
+// texture_w, texture_h = size of the texture, or an inverse factor
 // color = optional color for all vertices, NULL for opaque white
 // flip = flip vertically
 static void write_quad(struct vertex *va,
@@ -321,6 +344,52 @@ static void write_quad(struct vertex *va,
     va[4] = va[2];
     va[5] = va[1];
 #undef COLOR_INIT
+}
+
+static void fbotex_init(struct vo *vo, struct fbotex *fbo, int w, int h)
+{
+    struct gl_priv *p = vo->priv;
+    GL *gl = p->gl;
+
+    texSize(vo, w, h, &fbo->tex_w, &fbo->tex_h);
+
+    fbo->vp_w = w;
+    fbo->vp_h = h;
+
+    gl->GenFramebuffers(1, &fbo->fbo);
+    gl->GenTextures(1, &fbo->texture);
+    gl->BindTexture(GL_TEXTURE_2D, fbo->texture);
+    // We use a 16 bit format, because 8 bit is not really enough for
+    // storing linear RGB without loss.
+    glCreateClearTex(gl, GL_TEXTURE_2D, GL_RGBA16, GL_RGB, GL_UNSIGNED_BYTE,
+                     GL_LINEAR, fbo->tex_w, fbo->tex_h, 0);
+    gl->BindFramebuffer(GL_FRAMEBUFFER, fbo->fbo);
+    gl->FramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                             GL_TEXTURE_2D, fbo->texture, 0);
+
+    if (gl->CheckFramebufferStatus(GL_FRAMEBUFFER)
+        != GL_FRAMEBUFFER_COMPLETE)
+    {
+        mp_msg(MSGT_VO, MSGL_ERR, "[gl] Error: framebuffer completeness "
+                                    "check failed!\n");
+    }
+
+    gl->BindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    glCheckError(gl, "after creating framebuffer & associated texture");
+}
+
+static void fbotex_uninit(struct vo *vo, struct fbotex *fbo)
+{
+    struct gl_priv *p = vo->priv;
+    GL *gl = p->gl;
+
+    gl->DeleteFramebuffers(1, &fbo->fbo);
+    fbo->fbo = 0;
+    gl->DeleteTextures(1, &fbo->texture);
+    fbo->texture = 0;
+    fbo->tex_w = fbo->tex_h = 0;
+    fbo->vp_w = fbo->vp_h = 0;
 }
 
 static void scaler_texture(struct vo *vo, GLuint program, struct scaler *scaler)
@@ -445,23 +514,28 @@ static void update_all_uniforms(struct vo *vo)
 
     update_uniforms(vo, p->osd_program);
     update_uniforms(vo, p->eosd_program);
-    update_uniforms(vo, p->video_program);
+    update_uniforms(vo, p->indirect_program);
+    update_uniforms(vo, p->scale_sep_program);
     update_uniforms(vo, p->final_program);
 }
 
-static void reset_viewport(struct vo *vo)
+static void update_window_sized_objects(struct vo *vo)
 {
     struct gl_priv *p = vo->priv;
-    GL *gl = p->gl;
 
-    int left = 0, top = 0;
-    if (WinID >= 0) {
-        int w = vo->dwidth, h = vo->dheight;
-        int old_y = vo->dheight;
-        geometry(&left, &top, &w, &h, vo->dwidth, vo->dheight);
-        top = old_y - h - top;
+    if (p->scale_sep_program) {
+        if (p->dst_rect.height > p->scale_sep_fbo.tex_h) {
+            fbotex_uninit(vo, &p->scale_sep_fbo);
+            // Round up to an arbitrary alignment to make window resizing or
+            // panscan controls smoother (less texture reallocations).
+            int height = FFALIGN(p->dst_rect.height, 256);
+            int w, h;
+            texSize(vo, p->image_width, height, &w, &h);
+            fbotex_init(vo, &p->scale_sep_fbo, w, h);
+        }
+        p->scale_sep_fbo.vp_w = p->image_width;
+        p->scale_sep_fbo.vp_h = p->dst_rect.height;
     }
-    gl->Viewport(left, top, vo->dwidth, vo->dheight);
 }
 
 static void resize(struct vo *vo)
@@ -470,13 +544,23 @@ static void resize(struct vo *vo)
     GL *gl = p->gl;
 
     mp_msg(MSGT_VO, MSGL_V, "[gl] Resize: %dx%d\n", vo->dwidth, vo->dheight);
-    reset_viewport(vo);
+    p->vp_x = 0, p->vp_y = 0;
+    if (WinID >= 0) {
+        int w = vo->dwidth, h = vo->dheight;
+        int old_y = vo->dheight;
+        geometry(&p->vp_x, &p->vp_y, &w, &h, vo->dwidth, vo->dheight);
+        p->vp_y = old_y - h - p->vp_y;
+    }
+    p->vp_w = vo->dwidth, p->vp_h = vo->dheight;
+    gl->Viewport(p->vp_x, p->vp_y, p->vp_w, p->vp_h);
 
     struct vo_rect borders;
     calc_src_dst_rects(vo, p->image_width, p->image_height, &p->src_rect,
                        &p->dst_rect, &borders, NULL);
     p->border_x = borders.left;
     p->border_y = borders.top;
+
+    update_window_sized_objects(vo);
 
     update_all_uniforms(vo);
 
@@ -488,23 +572,6 @@ static void resize(struct vo *vo)
 
     gl->Clear(GL_COLOR_BUFFER_BIT);
     vo->want_redraw = true;
-}
-
-static void texSize(struct vo *vo, int w, int h, int *texw, int *texh)
-{
-    struct gl_priv *p = vo->priv;
-
-    if (p->use_rectangle) {
-        *texw = w;
-        *texh = h;
-    } else {
-        *texw = 32;
-        while (*texw < w)
-            *texw *= 2;
-        *texh = 32;
-        while (*texh < h)
-            *texh *= 2;
-    }
 }
 
 /**
@@ -646,19 +713,22 @@ static void draw_eosd(struct vo *vo, mp_eosd_images_t *imgs)
     gl->Disable(GL_BLEND);
 }
 
+static void delete_program(GL *gl, GLuint *prog)
+{
+    gl->DeleteProgram(*prog);
+    *prog = 0;
+}
+
 static void delete_shaders(struct vo *vo)
 {
     struct gl_priv *p = vo->priv;
     GL *gl = p->gl;
 
-    gl->DeleteProgram(p->osd_program);
-    p->osd_program = 0;
-    gl->DeleteProgram(p->eosd_program);
-    p->eosd_program = 0;
-    gl->DeleteProgram(p->video_program);
-    p->video_program = 0;
-    gl->DeleteProgram(p->final_program);
-    p->final_program = 0;
+    delete_program(gl, &p->osd_program);
+    delete_program(gl, &p->osd_program);
+    delete_program(gl, &p->indirect_program);
+    delete_program(gl, &p->scale_sep_program);
+    delete_program(gl, &p->final_program);
 }
 
 // Free video resources etc.
@@ -685,10 +755,8 @@ static void uninitVideo(struct vo *vo)
         plane->buffer_size = 0;
     }
 
-    gl->DeleteFramebuffers(1, &p->indirect_fbo);
-    p->indirect_fbo = 0;
-    gl->DeleteTextures(1, &p->indirect_texture);
-    p->indirect_texture = 0;
+    fbotex_uninit(vo, &p->indirect_fbo);
+    fbotex_uninit(vo, &p->scale_sep_fbo);
 }
 
 /**
@@ -703,7 +771,7 @@ static void uninitGL(struct vo *vo)
 
     vertex_array_uninit(gl, &p->va_osd);
     vertex_array_uninit(gl, &p->va_eosd);
-    vertex_array_uninit(gl, &p->va_video);
+    vertex_array_uninit(gl, &p->va_tmp);
 
     clearOSD(vo);
     gl->DeleteTextures(1, &p->eosd_texture);
@@ -826,15 +894,29 @@ static void shader_def_opt(char **shader, const char *name, bool b)
         shader_def(shader, name, "1");
 }
 
-static void shader_setup_scaler(char **shader, struct scaler *scaler)
+static void shader_setup_scaler(char **shader, struct scaler *scaler, int pass)
 {
     const char *target = scaler->id == 0 ? "SAMPLE_L" : "SAMPLE_C";
     if (!scaler->kernel) {
-        shader_def(shader, target, scaler->shader_fn);
+        *shader = talloc_asprintf_append(*shader, "#define %s sample_%s\n",
+                                         target, scaler->name);
     } else {
-        *shader = talloc_asprintf_append(*shader,
-            "#define %s(p0, p1) %s(%s, p0, p1)\n", target, scaler->shader_fn,
-            scaler->lut_name);
+        const struct convolution_filters *entry =
+            &convolution_filters[scaler->kernel->size];
+        if (pass != -1) {
+            // strictly needed for the first pass
+            if (pass == 0)
+                shader_def_opt(shader, "FIXED_SCALE", true);
+            // the direction/pass assignment is rather arbitrarily
+            const char *direction = pass == 0 ? "0, 1" : "1, 0";
+            *shader = talloc_asprintf_append(*shader,
+                "#define %s(p0, p1) %s(vec2(%s), %s, p0, p1)\n", target,
+                entry->shader_fn_sep, direction, scaler->lut_name);
+        } else {
+            *shader = talloc_asprintf_append(*shader,
+                "#define %s(p0, p1) %s(%s, p0, p1)\n", target, entry->shader_fn,
+                scaler->lut_name);
+        }
     }
 }
 
@@ -863,36 +945,49 @@ static void compile_shaders(struct vo *vo)
 
     char *header_conv = talloc_strdup(tmp, "");
     char *header_final = talloc_strdup(tmp, "");
+    char *header_sep = NULL;
 
     shader_def_opt(&header_conv, "USE_PLANAR", p->plane_count > 1);
     shader_def_opt(&header_conv, "USE_YGRAY", p->is_yuv && p->plane_count == 1);
     shader_def_opt(&header_conv, "USE_COLORMATRIX", p->is_yuv);
     shader_def_opt(&header_final, "USE_GAMMA_POW", p->use_gamma);
 
-    shader_setup_scaler(&header_final, &p->scalers[0]);
-    shader_setup_scaler(&header_conv, &p->scalers[1]);
+    if (p->use_indirect && p->use_scale_sep && p->scalers[0].kernel) {
+        header_sep = talloc_strdup(tmp, "");
+        shader_setup_scaler(&header_sep, &p->scalers[0], 0);
+        shader_setup_scaler(&header_final, &p->scalers[0], 1);
+    } else {
+        shader_setup_scaler(&header_final, &p->scalers[0], -1);
+    }
+
+    shader_setup_scaler(&header_conv, &p->scalers[1], -1);
 
     if (p->use_indirect && p->is_yuv) {
         // We don't use filtering for the Y-plane (luma), because it's never
         // scaled in this scenario.
         shader_def(&header_conv, "SAMPLE_L", "sample_bilinear");
         shader_def_opt(&header_conv, "USE_LINEAR_CONV", p->use_srgb);
+        shader_def_opt(&header_conv, "FIXED_SCALE", true);
         header_conv = talloc_asprintf(tmp, "%s%s", header, header_conv);
         header_final = talloc_asprintf(tmp, "%s%s", header, header_final);
-        p->video_program =
-            create_program(gl, "video", header_conv,
-                get_section(tmp, src, "vertex_noscale"),
-                get_section(tmp, src, "frag_video"));
-        p->final_program =
-            create_program(gl, "final", header_final, vertex_shader,
+        p->indirect_program =
+            create_program(gl, "indirect", header_conv, vertex_shader,
                 get_section(tmp, src, "frag_video"));
     } else {
-        header = talloc_asprintf(tmp, "%s%s%s", header, header_conv,
-                                 header_final);
-        p->video_program =
-            create_program(gl, "video", header, vertex_shader,
+        header_final = talloc_asprintf(tmp, "%s%s%s", header, header_conv,
+                                       header_final);
+    }
+
+    if (header_sep) {
+        header_sep = talloc_asprintf(tmp, "%s%s", header, header_sep);
+        p->scale_sep_program =
+            create_program(gl, "scale_sep", header_sep, vertex_shader,
                 get_section(tmp, src, "frag_video"));
     }
+
+    p->final_program =
+        create_program(gl, "final", header_final, vertex_shader,
+            get_section(tmp, src, "frag_video"));
 
     glCheckError(gl, "shader compilation");
 
@@ -924,7 +1019,7 @@ static int initGL(struct vo *vo)
 
     vertex_array_init(gl, &p->va_eosd);
     vertex_array_init(gl, &p->va_osd);
-    vertex_array_init(gl, &p->va_video);
+    vertex_array_init(gl, &p->va_tmp);
 
     GLint max_texture_size;
     gl->GetIntegerv(GL_MAX_TEXTURE_SIZE, &max_texture_size);
@@ -1027,28 +1122,8 @@ static void initVideo(struct vo *vo)
 
     glCheckError(gl, "after video texture creation");
 
-    if (p->final_program) {
-        gl->GenFramebuffers(1, &p->indirect_fbo);
-        gl->GenTextures(1, &p->indirect_texture);
-        gl->BindTexture(GL_TEXTURE_2D, p->indirect_texture);
-        // We use a 16 bit format, because 8 bit is not really enough for
-        // storing linear RGB without loss.
-        glCreateClearTex(gl, GL_TEXTURE_2D, GL_RGBA16, GL_RGB, GL_UNSIGNED_BYTE,
-                         GL_LINEAR, p->texture_width, p->texture_height, 0);
-        gl->BindFramebuffer(GL_FRAMEBUFFER, p->indirect_fbo);
-        gl->FramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                                 GL_TEXTURE_2D, p->indirect_texture, 0);
-        gl->BindFramebuffer(GL_FRAMEBUFFER, 0);
-
-        if (gl->CheckFramebufferStatus(GL_FRAMEBUFFER)
-            != GL_FRAMEBUFFER_COMPLETE)
-        {
-            mp_msg(MSGT_VO, MSGL_ERR, "[gl] Error: framebuffer completeness "
-                                      "check failed!\n");
-        }
-
-        glCheckError(gl, "after binding framebuffer for indirect scaling");
-    }
+    if (p->indirect_program)
+        fbotex_init(vo, &p->indirect_fbo, p->texture_width, p->texture_height);
 }
 
 
@@ -1211,6 +1286,44 @@ static void draw_osd(struct vo *vo, struct osd_state *osd)
     }
 }
 
+static void render_to_fbo(struct vo *vo, struct fbotex *fbo, int w, int h,
+                          int tex_w, int tex_h)
+{
+    struct gl_priv *p = vo->priv;
+    GL *gl = p->gl;
+
+    gl->Viewport(0, 0, fbo->vp_w, fbo->vp_h);
+    gl->BindFramebuffer(GL_FRAMEBUFFER, fbo->fbo);
+
+    struct vertex vb[VERTICES_PER_QUAD];
+    write_quad(vb, -1, -1, 1, 1,
+               0, 0, w, h,
+               tex_w, tex_h,
+               NULL, false);
+    vertex_array_upload(gl, &p->va_tmp, vb, VERTICES_PER_QUAD);
+    vertex_array_draw(gl, &p->va_tmp);
+
+    gl->BindFramebuffer(GL_FRAMEBUFFER, 0);
+    gl->Viewport(p->vp_x, p->vp_y, p->vp_w, p->vp_h);
+
+}
+
+static void handle_pass(struct vo *vo, struct fbotex **source,
+                        struct fbotex *fbo, GLuint program)
+{
+    struct gl_priv *p = vo->priv;
+    GL *gl = p->gl;
+
+    if (!program)
+        return;
+
+    gl->BindTexture(GL_TEXTURE_2D, (*source)->texture);
+    gl->UseProgram(program);
+    render_to_fbo(vo, fbo, (*source)->vp_w, (*source)->vp_h,
+                  (*source)->tex_w, (*source)->tex_h);
+    *source = fbo;
+}
+
 static void do_render(struct vo *vo)
 {
     struct gl_priv *p = vo->priv;
@@ -1218,30 +1331,24 @@ static void do_render(struct vo *vo)
     struct vertex vb[VERTICES_PER_QUAD * 2];
     bool is_flipped = p->mpi_flipped ^ p->vo_flipped;
 
-    if (p->final_program) {
-        gl->Viewport(0, 0, p->texture_width, p->texture_height);
+    // Order of processing:
+    //  [indirect -> [scale_sep ->]] final
 
-        gl->BindTexture(GL_TEXTURE_2D, p->planes[0].gl_texture);
-        gl->BindFramebuffer(GL_FRAMEBUFFER, p->indirect_fbo);
+    struct fbotex dummy = {
+        .vp_w = p->image_width, .vp_h = p->image_height,
+        .tex_w = p->texture_width, .tex_h = p->texture_height,
+        .texture = p->planes[0].gl_texture,
+    };
+    struct fbotex *source = &dummy;
 
-        write_quad(vb, -1, -1, 1, 1, 0, 0, 1, 1, 1, 1, NULL, false);
+    handle_pass(vo, &source, &p->indirect_fbo, p->indirect_program);
+    handle_pass(vo, &source, &p->scale_sep_fbo, p->scale_sep_program);
 
-        vertex_array_upload(gl, &p->va_video, vb, VERTICES_PER_QUAD);
-        gl->UseProgram(p->video_program);
-        vertex_array_draw(gl, &p->va_video);
-        gl->UseProgram(0);
+    gl->BindTexture(GL_TEXTURE_2D, source->texture);
+    gl->UseProgram(p->final_program);
 
-        gl->BindFramebuffer(GL_FRAMEBUFFER, 0);
-        reset_viewport(vo);
-    }
-
-    if (p->final_program) {
-        gl->BindTexture(GL_TEXTURE_2D, p->indirect_texture);
-        gl->UseProgram(p->final_program);
-    } else {
-        gl->BindTexture(GL_TEXTURE_2D, p->planes[0].gl_texture);
-        gl->UseProgram(p->video_program);
-    }
+    float final_texw = p->image_width * source->tex_w / (float)source->vp_w;
+    float final_texh = p->image_height * source->tex_h / (float)source->vp_h;
 
     if (p->use_srgb)
         gl->Enable(GL_FRAMEBUFFER_SRGB);
@@ -1254,19 +1361,19 @@ static void do_render(struct vo *vo)
                    p->dst_rect.right, p->dst_rect.bottom,
                    p->src_rect.left / 2, p->src_rect.top,
                    p->src_rect.left / 2 + w / 2, p->src_rect.bottom,
-                   p->texture_width, p->texture_height,
+                   final_texw, final_texh,
                    NULL, is_flipped);
         write_quad(vb + VERTICES_PER_QUAD,
                    p->dst_rect.left, p->dst_rect.top,
                    p->dst_rect.right, p->dst_rect.bottom,
                    p->src_rect.left / 2 + imgw / 2, p->src_rect.top,
                    p->src_rect.left / 2 + imgw / 2 + w / 2, p->src_rect.bottom,
-                   p->texture_width, p->texture_height,
+                   final_texw, final_texh,
                    NULL, is_flipped);
 
-        vertex_array_upload(gl, &p->va_video, vb, VERTICES_PER_QUAD * 2);
+        vertex_array_upload(gl, &p->va_tmp, vb, VERTICES_PER_QUAD * 2);
 
-        gl->BindVertexArray(p->va_video.vao);
+        gl->BindVertexArray(p->va_tmp.vao);
 
         glEnable3DLeft(gl, p->stereo_mode);
         gl->DrawArrays(GL_TRIANGLES, 0, VERTICES_PER_QUAD);
@@ -1281,17 +1388,19 @@ static void do_render(struct vo *vo)
                    p->dst_rect.right, p->dst_rect.bottom,
                    p->src_rect.left, p->src_rect.top,
                    p->src_rect.right, p->src_rect.bottom,
-                   p->texture_width, p->texture_height,
+                   final_texw, final_texh,
                    NULL, is_flipped);
 
-        vertex_array_upload(gl, &p->va_video, vb, VERTICES_PER_QUAD);
-        vertex_array_draw(gl, &p->va_video);
+        vertex_array_upload(gl, &p->va_tmp, vb, VERTICES_PER_QUAD);
+        vertex_array_draw(gl, &p->va_tmp);
     }
 
     if (p->use_srgb)
         gl->Disable(GL_FRAMEBUFFER_SRGB);
 
     gl->UseProgram(0);
+
+    glCheckError(gl, "after video rendering");
 }
 
 static void flip_page(struct vo *vo)
@@ -1512,9 +1621,6 @@ static bool handle_scaler_opt(struct vo *vo, struct scaler *scaler)
     if (!scaler->name || scaler->name[0] == '\0')
         scaler->name = talloc_strdup(vo, "bilinear");
 
-    talloc_free(scaler->shader_fn);
-    scaler->shader_fn = NULL;
-
     if (strcmp(scaler->name, "help") == 0) {
         mp_msg(MSGT_VO, MSGL_INFO, "Available scalers:\n");
         for (const char **e = fixed_scale_filters; *e; e++) {
@@ -1528,19 +1634,14 @@ static bool handle_scaler_opt(struct vo *vo, struct scaler *scaler)
 
     scaler->kernel = NULL;
     for (const char **filter = fixed_scale_filters; *filter; filter++) {
-        if (strcmp(*filter, scaler->name) == 0) {
-            scaler->shader_fn = talloc_asprintf(vo, "sample_%s", scaler->name);
-            break;
-        }
+        if (strcmp(*filter, scaler->name) == 0)
+            return true;
     }
-    if (scaler->shader_fn)
-        return true;
 
     scaler->kernel = mp_find_filter_kernel(scaler->name);
     if (can_use_filter_kernel(scaler->kernel)) {
         const struct convolution_filters *entry =
             &convolution_filters[scaler->kernel->size];
-        scaler->shader_fn = talloc_strdup(vo, entry->shader_fn);
         bool is_luma = scaler->id == 0;
         scaler->lut_name = entry->use_2d
                            ? (is_luma ? "lut_l_2d" : "lut_c_2d")
@@ -1593,6 +1694,7 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
         {"debug",        OPT_ARG_BOOL, &p->gl_debug,     NULL},
         {"force-gl2",    OPT_ARG_BOOL, &p->force_gl2,    NULL},
         {"indirect",     OPT_ARG_BOOL, &p->use_indirect, NULL},
+        {"scale-sep",    OPT_ARG_BOOL, &p->use_scale_sep, NULL},
         {NULL}
     };
 
@@ -1628,6 +1730,11 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
                "  There are more filters - print a list with lscale=help.\n"
                "  cscale=<n>\n"
                "    as lscale but for chroma (2x slower with little visible effect).\n"
+               "  scale-sep\n"
+               "    When using a separable scale filter for luma, do two filter\n"
+               "    passes. This is often faster. Note that chroma scalers will\n"
+               "    still be done as 1-pass filter.\n"
+               "    Forces the option 'indirect', and scaling will be done in RGB.\n"
                "  filter-strength=<value>\n"
                "    set the effect strength for the sharpen4/sharpen5 filters\n"
                "  mipmapgen\n"
@@ -1658,6 +1765,9 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
         p->use_indirect = 1;
         p->use_gamma = 1;
     }
+
+    if (p->use_scale_sep)
+        p->use_indirect = 1;
 
     p->scalers[0].name = talloc_strdup(vo, lscale);
     p->scalers[1].name = talloc_strdup(vo, cscale);
