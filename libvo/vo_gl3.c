@@ -725,7 +725,7 @@ static void delete_shaders(struct vo *vo)
     GL *gl = p->gl;
 
     delete_program(gl, &p->osd_program);
-    delete_program(gl, &p->osd_program);
+    delete_program(gl, &p->eosd_program);
     delete_program(gl, &p->indirect_program);
     delete_program(gl, &p->scale_sep_program);
     delete_program(gl, &p->final_program);
@@ -907,7 +907,7 @@ static void shader_setup_scaler(char **shader, struct scaler *scaler, int pass)
             // strictly needed for the first pass
             if (pass == 0)
                 shader_def_opt(shader, "FIXED_SCALE", true);
-            // the direction/pass assignment is rather arbitrarily
+            // the direction/pass assignment is rather arbitrary
             const char *direction = pass == 0 ? "0, 1" : "1, 0";
             *shader = talloc_asprintf_append(*shader,
                 "#define %s(p0, p1) %s(vec2(%s), %s, p0, p1)\n", target,
