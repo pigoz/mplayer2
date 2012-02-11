@@ -1652,8 +1652,12 @@ static bool handle_scaler_opt(struct vo *vo, struct scaler *scaler)
     return false;
 }
 
-static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
-                            enum MPGLType gltype)
+static int backend_valid(void *arg)
+{
+    return mpgl_find_backend(*(const char **)arg) >= 0;
+}
+
+static int preinit(struct vo *vo, const char *arg)
 {
     struct gl_priv *p = talloc_zero(vo, struct gl_priv);
     vo->priv = p;
@@ -1675,6 +1679,7 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
 
     char *lscale = NULL;
     char *cscale = NULL;
+    char *backend_arg = NULL;
 
     const opt_t subopts[] = {
         {"gamma",        OPT_ARG_BOOL, &p->use_gamma,    NULL},
@@ -1693,6 +1698,7 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
         {"force-gl2",    OPT_ARG_BOOL, &p->force_gl2,    NULL},
         {"indirect",     OPT_ARG_BOOL, &p->use_indirect, NULL},
         {"scale-sep",    OPT_ARG_BOOL, &p->use_scale_sep, NULL},
+        {"backend",      OPT_ARG_MSTRZ,&backend_arg,     backend_valid},
         {NULL}
     };
 
@@ -1755,6 +1761,11 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
                "  force-gl2\n"
                "    Create a legacy GL context. This will randomly malfunction\n"
                "    if the proper extensions are not supported.\n"
+               "  backend=<sys>\n"
+               "    auto: auto-select (default)\n"
+               "    cocoa: Cocoa/OSX\n"
+               "    win: Win32/WGL\n"
+               "    x11: X11/GLX\n"
                "\n");
         return -1;
     }
@@ -1767,6 +1778,9 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
     if (p->use_scale_sep)
         p->use_indirect = 1;
 
+    int backend = backend_arg ? mpgl_find_backend(backend_arg) : GLTYPE_AUTO;
+    free(backend_arg);
+
     p->scalers[0].name = talloc_strdup(vo, lscale);
     p->scalers[1].name = talloc_strdup(vo, cscale);
     free(lscale);
@@ -1777,7 +1791,7 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
     if (!handle_scaler_opt(vo, &p->scalers[1]))
         goto err_out;
 
-    p->glctx = init_mpglcontext(gltype, vo);
+    p->glctx = init_mpglcontext(backend, vo);
     if (!p->glctx)
         goto err_out;
     p->gl = p->glctx->gl;
@@ -1791,7 +1805,7 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
         // acceleration and so on. Destroy that window to make sure all state
         // associated with it is lost.
         uninit(vo);
-        p->glctx = init_mpglcontext(gltype, vo);
+        p->glctx = init_mpglcontext(backend, vo);
         if (!p->glctx)
             goto err_out;
         p->gl = p->glctx->gl;
@@ -1802,11 +1816,6 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
 err_out:
     uninit(vo);
     return -1;
-}
-
-static int preinit(struct vo *vo, const char *arg)
-{
-    return preinit_internal(vo, arg, 1, GLTYPE_AUTO);
 }
 
 static int control(struct vo *vo, uint32_t request, void *data)
