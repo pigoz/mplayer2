@@ -529,9 +529,7 @@ static void update_window_sized_objects(struct vo *vo)
             // Round up to an arbitrary alignment to make window resizing or
             // panscan controls smoother (less texture reallocations).
             int height = FFALIGN(p->dst_rect.height, 256);
-            int w, h;
-            texSize(vo, p->image_width, height, &w, &h);
-            fbotex_init(vo, &p->scale_sep_fbo, w, h);
+            fbotex_init(vo, &p->scale_sep_fbo, p->image_width, height);
         }
         p->scale_sep_fbo.vp_w = p->image_width;
         p->scale_sep_fbo.vp_h = p->dst_rect.height;
