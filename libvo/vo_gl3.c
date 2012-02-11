@@ -181,6 +181,7 @@ struct gl_priv {
     int use_pbo;
     int use_glFinish;
     int swap_interval;
+    GLint fbo_format;
 
     // per pixel (full pixel when packed, each component when planar)
     int plane_bytes;
@@ -359,9 +360,7 @@ static void fbotex_init(struct vo *vo, struct fbotex *fbo, int w, int h)
     gl->GenFramebuffers(1, &fbo->fbo);
     gl->GenTextures(1, &fbo->texture);
     gl->BindTexture(GL_TEXTURE_2D, fbo->texture);
-    // We use a 16 bit format, because 8 bit is not really enough for
-    // storing linear RGB without loss.
-    glCreateClearTex(gl, GL_TEXTURE_2D, GL_RGBA16, GL_RGB, GL_UNSIGNED_BYTE,
+    glCreateClearTex(gl, GL_TEXTURE_2D, p->fbo_format, GL_RGB, GL_UNSIGNED_BYTE,
                      GL_LINEAR, fbo->tex_w, fbo->tex_h, 0);
     gl->BindFramebuffer(GL_FRAMEBUFFER, fbo->fbo);
     gl->FramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
@@ -1657,6 +1656,35 @@ static int backend_valid(void *arg)
     return mpgl_find_backend(*(const char **)arg) >= 0;
 }
 
+struct fbo_format {
+    const char *name;
+    GLint format;
+};
+
+const struct fbo_format fbo_formats[] = {
+    {"rgb",    GL_RGB},
+    {"rgba",   GL_RGBA},
+    {"rgb8",   GL_RGB8},
+    {"rgb16",  GL_RGB16},
+    {"rgb16f", GL_RGB16F},
+    {"rgb32f", GL_RGB32F},
+    {0}
+};
+
+static GLint find_fbo_format(const char *name)
+{
+    for (const struct fbo_format *fmt = fbo_formats; fmt->name; fmt++) {
+        if (strcmp(fmt->name, name) == 0)
+            return fmt->format;
+    }
+    return -1;
+}
+
+static int fbo_format_valid(void *arg)
+{
+    return find_fbo_format(*(const char **)arg) >= 0;
+}
+
 static int preinit(struct vo *vo, const char *arg)
 {
     struct gl_priv *p = talloc_zero(vo, struct gl_priv);
@@ -1669,6 +1697,7 @@ static int preinit(struct vo *vo, const char *arg)
         .use_pbo = 1,
         .swap_interval = 1,
         .osd_color = 0xffffff,
+        .fbo_format = GL_RGB16,
         .scalers = {
             { .id = 0, .texunit = 5 },
             { .id = 1, .texunit = 6 },
@@ -1680,6 +1709,7 @@ static int preinit(struct vo *vo, const char *arg)
     char *lscale = NULL;
     char *cscale = NULL;
     char *backend_arg = NULL;
+    char *fbo_format = NULL;
 
     const opt_t subopts[] = {
         {"gamma",        OPT_ARG_BOOL, &p->use_gamma,    NULL},
@@ -1698,6 +1728,7 @@ static int preinit(struct vo *vo, const char *arg)
         {"force-gl2",    OPT_ARG_BOOL, &p->force_gl2,    NULL},
         {"indirect",     OPT_ARG_BOOL, &p->use_indirect, NULL},
         {"scale-sep",    OPT_ARG_BOOL, &p->use_scale_sep, NULL},
+        {"fbo-format",   OPT_ARG_MSTRZ,&fbo_format,      fbo_format_valid},
         {"backend",      OPT_ARG_MSTRZ,&backend_arg,     backend_valid},
         {NULL}
     };
@@ -1758,6 +1789,10 @@ static int preinit(struct vo *vo, const char *arg)
                "    is used only on YUV conversion, and only if the video uses\n"
                "    chroma-subsampling.\n"
                "    This mechanism is disabled on RGB input.\n"
+               "  fbo-format=<fmt>\n"
+               "    fmt: one of: rgb, rgba, rgb8, rgb16, rgb16f, rgb32f\n"
+               "    Selects the internal format of any FBO textures used.\n"
+               "    Default is rgb16.\n"
                "  force-gl2\n"
                "    Create a legacy GL context. This will randomly malfunction\n"
                "    if the proper extensions are not supported.\n"
@@ -1780,6 +1815,9 @@ static int preinit(struct vo *vo, const char *arg)
 
     int backend = backend_arg ? mpgl_find_backend(backend_arg) : GLTYPE_AUTO;
     free(backend_arg);
+
+    p->fbo_format = fbo_format ? find_fbo_format(fbo_format) : GL_RGBA16;
+    free(fbo_format);
 
     p->scalers[0].name = talloc_strdup(vo, lscale);
     p->scalers[1].name = talloc_strdup(vo, cscale);
