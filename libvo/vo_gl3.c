@@ -1027,16 +1027,6 @@ static int initGL(struct vo *vo)
     if (gl->SwapInterval && p->swap_interval >= 0)
         gl->SwapInterval(p->swap_interval);
 
-    if (p->use_srgb) {
-        GLboolean b = 0;
-        gl->GetBooleanv(GL_FRAMEBUFFER_SRGB_CAPABLE_EXT, &b);
-        if (!b) {
-            mp_msg(MSGT_VO, MSGL_ERR, "[gl]no sRGB framebuffer! Disabling any "
-                                      "sRGB use.\n");
-            p->use_srgb = 0;
-        }
-    }
-
     glCheckError(gl, "after initGL");
 
     return 1;
