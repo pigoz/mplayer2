@@ -1027,6 +1027,7 @@ static int initGL(struct vo *vo)
     if (gl->SwapInterval && p->swap_interval >= 0)
         gl->SwapInterval(p->swap_interval);
 
+#ifndef __APPLE__
     if (p->use_srgb) {
         GLboolean b = 0;
         gl->GetBooleanv(GL_FRAMEBUFFER_SRGB_CAPABLE_EXT, &b);
@@ -1036,6 +1037,7 @@ static int initGL(struct vo *vo)
             p->use_srgb = 0;
         }
     }
+#endif
 
     glCheckError(gl, "after initGL");
 
