@@ -181,6 +181,7 @@ struct gl_priv {
     int use_pbo;
     int use_glFinish;
     int swap_interval;
+    GLint fbo_format;
 
     // per pixel (full pixel when packed, each component when planar)
     int plane_bytes;
@@ -359,9 +360,7 @@ static void fbotex_init(struct vo *vo, struct fbotex *fbo, int w, int h)
     gl->GenFramebuffers(1, &fbo->fbo);
     gl->GenTextures(1, &fbo->texture);
     gl->BindTexture(GL_TEXTURE_2D, fbo->texture);
-    // We use a 16 bit format, because 8 bit is not really enough for
-    // storing linear RGB without loss.
-    glCreateClearTex(gl, GL_TEXTURE_2D, GL_RGBA16, GL_RGB, GL_UNSIGNED_BYTE,
+    glCreateClearTex(gl, GL_TEXTURE_2D, p->fbo_format, GL_RGB, GL_UNSIGNED_BYTE,
                      GL_LINEAR, fbo->tex_w, fbo->tex_h, 0);
     gl->BindFramebuffer(GL_FRAMEBUFFER, fbo->fbo);
     gl->FramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
@@ -529,9 +528,7 @@ static void update_window_sized_objects(struct vo *vo)
             // Round up to an arbitrary alignment to make window resizing or
             // panscan controls smoother (less texture reallocations).
             int height = FFALIGN(p->dst_rect.height, 256);
-            int w, h;
-            texSize(vo, p->image_width, height, &w, &h);
-            fbotex_init(vo, &p->scale_sep_fbo, w, h);
+            fbotex_init(vo, &p->scale_sep_fbo, p->image_width, height);
         }
         p->scale_sep_fbo.vp_w = p->image_width;
         p->scale_sep_fbo.vp_h = p->dst_rect.height;
@@ -725,7 +722,7 @@ static void delete_shaders(struct vo *vo)
     GL *gl = p->gl;
 
     delete_program(gl, &p->osd_program);
-    delete_program(gl, &p->osd_program);
+    delete_program(gl, &p->eosd_program);
     delete_program(gl, &p->indirect_program);
     delete_program(gl, &p->scale_sep_program);
     delete_program(gl, &p->final_program);
@@ -907,7 +904,7 @@ static void shader_setup_scaler(char **shader, struct scaler *scaler, int pass)
             // strictly needed for the first pass
             if (pass == 0)
                 shader_def_opt(shader, "FIXED_SCALE", true);
-            // the direction/pass assignment is rather arbitrarily
+            // the direction/pass assignment is rather arbitrary
             const char *direction = pass == 0 ? "0, 1" : "1, 0";
             *shader = talloc_asprintf_append(*shader,
                 "#define %s(p0, p1) %s(vec2(%s), %s, p0, p1)\n", target,
@@ -1135,7 +1132,7 @@ static int create_window(struct vo *vo, uint32_t d_width, uint32_t d_height,
     if (p->stereo_mode == GL_3D_QUADBUFFER)
         flags |= VOFLAG_STEREO;
 
-    int mpgl_version = p->force_gl2 ? MPGL_VER(2, 1) : MPGL_VER(3, 0);
+    int mpgl_version = p->force_gl2 ? MPGL_VER(2, 1) : MPGL_VER(3, 2);
     int mpgl_flags = 0;
     if (p->gl_debug)
         mpgl_flags |= MPGLFLAG_DEBUG;
@@ -1654,8 +1651,41 @@ static bool handle_scaler_opt(struct vo *vo, struct scaler *scaler)
     return false;
 }
 
-static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
-                            enum MPGLType gltype)
+static int backend_valid(void *arg)
+{
+    return mpgl_find_backend(*(const char **)arg) >= 0;
+}
+
+struct fbo_format {
+    const char *name;
+    GLint format;
+};
+
+const struct fbo_format fbo_formats[] = {
+    {"rgb",    GL_RGB},
+    {"rgba",   GL_RGBA},
+    {"rgb8",   GL_RGB8},
+    {"rgb16",  GL_RGB16},
+    {"rgb16f", GL_RGB16F},
+    {"rgb32f", GL_RGB32F},
+    {0}
+};
+
+static GLint find_fbo_format(const char *name)
+{
+    for (const struct fbo_format *fmt = fbo_formats; fmt->name; fmt++) {
+        if (strcmp(fmt->name, name) == 0)
+            return fmt->format;
+    }
+    return -1;
+}
+
+static int fbo_format_valid(void *arg)
+{
+    return find_fbo_format(*(const char **)arg) >= 0;
+}
+
+static int preinit(struct vo *vo, const char *arg)
 {
     struct gl_priv *p = talloc_zero(vo, struct gl_priv);
     vo->priv = p;
@@ -1667,6 +1697,7 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
         .use_pbo = 1,
         .swap_interval = 1,
         .osd_color = 0xffffff,
+        .fbo_format = GL_RGB16,
         .scalers = {
             { .id = 0, .texunit = 5 },
             { .id = 1, .texunit = 6 },
@@ -1677,6 +1708,8 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
 
     char *lscale = NULL;
     char *cscale = NULL;
+    char *backend_arg = NULL;
+    char *fbo_format = NULL;
 
     const opt_t subopts[] = {
         {"gamma",        OPT_ARG_BOOL, &p->use_gamma,    NULL},
@@ -1695,6 +1728,8 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
         {"force-gl2",    OPT_ARG_BOOL, &p->force_gl2,    NULL},
         {"indirect",     OPT_ARG_BOOL, &p->use_indirect, NULL},
         {"scale-sep",    OPT_ARG_BOOL, &p->use_scale_sep, NULL},
+        {"fbo-format",   OPT_ARG_MSTRZ,&fbo_format,      fbo_format_valid},
+        {"backend",      OPT_ARG_MSTRZ,&backend_arg,     backend_valid},
         {NULL}
     };
 
@@ -1754,9 +1789,18 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
                "    is used only on YUV conversion, and only if the video uses\n"
                "    chroma-subsampling.\n"
                "    This mechanism is disabled on RGB input.\n"
+               "  fbo-format=<fmt>\n"
+               "    fmt: one of: rgb, rgba, rgb8, rgb16, rgb16f, rgb32f\n"
+               "    Selects the internal format of any FBO textures used.\n"
+               "    Default is rgb16.\n"
                "  force-gl2\n"
                "    Create a legacy GL context. This will randomly malfunction\n"
                "    if the proper extensions are not supported.\n"
+               "  backend=<sys>\n"
+               "    auto: auto-select (default)\n"
+               "    cocoa: Cocoa/OSX\n"
+               "    win: Win32/WGL\n"
+               "    x11: X11/GLX\n"
                "\n");
         return -1;
     }
@@ -1769,6 +1813,12 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
     if (p->use_scale_sep)
         p->use_indirect = 1;
 
+    int backend = backend_arg ? mpgl_find_backend(backend_arg) : GLTYPE_AUTO;
+    free(backend_arg);
+
+    p->fbo_format = fbo_format ? find_fbo_format(fbo_format) : GL_RGBA16;
+    free(fbo_format);
+
     p->scalers[0].name = talloc_strdup(vo, lscale);
     p->scalers[1].name = talloc_strdup(vo, cscale);
     free(lscale);
@@ -1779,7 +1829,7 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
     if (!handle_scaler_opt(vo, &p->scalers[1]))
         goto err_out;
 
-    p->glctx = init_mpglcontext(gltype, vo);
+    p->glctx = init_mpglcontext(backend, vo);
     if (!p->glctx)
         goto err_out;
     p->gl = p->glctx->gl;
@@ -1793,7 +1843,7 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
         // acceleration and so on. Destroy that window to make sure all state
         // associated with it is lost.
         uninit(vo);
-        p->glctx = init_mpglcontext(gltype, vo);
+        p->glctx = init_mpglcontext(backend, vo);
         if (!p->glctx)
             goto err_out;
         p->gl = p->glctx->gl;
@@ -1804,11 +1854,6 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
 err_out:
     uninit(vo);
     return -1;
-}
-
-static int preinit(struct vo *vo, const char *arg)
-{
-    return preinit_internal(vo, arg, 1, GLTYPE_AUTO);
 }
 
 static int control(struct vo *vo, uint32_t request, void *data)
