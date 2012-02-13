@@ -313,7 +313,7 @@ void create_menu()
 
 bool is_lion_or_better(void)
 {
-    SInt32 major, minor, bugfix;
+    SInt32 major, minor;
     Gestalt(gestaltSystemVersionMajor, &major);
     Gestalt(gestaltSystemVersionMinor, &minor);
     if(major >= 10 && minor >= 7)
