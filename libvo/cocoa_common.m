@@ -1,7 +1,7 @@
 #import <Cocoa/Cocoa.h>
 #import <OpenGL/OpenGL.h>
 #import <QuartzCore/QuartzCore.h>
-#import <CoreServices/CoreServices.h> // for CGDisplayHideCursor
+#import <CoreServices/CoreServices.h> // for CGDisplayHideCursor and Gestalt
 #include "cocoa_common.h"
 
 #include "options.h"
@@ -77,6 +77,8 @@ struct vo_cocoa_state *vo_cocoa_init_state(void);
 void update_screen_info(void);
 void resize_window(struct vo *vo);
 void create_menu(void);
+
+bool is_lion_or_better(void);
 
 struct vo_cocoa_state *vo_cocoa_init_state(void)
 {
@@ -168,14 +170,18 @@ int vo_cocoa_create_window(struct vo *vo, uint32_t d_width,
 
         GLMPlayerOpenGLView *glView = [[GLMPlayerOpenGLView alloc] initWithFrame:NSMakeRect(0, 0, 100, 100)];
 
-        NSOpenGLPixelFormatAttribute attrs[] = {
-            NSOpenGLPFAOpenGLProfile, (gl3profile ? NSOpenGLProfileVersion3_2Core : NSOpenGLProfileVersionLegacy),
-            NSOpenGLPFADoubleBuffer, // double buffered
-            NSOpenGLPFADepthSize, (NSOpenGLPixelFormatAttribute)16, // 16 bit depth buffer
-            (NSOpenGLPixelFormatAttribute)0
-        };
+        int i = 0;
+        NSOpenGLPixelFormatAttribute attr[32];
+        if (is_lion_or_better()) {
+          attr[i++] = NSOpenGLPFAOpenGLProfile;
+          attr[i++] = (gl3profile ? NSOpenGLProfileVersion3_2Core : NSOpenGLProfileVersionLegacy);
+        }
+        attr[i++] = NSOpenGLPFADoubleBuffer; // double buffered
+        attr[i++] = NSOpenGLPFADepthSize;
+        attr[i++] = (NSOpenGLPixelFormatAttribute)16; // 16 bit depth buffer
+        attr[i] = (NSOpenGLPixelFormatAttribute)0;
 
-        NSOpenGLPixelFormat *pixelFormat = [[NSOpenGLPixelFormat alloc] initWithAttributes:attrs];
+        NSOpenGLPixelFormat *pixelFormat = [[NSOpenGLPixelFormat alloc] initWithAttributes:attr];
         s->glContext = [[NSOpenGLContext alloc] initWithFormat:pixelFormat shareContext:nil];
 
         create_menu();
@@ -303,6 +309,17 @@ void create_menu()
 
     [menu release];
     [menuItem release];
+}
+
+bool is_lion_or_better(void)
+{
+    SInt32 major, minor;
+    Gestalt(gestaltSystemVersionMajor, &major);
+    Gestalt(gestaltSystemVersionMinor, &minor);
+    if(major >= 10 && minor >= 7)
+      return YES;
+    else
+      return NO;
 }
 
 @implementation GLMPlayerWindow
