@@ -117,6 +117,7 @@ static int write_png(screenshot_ctx *ctx, struct mp_image *image)
 error_exit:
     if (avctx)
         avcodec_close(avctx);
+    av_free(avctx);
     if (fp)
         fclose(fp);
     av_destruct_packet(&outbuffer);
