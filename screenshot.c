@@ -65,7 +65,7 @@ static int write_png(screenshot_ctx *ctx, struct mp_image *image)
 {
     char *fname = ctx->fname;
     FILE *fp = NULL;
-    void *outbuffer = NULL;
+    AVPacket outbuffer = {0};
     int success = 0;
 
     struct AVCodec *png_codec = avcodec_find_encoder(CODEC_ID_PNG);
@@ -89,30 +89,25 @@ static int write_png(screenshot_ctx *ctx, struct mp_image *image)
         goto error_exit;
     }
 
-    size_t outbuffer_size = image->width * image->height * 3 * 2;
-    outbuffer = malloc(outbuffer_size);
-    if (!outbuffer)
-        goto error_exit;
-
     AVFrame pic;
     avcodec_get_frame_defaults(&pic);
     for (int n = 0; n < 4; n++) {
         pic.data[n] = image->planes[n];
         pic.linesize[n] = image->stride[n];
     }
-    int size = avcodec_encode_video(avctx, outbuffer, outbuffer_size, &pic);
-    if (size < 1)
+    int gotpacket;
+    int err = avcodec_encode_video2(avctx, &outbuffer, &pic, &gotpacket);
+    if (err != 0 || !gotpacket)
         goto error_exit;
 
     fp = fopen(fname, "wb");
     if (fp == NULL) {
-        avcodec_close(avctx);
         mp_msg(MSGT_CPLAYER, MSGL_ERR, "\nPNG Error opening %s for writing!\n",
                fname);
         goto error_exit;
     }
 
-    fwrite(outbuffer, size, 1, fp);
+    fwrite(outbuffer.data, outbuffer.size, 1, fp);
     fflush(fp);
 
     if (ferror(fp))
@@ -124,7 +119,7 @@ error_exit:
         avcodec_close(avctx);
     if (fp)
         fclose(fp);
-    free(outbuffer);
+    av_destruct_packet(&outbuffer);
     return success;
 }
 
