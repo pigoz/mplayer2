@@ -172,7 +172,7 @@ struct gl_priv {
     struct mp_csp_details colorspace;
     int is_yuv;
     float filter_strength;
-    int use_rectangle;
+    int use_npot;
     uint32_t image_width;
     uint32_t image_height;
     uint32_t image_format;
@@ -221,7 +221,7 @@ static void texSize(struct vo *vo, int w, int h, int *texw, int *texh)
 {
     struct gl_priv *p = vo->priv;
 
-    if (p->use_rectangle) {
+    if (p->use_npot) {
         *texw = w;
         *texh = h;
     } else {
@@ -1683,7 +1683,7 @@ static int preinit(struct vo *vo, const char *arg)
     *p = (struct gl_priv) {
         .colorspace = MP_CSP_DETAILS_DEFAULTS,
         .filter_strength = 0.5,
-        .use_rectangle = 1,
+        .use_npot = 1,
         .use_pbo = 1,
         .swap_interval = 1,
         .osd_color = 0xffffff,
@@ -1704,7 +1704,7 @@ static int preinit(struct vo *vo, const char *arg)
     const opt_t subopts[] = {
         {"gamma",        OPT_ARG_BOOL, &p->use_gamma,    NULL},
         {"srgb",         OPT_ARG_BOOL, &p->use_srgb,     NULL},
-        {"rectangle",    OPT_ARG_INT,  &p->use_rectangle,int_non_neg},
+        {"npot",         OPT_ARG_BOOL, &p->use_npot,     NULL},
         {"filter-strength", OPT_ARG_FLOAT, &p->filter_strength, NULL},
         {"pbo",          OPT_ARG_BOOL, &p->use_pbo,      NULL},
         {"glfinish",     OPT_ARG_BOOL, &p->use_glFinish, NULL},
@@ -1769,9 +1769,8 @@ static int preinit(struct vo *vo, const char *arg)
                "    1 is equivalent to enable VSYNC, 0 to disable VSYNC.\n"
                "  no-pbo\n"
                "    Disable use of PBOs. (Stability and performance issues.)\n"
-               "  rectangle=<0,1,2>\n"
-               "    0: use power-of-two textures\n"
-               "    1 and 2: use texture_non_power_of_two\n"
+               "  no-npot\n"
+               "    Force use of power-of-2 texture sizes.\n"
                "  glfinish\n"
                "    Call glFinish() before swapping buffers\n"
                "  backend=<sys>\n"
