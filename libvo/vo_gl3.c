@@ -170,7 +170,7 @@ struct gl_priv {
     int use_srgb;
     int use_scale_sep;
     struct mp_csp_details colorspace;
-    int is_yuv;
+    bool is_yuv;
     float filter_strength;
     int use_npot;
     uint32_t image_width;
@@ -216,6 +216,100 @@ struct gl_priv {
     int vp_x, vp_y, vp_w, vp_h; // GL viewport
 };
 
+struct fmt_entry {
+    int mp_format;
+    GLint internal_format;
+    GLenum format;
+    GLenum type;
+};
+
+static const struct fmt_entry mp_to_gl_formats[] = {
+    {IMGFMT_RGB48NE, GL_RGB16, GL_RGB,  GL_UNSIGNED_SHORT},
+    {IMGFMT_RGB24,   GL_RGB,   GL_RGB,  GL_UNSIGNED_BYTE},
+    {IMGFMT_RGBA,    GL_RGBA,  GL_RGBA, GL_UNSIGNED_BYTE},
+    {IMGFMT_RGB15,   GL_RGBA,  GL_RGBA, GL_UNSIGNED_SHORT_1_5_5_5_REV},
+    {IMGFMT_RGB16,   GL_RGB,   GL_RGB,  GL_UNSIGNED_SHORT_5_6_5_REV},
+    {IMGFMT_BGR15,   GL_RGBA,  GL_BGRA, GL_UNSIGNED_SHORT_1_5_5_5_REV},
+    {IMGFMT_BGR16,   GL_RGB,   GL_RGB,  GL_UNSIGNED_SHORT_5_6_5},
+    {IMGFMT_BGR24,   GL_RGB,   GL_BGR,  GL_UNSIGNED_BYTE},
+    {IMGFMT_BGRA,    GL_RGBA,  GL_BGRA, GL_UNSIGNED_BYTE},
+    {0},
+};
+
+// Return the high byte of the value that represents white in chroma (U/V)
+static int get_chroma_clear_val(int bit_depth)
+{
+    return 1 << (bit_depth - 1 & 7);
+}
+
+static bool init_format(int fmt, struct gl_priv *init)
+{
+    bool supported = false;
+    struct gl_priv dummy;
+    if (!init)
+        init = &dummy;
+
+    mp_image_t dummy_img = {0};
+    mp_image_setfmt(&dummy_img, fmt);
+
+    init->image_format = fmt;
+
+    // RGB/packed formats
+    for (const struct fmt_entry *e = mp_to_gl_formats; e->mp_format; e++) {
+        if (e->mp_format == fmt) {
+            supported = true;
+            init->plane_bits = dummy_img.bpp;
+            init->gl_format = e->format;
+            init->gl_internal_format = e->internal_format;
+            init->gl_type = e->type;
+            break;
+        }
+    }
+
+    // YUV/planar formats
+    if (!supported && mp_get_chroma_shift(fmt, NULL, NULL, &init->plane_bits)) {
+        init->gl_format = GL_RED;
+        if (init->plane_bits == 8) {
+            supported = true;
+            init->gl_internal_format = GL_RED;
+            init->gl_type = GL_UNSIGNED_BYTE;
+        } else if (IMGFMT_IS_YUVP16_NE(fmt)) {
+            supported = true;
+            init->gl_internal_format = GL_R16;
+            init->gl_type = GL_UNSIGNED_SHORT;
+        }
+    }
+
+    if (!supported)
+        return false;
+
+    init->plane_bytes = (init->plane_bits + 7) / 8;
+    init->is_yuv = dummy_img.flags & MP_IMGFLAG_YUV;
+
+    // NOTE: we throw away the additional alpha plane, if one exists.
+    init->plane_count = dummy_img.num_planes > 2 ? 3 : 1;
+    assert(dummy_img.num_planes >= init->plane_count);
+    assert(dummy_img.num_planes <= init->plane_count + 1);
+
+    for (int n = 0; n < init->plane_count; n++) {
+        struct texplane *plane = &init->planes[n];
+
+        plane->is_chroma = n > 0;
+        plane->shift_x = n > 0 ? dummy_img.chroma_x_shift : 0;
+        plane->shift_y = n > 0 ? dummy_img.chroma_y_shift : 0;
+        plane->clear_val = n > 0 ? get_chroma_clear_val(init->plane_bits) : 0;
+    }
+
+    return true;
+}
+
+static void default_tex_params(struct GL *gl, GLenum target, GLint filter)
+{
+    gl->TexParameteri(target, GL_TEXTURE_MIN_FILTER, filter);
+    gl->TexParameteri(target, GL_TEXTURE_MAG_FILTER, filter);
+    gl->TexParameteri(target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    gl->TexParameteri(target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+}
 
 static void texSize(struct vo *vo, int w, int h, int *texw, int *texh)
 {
@@ -360,8 +454,9 @@ static void fbotex_init(struct vo *vo, struct fbotex *fbo, int w, int h)
     gl->GenFramebuffers(1, &fbo->fbo);
     gl->GenTextures(1, &fbo->texture);
     gl->BindTexture(GL_TEXTURE_2D, fbo->texture);
-    glCreateClearTex(gl, GL_TEXTURE_2D, p->fbo_format, GL_RGB, GL_UNSIGNED_BYTE,
-                     GL_LINEAR, fbo->tex_w, fbo->tex_h, 0);
+    gl->TexImage2D(GL_TEXTURE_2D, 0, p->fbo_format, fbo->tex_w, fbo->tex_h, 0,
+                   GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    default_tex_params(gl, GL_TEXTURE_2D, GL_LINEAR);
     gl->BindFramebuffer(GL_FRAMEBUFFER, fbo->fbo);
     gl->FramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
                              GL_TEXTURE_2D, fbo->texture, 0);
@@ -611,10 +706,10 @@ static void genEOSD(struct vo *vo, mp_eosd_images_t *imgs)
     if (need_allocate) {
         texSize(vo, p->eosd->surface.w, p->eosd->surface.h,
                 &p->eosd_texture_width, &p->eosd_texture_height);
-        // xxx it doesn't need to be cleared, that's a waste of time
-        glCreateClearTex(gl, GL_TEXTURE_2D, GL_RED, GL_RED,
-                         GL_UNSIGNED_BYTE, GL_NEAREST,
-                         p->eosd_texture_width, p->eosd_texture_height, 0);
+        gl->TexImage2D(GL_TEXTURE_2D, 0, GL_RED,
+                       p->eosd_texture_width, p->eosd_texture_height, 0,
+                       GL_RED, GL_UNSIGNED_BYTE, NULL);
+        default_tex_params(gl, GL_TEXTURE_2D, GL_NEAREST);
         gl->BindBuffer(GL_PIXEL_UNPACK_BUFFER, p->eosd_buffer);
         gl->BufferData(GL_PIXEL_UNPACK_BUFFER,
                        p->eosd->surface.w * p->eosd->surface.h,
@@ -775,12 +870,6 @@ static void uninitGL(struct vo *vo)
     gl->DeleteBuffers(1, &p->eosd_buffer);
     eosd_packer_reinit(p->eosd, 0, 0);
     p->eosd_texture = 0;
-}
-
-// Return the high byte of the value that represents white in chroma (U/V)
-static int get_chroma_clear_val(int bit_depth)
-{
-    return 1 << (bit_depth - 1 & 7);
 }
 
 #define SECTION_HEADER "#!section "
@@ -1037,42 +1126,10 @@ static void initVideo(struct vo *vo)
     struct gl_priv *p = vo->priv;
     GL *gl = p->gl;
 
-    int xs, ys, depth;
-    p->is_yuv = mp_get_chroma_shift(p->image_format, &xs, &ys, &depth) > 0;
-    glFindFormat(p->image_format, true, NULL, &p->gl_internal_format,
-                 &p->gl_format, &p->gl_type);
-
-    // fix for legacy crap from gl_common.c
-    if (p->gl_internal_format == 1) p->gl_internal_format = GL_RED;
-    if (p->gl_internal_format == 2) p->gl_internal_format = GL_RG;
-    if (p->gl_internal_format == 3) p->gl_internal_format = GL_RGB;
-    if (p->gl_internal_format == 4) p->gl_internal_format = GL_RGBA;
-    if (p->gl_format == GL_LUMINANCE)
-        p->gl_format = GL_RED;
+    init_format(p->image_format, p);
 
     if (!p->is_yuv && p->use_srgb)
         p->gl_internal_format = GL_SRGB;
-
-    if (!p->is_yuv) {
-        // xxx mp_image_setfmt calculates this as well
-        depth = glFmt2bpp(p->gl_format, p->gl_type) * 8;
-    }
-
-    p->plane_bits = depth;
-    p->plane_bytes = (depth + 7) / 8;
-
-    p->plane_count = p->is_yuv ? 3 : 1;
-    if (p->image_format == IMGFMT_Y800)
-        p->plane_count = 1;
-
-    for (int n = 0; n < p->plane_count; n++) {
-        struct texplane *plane = &p->planes[n];
-
-        plane->is_chroma = n > 0;
-        plane->shift_x = n > 0 ? xs : 0;
-        plane->shift_y = n > 0 ? ys : 0;
-        plane->clear_val = n > 0 ? get_chroma_clear_val(p->plane_bits) : 0;
-    }
 
     int eq_caps = 0;
     if (p->is_yuv)
@@ -1088,7 +1145,12 @@ static void initVideo(struct vo *vo)
     texSize(vo, p->image_width, p->image_height,
             &p->texture_width, &p->texture_height);
 
-    int scale_type = p->mipmap_gen ? GL_LINEAR_MIPMAP_NEAREST : GL_LINEAR;
+    void *tmp = NULL;
+    if (!p->use_npot)
+        tmp = malloc(p->texture_width * p->texture_height * p->plane_bytes);
+
+    gl->PixelStorei(GL_UNPACK_ALIGNMENT, 4);
+    gl->PixelStorei(GL_UNPACK_ROW_LENGTH, 0);
 
     for (int n = 0; n < p->plane_count; n++) {
         struct texplane *plane = &p->planes[n];
@@ -1102,10 +1164,18 @@ static void initVideo(struct vo *vo)
         gl->GenTextures(1, &plane->gl_texture);
         gl->BindTexture(GL_TEXTURE_2D, plane->gl_texture);
 
-        glCreateClearTex(gl, GL_TEXTURE_2D, p->gl_internal_format, p->gl_format,
-                         p->gl_type, scale_type, w, h, plane->clear_val);
+        if (tmp)
+            memset(tmp, plane->clear_val, w * h * p->plane_bytes);
+        gl->TexImage2D(GL_TEXTURE_2D, 0, p->gl_internal_format, w, h, 0,
+                       p->gl_format, p->gl_type, tmp);
+        default_tex_params(gl, GL_TEXTURE_2D, GL_LINEAR);
+        if (p->mipmap_gen)
+            gl->TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+                              GL_LINEAR_MIPMAP_NEAREST);
     }
     gl->ActiveTexture(GL_TEXTURE0);
+
+    free(tmp);
 
     glCheckError(gl, "after video texture creation");
 
@@ -1194,7 +1264,6 @@ static void create_osd_texture(void *ctx, int x0, int y0, int w, int h,
 
     // initialize to 8 to avoid special-casing on alignment
     int sx = 8, sy = 8;
-    GLint scale_type = GL_NEAREST;
 
     if (w <= 0 || h <= 0 || stride < w) {
         mp_msg(MSGT_VO, MSGL_V, "Invalid dimensions OSD for part!\n");
@@ -1209,8 +1278,9 @@ static void create_osd_texture(void *ctx, int x0, int y0, int w, int h,
 
     gl->GenTextures(1, &p->osdtex[p->osdtexCnt]);
     gl->BindTexture(GL_TEXTURE_2D, p->osdtex[p->osdtexCnt]);
-    glCreateClearTex(gl, GL_TEXTURE_2D, GL_RG, GL_RG, GL_UNSIGNED_BYTE,
-                     scale_type, sx, sy, 0);
+    gl->TexImage2D(GL_TEXTURE_2D, 0, GL_RG, sx, sy, 0, GL_RG, GL_UNSIGNED_BYTE,
+                   NULL);
+    default_tex_params(gl, GL_TEXTURE_2D, GL_NEAREST);
     {
         int i;
         unsigned char *tmp = malloc(stride * h * 2);
@@ -1430,7 +1500,10 @@ static uint32_t get_image(struct vo *vo, mp_image_t *mpi)
     if (!p->use_pbo)
         return VO_FALSE;
 
-    assert(mpi->num_planes >= p->plane_count);
+    // We don't support alpha planes. (Disabling PBOs with normal draw calls is
+    // an undesired, but harmless side-effect.)
+    if (mpi->num_planes != p->plane_count)
+        return VO_FALSE;
 
     if (mpi->flags & MP_IMGFLAG_READABLE)
         return VO_FALSE;
@@ -1527,15 +1600,13 @@ static mp_image_t *get_screenshot(struct vo *vo)
 
     mp_image_t *image = alloc_mpi(p->texture_width, p->texture_height,
                                   p->image_format);
-    assert(image->num_planes >= p->plane_count);
-    // Account for alpha plane.
+
     // NOTE about image formats with alpha plane: we don't even have the alpha
     // anymore. We never upload it to any texture, as it would be a waste of
     // time. On the other hand, we can't find a "similar", non-alpha image
     // format easily. So we just leave the alpha plane of the newly allocated
     // image as-is, and hope that the alpha is ignored by the receiver of the
     // screenshot. (If not, code should be added to make it fully opaque.)
-    assert(image->num_planes <= p->plane_count + 1);
 
     for (int n = 0; n < p->plane_count; n++) {
         gl->ActiveTexture(GL_TEXTURE0 + n);
@@ -1576,19 +1647,12 @@ static mp_image_t *get_window_screenshot(struct vo *vo)
 
 static int query_format(struct vo *vo, uint32_t format)
 {
-    int depth;
     int caps = VFCAP_CSP_SUPPORTED | VFCAP_CSP_SUPPORTED_BY_HW | VFCAP_FLIP |
                VFCAP_HWSCALE_UP | VFCAP_HWSCALE_DOWN | VFCAP_ACCEPT_STRIDE |
                VFCAP_OSD | VFCAP_EOSD | VFCAP_EOSD_UNSCALED;
-    if (mp_get_chroma_shift(format, NULL, NULL, &depth) &&
-        (IMGFMT_IS_YUVP16_NE(format) || !IMGFMT_IS_YUVP16(format)))
-        return caps;
-    // xxx glFindFormat reports this as supported
-    if (format == IMGFMT_UYVY || format == IMGFMT_YVYU)
+    if (!init_format(format, NULL))
         return 0;
-    if (glFindFormat(format, true, NULL, NULL, NULL, NULL))
-        return caps;
-    return 0;
+    return caps;
 }
 
 static void uninit(struct vo *vo)
