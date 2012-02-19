@@ -742,7 +742,9 @@ static void genEOSD(struct vo *vo, mp_eosd_images_t *imgs)
                 memcpy_pic(pdata, i->bitmap, i->w, i->h,
                            p->eosd->surface.w, i->stride);
             }
-            gl->UnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
+            if (!gl->UnmapBuffer(GL_PIXEL_UNPACK_BUFFER))
+                mp_msg(MSGT_VO, MSGL_FATAL, "[gl] EOSD PBO upload failed. "
+                       "Remove the 'pbo' suboption.\n");
             struct eosd_rect rc;
             eosd_packer_calculate_source_bb(p->eosd, &rc);
             glUploadTex(gl, GL_TEXTURE_2D, GL_RED, GL_UNSIGNED_BYTE, NULL,
@@ -1567,7 +1569,9 @@ static uint32_t draw_image(struct vo *vo, mp_image_t *mpi)
         void *plane_ptr = mpi->planes[n];
         if (mpi->flags & MP_IMGFLAG_DIRECT) {
             gl->BindBuffer(GL_PIXEL_UNPACK_BUFFER, plane->gl_buffer);
-            gl->UnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
+            if (!gl->UnmapBuffer(GL_PIXEL_UNPACK_BUFFER))
+                mp_msg(MSGT_VO, MSGL_FATAL, "[gl] Video PBO upload failed. "
+                       "Remove the 'pbo' suboption.\n");
             plane->buffer_ptr = NULL;
             plane_ptr = NULL; // PBO offset 0
         }
@@ -1746,7 +1750,7 @@ static int preinit(struct vo *vo, const char *arg)
         .colorspace = MP_CSP_DETAILS_DEFAULTS,
         .filter_strength = 0.5,
         .use_npot = 1,
-        .use_pbo = 1,
+        .use_pbo = 0,
         .swap_interval = 1,
         .osd_color = 0xffffff,
         .fbo_format = GL_RGB16,
@@ -1823,12 +1827,13 @@ static int preinit(struct vo *vo, const char *arg)
                "    NOTE: for BT.709 colorspaces, a gamma of 2.35 is assumed. For\n"
                "    other YUV colorspaces, 2.2 is assumed. RGB input is always\n"
                "    assumed to be in sRGB.\n"
+               "  pbo\n"
+               "    Enable use of PBOs. This is faster, but can sometimes lead to\n"
+               "    sparodic and temporary image corruption.\n"
                "Less useful options:\n"
                "  swapinterval=<n>\n"
                "    Interval in displayed frames between to buffer swaps.\n"
                "    1 is equivalent to enable VSYNC, 0 to disable VSYNC.\n"
-               "  no-pbo\n"
-               "    Disable use of PBOs. (Stability and performance issues.)\n"
                "  no-npot\n"
                "    Force use of power-of-2 texture sizes.\n"
                "  glfinish\n"
