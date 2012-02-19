@@ -168,9 +168,11 @@ const struct vo_driver *video_out_drivers[] =
 #ifdef CONFIG_XV
         &video_out_xv,
 #endif
-#ifdef CONFIG_X11
 #ifdef CONFIG_GL
         &video_out_gl3,
+#endif
+#ifdef CONFIG_X11
+#ifdef CONFIG_GL
         &video_out_gl_nosw,
 #endif
         &video_out_x11,
