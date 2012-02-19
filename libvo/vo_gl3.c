@@ -1131,11 +1131,9 @@ static void initVideo(struct vo *vo)
     if (!p->is_yuv && p->use_srgb)
         p->gl_internal_format = GL_SRGB;
 
-    int eq_caps = 0;
+    int eq_caps = MP_CSP_EQ_CAPS_GAMMA;
     if (p->is_yuv)
         eq_caps |= MP_CSP_EQ_CAPS_COLORMATRIX;
-    if (p->use_gamma)
-        eq_caps |= MP_CSP_EQ_CAPS_GAMMA;
     p->video_eq.capabilities = eq_caps;
 
     compile_shaders(vo);
@@ -1818,8 +1816,6 @@ static int preinit(struct vo *vo, const char *arg)
                "    1: side-by-side to red-cyan stereo\n"
                "    2: side-by-side to green-magenta stereo\n"
                "    3: side-by-side to quadbuffer stereo\n"
-               "  gamma\n"
-               "    Enable gamma control.\n"
                "  srgb\n"
                "    Enable gamma-correct scaling by working in linear light. This\n"
                "    makes use of sRGB textures and framebuffers.\n"
@@ -1856,6 +1852,8 @@ static int preinit(struct vo *vo, const char *arg)
                "    Selects the internal format of any FBO textures used.\n"
                "    fmt can be one of: rgb, rgba, rgb8, rgb16, rgb16f, rgb32f\n"
                "    Default: rgb16.\n"
+               "  gamma\n"
+               "    Always enable gamma control. (Disables delayed enabling.)\n"
                "  force-gl2\n"
                "    Create a legacy GL context. This will randomly malfunction\n"
                "    if the proper extensions are not supported.\n"
@@ -1972,6 +1970,11 @@ static int control(struct vo *vo, uint32_t request, void *data)
         struct voctrl_set_equalizer_args *args = data;
         if (mp_csp_equalizer_set(&p->video_eq, args->name, args->value) < 0)
             return VO_NOTIMPL;
+        if (!p->use_gamma && p->video_eq.values[MP_CSP_EQ_GAMMA] != 0) {
+            mp_msg(MSGT_VO, MSGL_V, "[gl] Auto-enabling gamma.\n");
+            p->use_gamma = true;
+            compile_shaders(vo);
+        }
         update_all_uniforms(vo);
         vo->want_redraw = true;
         return VO_TRUE;
