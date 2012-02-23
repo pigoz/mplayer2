@@ -149,6 +149,7 @@ struct fbotex {
 };
 
 struct gl_priv {
+    struct vo *vo;
     MPGLContext *glctx;
     GL *gl;
 
@@ -318,10 +319,8 @@ static void default_tex_params(struct GL *gl, GLenum target, GLint filter)
     gl->TexParameteri(target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 }
 
-static void texSize(struct vo *vo, int w, int h, int *texw, int *texh)
+static void texSize(struct gl_priv *p, int w, int h, int *texw, int *texh)
 {
-    struct gl_priv *p = vo->priv;
-
     if (p->use_npot) {
         *texw = w;
         *texh = h;
@@ -447,15 +446,14 @@ static void write_quad(struct vertex *va,
 #undef COLOR_INIT
 }
 
-static void fbotex_init(struct vo *vo, struct fbotex *fbo, int w, int h)
+static void fbotex_init(struct gl_priv *p, struct fbotex *fbo, int w, int h)
 {
-    struct gl_priv *p = vo->priv;
     GL *gl = p->gl;
 
     assert(!fbo->fbo);
     assert(!fbo->texture);
 
-    texSize(vo, w, h, &fbo->tex_w, &fbo->tex_h);
+    texSize(p, w, h, &fbo->tex_w, &fbo->tex_h);
 
     fbo->vp_w = w;
     fbo->vp_h = h;
@@ -484,9 +482,8 @@ static void fbotex_init(struct vo *vo, struct fbotex *fbo, int w, int h)
     glCheckError(gl, "after creating framebuffer & associated texture");
 }
 
-static void fbotex_uninit(struct vo *vo, struct fbotex *fbo)
+static void fbotex_uninit(struct gl_priv *p, struct fbotex *fbo)
 {
-    struct gl_priv *p = vo->priv;
     GL *gl = p->gl;
 
     gl->DeleteFramebuffers(1, &fbo->fbo);
@@ -497,9 +494,8 @@ static void fbotex_uninit(struct vo *vo, struct fbotex *fbo)
     fbo->vp_w = fbo->vp_h = 0;
 }
 
-static void update_uniforms(struct vo *vo, GLuint program)
+static void update_uniforms(struct gl_priv *p, GLuint program)
 {
-    struct gl_priv *p = vo->priv;
     GL *gl = p->gl;
     GLint loc;
 
@@ -517,7 +513,7 @@ static void update_uniforms(struct vo *vo, GLuint program)
     loc = gl->GetUniformLocation(program, "transform");
     if (loc >= 0) {
         float matrix[3][3];
-        matrix_ortho2d(matrix, 0, vo->dwidth, vo->dheight, 0);
+        matrix_ortho2d(matrix, 0, p->vp_w, p->vp_h, 0);
         gl->UniformMatrix3fv(loc, 1, GL_FALSE, &matrix[0][0]);
     }
 
@@ -569,41 +565,35 @@ static void update_uniforms(struct vo *vo, GLuint program)
     glCheckError(gl, "update_uniforms()");
 }
 
-static void update_all_uniforms(struct vo *vo)
+static void update_all_uniforms(struct gl_priv *p)
 {
-    struct gl_priv *p = vo->priv;
-
-    update_uniforms(vo, p->osd_program);
-    update_uniforms(vo, p->eosd_program);
-    update_uniforms(vo, p->indirect_program);
-    update_uniforms(vo, p->scale_sep_program);
-    update_uniforms(vo, p->final_program);
+    update_uniforms(p, p->osd_program);
+    update_uniforms(p, p->eosd_program);
+    update_uniforms(p, p->indirect_program);
+    update_uniforms(p, p->scale_sep_program);
+    update_uniforms(p, p->final_program);
 }
 
-static void update_window_sized_objects(struct vo *vo)
+static void update_window_sized_objects(struct gl_priv *p)
 {
-    struct gl_priv *p = vo->priv;
-
     if (p->scale_sep_program) {
         if (p->dst_rect.height > p->scale_sep_fbo.tex_h) {
-            fbotex_uninit(vo, &p->scale_sep_fbo);
+            fbotex_uninit(p, &p->scale_sep_fbo);
             // Round up to an arbitrary alignment to make window resizing or
             // panscan controls smoother (less texture reallocations).
             int height = FFALIGN(p->dst_rect.height, 256);
-            fbotex_init(vo, &p->scale_sep_fbo, p->image_width, height);
+            fbotex_init(p, &p->scale_sep_fbo, p->image_width, height);
         }
         p->scale_sep_fbo.vp_w = p->image_width;
         p->scale_sep_fbo.vp_h = p->dst_rect.height;
     }
 }
 
-static void initScalers(struct vo *vo);
-static void init_scaler(struct vo *vo, struct scaler *scaler);
+static void initScalers(struct gl_priv *p);
+static void init_scaler(struct gl_priv *p, struct scaler *scaler);
 
-static double get_scale_factor(struct vo *vo)
+static double get_scale_factor(struct gl_priv *p)
 {
-    struct gl_priv *p = vo->priv;
-
     double sx = p->dst_rect.width / (double)p->src_rect.width;
     double sy = p->dst_rect.height / (double)p->src_rect.height;
     // xxx: actually we should use different scalers in X/Y directions if the
@@ -611,20 +601,18 @@ static double get_scale_factor(struct vo *vo)
     return FFMIN(sx, sy);
 }
 
-static bool update_scale_factor(struct vo *vo, struct filter_kernel *kernel)
+static bool update_scale_factor(struct gl_priv *p, struct filter_kernel *kernel)
 {
-    struct gl_priv *p = vo->priv;
-
-    double scale = get_scale_factor(vo);
+    double scale = get_scale_factor(p);
     if (!p->use_fancy_downscaling && scale < 1.0)
         scale = 1.0;
     return mp_init_filter(kernel, filter_sizes, FFMAX(1.0, 1.0/scale));
 }
 
-static void resize(struct vo *vo)
+static void resize(struct gl_priv *p)
 {
-    struct gl_priv *p = vo->priv;
     GL *gl = p->gl;
+    struct vo *vo = p->vo;
 
     mp_msg(MSGT_VO, MSGL_V, "[gl] Resize: %dx%d\n", vo->dwidth, vo->dheight);
     p->vp_x = 0, p->vp_y = 0;
@@ -650,24 +638,24 @@ static void resize(struct vo *vo)
         if (p->scalers[n].kernel) {
             struct filter_kernel tkernel = *p->scalers[n].kernel;
             struct filter_kernel old = tkernel;
-            bool ok = update_scale_factor(vo, &tkernel);
+            bool ok = update_scale_factor(p, &tkernel);
             too_small |= !ok;
             need_scaler_reinit |= (tkernel.size != old.size);
             need_scaler_update |= (tkernel.inv_scale != old.inv_scale);
         }
     }
     if (need_scaler_reinit) {
-        initScalers(vo);
+        initScalers(p);
     } else if (need_scaler_update) {
-        init_scaler(vo, &p->scalers[0]);
-        init_scaler(vo, &p->scalers[1]);
+        init_scaler(p, &p->scalers[0]);
+        init_scaler(p, &p->scalers[1]);
     }
     if (too_small)
         mp_msg(MSGT_VO, MSGL_WARN, "[gl] Can't downscale that much, window "
                "output may look suboptimal.\n");
 
-    update_window_sized_objects(vo);
-    update_all_uniforms(vo);
+    update_window_sized_objects(p);
+    update_all_uniforms(p);
 
 #ifdef CONFIG_FREETYPE
     // adjust font size to display size
@@ -682,9 +670,8 @@ static void resize(struct vo *vo)
 /**
  * \brief remove all OSD textures and display-lists, thus clearing it.
  */
-static void clearOSD(struct vo *vo)
+static void clearOSD(struct gl_priv *p)
 {
-    struct gl_priv *p = vo->priv;
     GL *gl = p->gl;
 
     if (!p->osdtexCnt)
@@ -697,9 +684,8 @@ static void clearOSD(struct vo *vo)
  * \brief construct display list from ass image list
  * \param img image list to create OSD from.
  */
-static void genEOSD(struct vo *vo, mp_eosd_images_t *imgs)
+static void genEOSD(struct gl_priv *p, mp_eosd_images_t *imgs)
 {
-    struct gl_priv *p = vo->priv;
     GL *gl = p->gl;
 
     bool need_repos, need_upload, need_allocate;
@@ -717,7 +703,7 @@ static void genEOSD(struct vo *vo, mp_eosd_images_t *imgs)
     gl->BindTexture(GL_TEXTURE_2D, p->eosd_texture);
 
     if (need_allocate) {
-        texSize(vo, p->eosd->surface.w, p->eosd->surface.h,
+        texSize(p, p->eosd->surface.w, p->eosd->surface.h,
                 &p->eosd_texture_width, &p->eosd_texture_height);
         gl->TexImage2D(GL_TEXTURE_2D, 0, GL_RED,
                        p->eosd_texture_width, p->eosd_texture_height, 0,
@@ -800,12 +786,11 @@ static void genEOSD(struct vo *vo, mp_eosd_images_t *imgs)
                         p->eosd->targets_count * VERTICES_PER_QUAD);
 }
 
-static void draw_eosd(struct vo *vo, mp_eosd_images_t *imgs)
+static void draw_eosd(struct gl_priv *p, mp_eosd_images_t *imgs)
 {
-    struct gl_priv *p = vo->priv;
     GL *gl = p->gl;
 
-    genEOSD(vo, imgs);
+    genEOSD(p, imgs);
 
     if (p->eosd->targets_count == 0)
         return;
@@ -826,9 +811,8 @@ static void delete_program(GL *gl, GLuint *prog)
     *prog = 0;
 }
 
-static void delete_shaders(struct vo *vo)
+static void delete_shaders(struct gl_priv *p)
 {
-    struct gl_priv *p = vo->priv;
     GL *gl = p->gl;
 
     delete_program(gl, &p->osd_program);
@@ -838,12 +822,11 @@ static void delete_shaders(struct vo *vo)
     delete_program(gl, &p->final_program);
 }
 
-static void uninitScalers(struct vo *vo)
+static void uninitScalers(struct gl_priv *p)
 {
-    struct gl_priv *p = vo->priv;
     GL *gl = p->gl;
 
-    delete_shaders(vo);
+    delete_shaders(p);
 
     for (int n = 0; n < 2; n++) {
         gl->DeleteTextures(1, &p->scalers->gl_lut);
@@ -853,12 +836,11 @@ static void uninitScalers(struct vo *vo)
 }
 
 // Free video resources etc.
-static void uninitVideo(struct vo *vo)
+static void uninitVideo(struct gl_priv *p)
 {
-    struct gl_priv *p = vo->priv;
     GL *gl = p->gl;
 
-    uninitScalers(vo);
+    uninitScalers(p);
 
     for (int n = 0; n < 3; n++) {
         struct texplane *plane = &p->planes[n];
@@ -871,25 +853,28 @@ static void uninitVideo(struct vo *vo)
         plane->buffer_size = 0;
     }
 
-    fbotex_uninit(vo, &p->indirect_fbo);
-    fbotex_uninit(vo, &p->scale_sep_fbo);
+    fbotex_uninit(p, &p->indirect_fbo);
+    fbotex_uninit(p, &p->scale_sep_fbo);
 }
 
 /**
  * \brief uninitialize OpenGL context, freeing textures, buffers etc.
  */
-static void uninitGL(struct vo *vo)
+static void uninitGL(struct gl_priv *p)
 {
-    struct gl_priv *p = vo->priv;
     GL *gl = p->gl;
 
-    uninitVideo(vo);
+    // NOTE: GL functions might not be loaded yet
+    if (!(p->glctx && p->gl->DeleteTextures))
+        return;
+
+    uninitVideo(p);
 
     vertex_array_uninit(gl, &p->va_osd);
     vertex_array_uninit(gl, &p->va_eosd);
     vertex_array_uninit(gl, &p->va_tmp);
 
-    clearOSD(vo);
+    clearOSD(p);
     gl->DeleteTextures(1, &p->eosd_texture);
     gl->DeleteBuffers(1, &p->eosd_buffer);
     eosd_packer_reinit(p->eosd, 0, 0);
@@ -1030,12 +1015,11 @@ static void shader_setup_scaler(char **shader, struct scaler *scaler, int pass)
     }
 }
 
-static void compile_shaders(struct vo *vo)
+static void compile_shaders(struct gl_priv *p)
 {
-    struct gl_priv *p = vo->priv;
     GL *gl = p->gl;
 
-    delete_shaders(vo);
+    delete_shaders(p);
 
     void *tmp = talloc_new(NULL);
     struct bstr src = { (char*)vo_gl3_shaders, sizeof(vo_gl3_shaders) };
@@ -1109,9 +1093,8 @@ static void compile_shaders(struct vo *vo)
 
 
 // First-time initialization of the GL state.
-static int initGL(struct vo *vo)
+static int initGL(struct gl_priv *p)
 {
-    struct gl_priv *p = vo->priv;
     GL *gl = p->gl;
 
     glCheckError(p->gl, "before initGL");
@@ -1148,15 +1131,14 @@ static int initGL(struct vo *vo)
     return 1;
 }
 
-static void init_scaler(struct vo *vo, struct scaler *scaler)
+static void init_scaler(struct gl_priv *p, struct scaler *scaler)
 {
-    struct gl_priv *p = vo->priv;
     GL *gl = p->gl;
 
     if (!scaler->kernel)
         return;
 
-    update_scale_factor(vo, scaler->kernel);
+    update_scale_factor(p, scaler->kernel);
 
     int size = scaler->kernel->size;
     assert(size < FF_ARRAY_ELEMS(convolution_filters));
@@ -1201,28 +1183,26 @@ static void init_scaler(struct vo *vo, struct scaler *scaler)
     glCheckError(gl, "after initializing scaler");
 }
 
-static void initScalers(struct vo *vo)
+static void initScalers(struct gl_priv *p)
 {
-    struct gl_priv *p = vo->priv;
     GL *gl = p->gl;
 
     mp_msg(MSGT_VO, MSGL_V, "[gl] Reinit scalers.\n");
 
     glCheckError(gl, "before scaler initialization");
 
-    uninitScalers(vo);
+    uninitScalers(p);
 
-    init_scaler(vo, &p->scalers[0]);
-    init_scaler(vo, &p->scalers[1]);
-    compile_shaders(vo);
+    init_scaler(p, &p->scalers[0]);
+    init_scaler(p, &p->scalers[1]);
+    compile_shaders(p);
 
     if (p->indirect_program && !p->indirect_fbo.fbo)
-        fbotex_init(vo, &p->indirect_fbo, p->texture_width, p->texture_height);
+        fbotex_init(p, &p->indirect_fbo, p->texture_width, p->texture_height);
 }
 
-static void initVideo(struct vo *vo)
+static void initVideo(struct gl_priv *p)
 {
-    struct gl_priv *p = vo->priv;
     GL *gl = p->gl;
 
     init_format(p->image_format, p);
@@ -1237,7 +1217,7 @@ static void initVideo(struct vo *vo)
 
     glCheckError(gl, "before video texture creation");
 
-    texSize(vo, p->image_width, p->image_height,
+    texSize(p, p->image_width, p->image_height,
             &p->texture_width, &p->texture_height);
 
     void *tmp = NULL;
@@ -1274,15 +1254,13 @@ static void initVideo(struct vo *vo)
 
     glCheckError(gl, "after video texture creation");
 
-    initScalers(vo);
+    initScalers(p);
 }
 
 
-static int create_window(struct vo *vo, uint32_t d_width, uint32_t d_height,
+static int create_window(struct gl_priv *p, uint32_t d_width, uint32_t d_height,
                          uint32_t flags)
 {
-    struct gl_priv *p = vo->priv;
-
     if (p->stereo_mode == GL_3D_QUADBUFFER)
         flags |= VOFLAG_STEREO;
 
@@ -1301,11 +1279,11 @@ static int config(struct vo *vo, uint32_t width, uint32_t height,
 {
     struct gl_priv *p = vo->priv;
 
-    if (create_window(vo, d_width, d_height, flags) == SET_WINDOW_FAILED)
+    if (create_window(p, d_width, d_height, flags) == SET_WINDOW_FAILED)
         return -1;
 
     if (!vo->config_count)
-        initGL(vo);
+        initGL(p);
 
     p->image_d_width = d_width;
     p->image_d_height = d_height;
@@ -1314,14 +1292,14 @@ static int config(struct vo *vo, uint32_t width, uint32_t height,
     if (p->image_format != format || p->image_width != width
         || p->image_height != height)
     {
-        uninitVideo(vo);
+        uninitVideo(p);
         p->image_height = height;
         p->image_width = width;
         p->image_format = format;
-        initVideo(vo);
+        initVideo(p);
     }
 
-    resize(vo);
+    resize(p);
 
     return 0;
 }
@@ -1332,13 +1310,13 @@ static void check_events(struct vo *vo)
 
     int e = p->glctx->check_events(vo);
     if (e & VO_EVENT_REINIT) {
-        uninitGL(vo);
-        initGL(vo);
-        initVideo(vo);
-        resize(vo);
+        uninitGL(p);
+        initGL(p);
+        initVideo(p);
+        resize(p);
     }
     if (e & VO_EVENT_RESIZE)
-        resize(vo);
+        resize(p);
     if (e & VO_EVENT_EXPOSE)
         vo->want_redraw = true;
 }
@@ -1352,8 +1330,7 @@ static void create_osd_texture(void *ctx, int x0, int y0, int w, int h,
                                unsigned char *src, unsigned char *srca,
                                int stride)
 {
-    struct vo *vo = ctx;
-    struct gl_priv *p = vo->priv;
+    struct gl_priv *p = ctx;
     GL *gl = p->gl;
 
     // initialize to 8 to avoid special-casing on alignment
@@ -1363,7 +1340,7 @@ static void create_osd_texture(void *ctx, int x0, int y0, int w, int h,
         mp_msg(MSGT_VO, MSGL_V, "Invalid dimensions OSD for part!\n");
         return;
     }
-    texSize(vo, w, h, &sx, &sy);
+    texSize(p, w, h, &sx, &sy);
 
     if (p->osdtexCnt >= MAX_OSD_PARTS) {
         mp_msg(MSGT_VO, MSGL_ERR, "Too many OSD parts, contact the developers!\n");
@@ -1406,11 +1383,11 @@ static void draw_osd(struct vo *vo, struct osd_state *osd)
     GL *gl = p->gl;
 
     if (vo_osd_changed(0)) {
-        clearOSD(vo);
+        clearOSD(p);
         osd_draw_text_ext(osd, vo->dwidth, vo->dheight, p->border_x,
                           p->border_y, p->border_x,
                           p->border_y, p->image_width,
-                          p->image_height, create_osd_texture, vo);
+                          p->image_height, create_osd_texture, p);
         vertex_array_upload(gl, &p->va_osd, &p->osd_va[0],
                             p->osdtexCnt * VERTICES_PER_QUAD);
     }
@@ -1437,10 +1414,9 @@ static void draw_osd(struct vo *vo, struct osd_state *osd)
     }
 }
 
-static void render_to_fbo(struct vo *vo, struct fbotex *fbo, int w, int h,
+static void render_to_fbo(struct gl_priv *p, struct fbotex *fbo, int w, int h,
                           int tex_w, int tex_h)
 {
-    struct gl_priv *p = vo->priv;
     GL *gl = p->gl;
 
     gl->Viewport(0, 0, fbo->vp_w, fbo->vp_h);
@@ -1459,10 +1435,9 @@ static void render_to_fbo(struct vo *vo, struct fbotex *fbo, int w, int h,
 
 }
 
-static void handle_pass(struct vo *vo, struct fbotex **source,
+static void handle_pass(struct gl_priv *p, struct fbotex **source,
                         struct fbotex *fbo, GLuint program)
 {
-    struct gl_priv *p = vo->priv;
     GL *gl = p->gl;
 
     if (!program)
@@ -1470,14 +1445,13 @@ static void handle_pass(struct vo *vo, struct fbotex **source,
 
     gl->BindTexture(GL_TEXTURE_2D, (*source)->texture);
     gl->UseProgram(program);
-    render_to_fbo(vo, fbo, (*source)->vp_w, (*source)->vp_h,
+    render_to_fbo(p, fbo, (*source)->vp_w, (*source)->vp_h,
                   (*source)->tex_w, (*source)->tex_h);
     *source = fbo;
 }
 
-static void do_render(struct vo *vo)
+static void do_render(struct gl_priv *p)
 {
-    struct gl_priv *p = vo->priv;
     GL *gl = p->gl;
     struct vertex vb[VERTICES_PER_QUAD * 2];
     bool is_flipped = p->mpi_flipped ^ p->vo_flipped;
@@ -1492,8 +1466,8 @@ static void do_render(struct vo *vo)
     };
     struct fbotex *source = &dummy;
 
-    handle_pass(vo, &source, &p->indirect_fbo, p->indirect_program);
-    handle_pass(vo, &source, &p->scale_sep_fbo, p->scale_sep_program);
+    handle_pass(p, &source, &p->indirect_fbo, p->indirect_program);
+    handle_pass(p, &source, &p->scale_sep_fbo, p->scale_sep_program);
 
     gl->BindTexture(GL_TEXTURE_2D, source->texture);
     gl->UseProgram(p->final_program);
@@ -1627,9 +1601,8 @@ static uint32_t get_image(struct vo *vo, mp_image_t *mpi)
     return VO_TRUE;
 }
 
-static uint32_t draw_image(struct vo *vo, mp_image_t *mpi)
+static uint32_t draw_image(struct gl_priv *p, mp_image_t *mpi)
 {
-    struct gl_priv *p = vo->priv;
     GL *gl = p->gl;
     int n;
 
@@ -1645,7 +1618,7 @@ static uint32_t draw_image(struct vo *vo, mp_image_t *mpi)
     mpi2.height = mpi2.h;
     if (!(mpi->flags & MP_IMGFLAG_DIRECT)
         && !p->planes[0].buffer_ptr
-        && get_image(vo, &mpi2) == VO_TRUE)
+        && get_image(p->vo, &mpi2) == VO_TRUE)
     {
         for (n = 0; n < p->plane_count; n++) {
             struct texplane *plane = &p->planes[n];
@@ -1685,13 +1658,12 @@ skip_upload:
         }
         gl->ActiveTexture(GL_TEXTURE0);
     }
-    do_render(vo);
+    do_render(p);
     return VO_TRUE;
 }
 
-static mp_image_t *get_screenshot(struct vo *vo)
+static mp_image_t *get_screenshot(struct gl_priv *p)
 {
-    struct gl_priv *p = vo->priv;
     GL *gl = p->gl;
 
     mp_image_t *image = alloc_mpi(p->texture_width, p->texture_height,
@@ -1721,9 +1693,8 @@ static mp_image_t *get_screenshot(struct vo *vo)
     return image;
 }
 
-static mp_image_t *get_window_screenshot(struct vo *vo)
+static mp_image_t *get_window_screenshot(struct gl_priv *p)
 {
-    struct gl_priv *p = vo->priv;
     GL *gl = p->gl;
 
     GLint vp[4]; //x, y, w, h
@@ -1741,7 +1712,7 @@ static mp_image_t *get_window_screenshot(struct vo *vo)
     return image;
 }
 
-static int query_format(struct vo *vo, uint32_t format)
+static int query_format(uint32_t format)
 {
     int caps = VFCAP_CSP_SUPPORTED | VFCAP_CSP_SUPPORTED_BY_HW | VFCAP_FLIP |
                VFCAP_HWSCALE_UP | VFCAP_HWSCALE_DOWN | VFCAP_ACCEPT_STRIDE |
@@ -1755,18 +1726,16 @@ static void uninit(struct vo *vo)
 {
     struct gl_priv *p = vo->priv;
 
-    // NOTE: GL functions might not be loaded yet
-    if (p->glctx && p->gl->DeleteTextures)
-        uninitGL(vo);
+    uninitGL(p);
     uninit_mpglcontext(p->glctx);
     p->glctx = NULL;
     p->gl = NULL;
 }
 
-static bool handle_scaler_opt(struct vo *vo, struct scaler *scaler)
+static bool handle_scaler_opt(struct gl_priv *p, struct scaler *scaler)
 {
     if (!scaler->name || scaler->name[0] == '\0')
-        scaler->name = talloc_strdup(vo, "bilinear");
+        scaler->name = talloc_strdup(p, "bilinear");
 
     if (strcmp(scaler->name, "help") == 0) {
         mp_msg(MSGT_VO, MSGL_INFO, "Available scalers:\n");
@@ -1837,6 +1806,7 @@ static int preinit(struct vo *vo, const char *arg)
     vo->priv = p;
 
     *p = (struct gl_priv) {
+        .vo = vo,
         .colorspace = MP_CSP_DETAILS_DEFAULTS,
         .filter_strength = 0.5,
         .use_npot = 1,
@@ -1987,9 +1957,9 @@ static int preinit(struct vo *vo, const char *arg)
     free(lscale);
     free(cscale);
 
-    if (!handle_scaler_opt(vo, &p->scalers[0]))
+    if (!handle_scaler_opt(p, &p->scalers[0]))
         goto err_out;
-    if (!handle_scaler_opt(vo, &p->scalers[1]))
+    if (!handle_scaler_opt(p, &p->scalers[1]))
         goto err_out;
 
     p->glctx = init_mpglcontext(backend, vo);
@@ -1998,12 +1968,12 @@ static int preinit(struct vo *vo, const char *arg)
     p->gl = p->glctx->gl;
 
     if (true) {
-        if (create_window(vo, 320, 200, VOFLAG_HIDDEN) == SET_WINDOW_FAILED)
+        if (create_window(p, 320, 200, VOFLAG_HIDDEN) == SET_WINDOW_FAILED)
             goto err_out;
-        if (!initGL(vo))
+        if (!initGL(p))
             goto err_out;
-        // We created a window to test whether the GL context supports hardware
-        // acceleration and so on. Destroy that window to make sure all state
+        // We created a window to test whether the GL context could be
+        // created and so on. Destroy that window to make sure all state
         // associated with it is lost.
         uninit(vo);
         p->glctx = init_mpglcontext(backend, vo);
@@ -2025,15 +1995,15 @@ static int control(struct vo *vo, uint32_t request, void *data)
 
     switch (request) {
     case VOCTRL_QUERY_FORMAT:
-        return query_format(vo, *(uint32_t *)data);
+        return query_format(*(uint32_t *)data);
     case VOCTRL_GET_IMAGE:
         return get_image(vo, data);
     case VOCTRL_DRAW_IMAGE:
-        return draw_image(vo, data);
+        return draw_image(p, data);
     case VOCTRL_DRAW_EOSD:
         if (!data)
             return VO_FALSE;
-        draw_eosd(vo, data);
+        draw_eosd(p, data);
         return VO_TRUE;
     case VOCTRL_GET_EOSD_RES: {
         mp_eosd_res_t *r = data;
@@ -2053,18 +2023,18 @@ static int control(struct vo *vo, uint32_t request, void *data)
         return VO_TRUE;
     case VOCTRL_FULLSCREEN:
         p->glctx->fullscreen(vo);
-        resize(vo);
+        resize(p);
         return VO_TRUE;
     case VOCTRL_BORDER:
         if (!p->glctx->border)
             break;
         p->glctx->border(vo);
-        resize(vo);
+        resize(p);
         return VO_TRUE;
     case VOCTRL_GET_PANSCAN:
         return VO_TRUE;
     case VOCTRL_SET_PANSCAN:
-        resize(vo);
+        resize(p);
         return VO_TRUE;
     case VOCTRL_GET_EQUALIZER: {
         struct voctrl_get_equalizer_args *args = data;
@@ -2078,16 +2048,16 @@ static int control(struct vo *vo, uint32_t request, void *data)
         if (!p->use_gamma && p->video_eq.values[MP_CSP_EQ_GAMMA] != 0) {
             mp_msg(MSGT_VO, MSGL_V, "[gl] Auto-enabling gamma.\n");
             p->use_gamma = true;
-            compile_shaders(vo);
+            compile_shaders(p);
         }
-        update_all_uniforms(vo);
+        update_all_uniforms(p);
         vo->want_redraw = true;
         return VO_TRUE;
     }
     case VOCTRL_SET_YUV_COLORSPACE: {
         if (p->is_yuv) {
             p->colorspace = *(struct mp_csp_details *)data;
-            update_all_uniforms(vo);
+            update_all_uniforms(p);
             vo->want_redraw = true;
         }
         return VO_TRUE;
@@ -2103,13 +2073,13 @@ static int control(struct vo *vo, uint32_t request, void *data)
     case VOCTRL_SCREENSHOT: {
         struct voctrl_screenshot_args *args = data;
         if (args->full_window)
-            args->out_image = get_window_screenshot(vo);
+            args->out_image = get_window_screenshot(p);
         else
-            args->out_image = get_screenshot(vo);
+            args->out_image = get_screenshot(p);
         return true;
     }
     case VOCTRL_REDRAW_FRAME:
-        do_render(vo);
+        do_render(p);
         return true;
     }
     return VO_NOTIMPL;
