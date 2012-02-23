@@ -9,6 +9,8 @@
  * Also see glumpy (BSD licensed), contains the same code in Python:
  * http://code.google.com/p/glumpy/source/browse/glumpy/image/filter.py
  *
+ * Also see: Paul Heckbert's "zoom"
+ *
  * Also see XBMC: ConvolutionKernels.cpp etc.
  *
  * mplayer2 is free software; you can redistribute it and/or modify
@@ -29,19 +31,48 @@
 #include <stddef.h>
 #include <string.h>
 #include <math.h>
+#include <assert.h>
 
 #include "filter_kernels.h"
 
 // NOTE: all filters are separable, symmetric, and are intended for use with
 //       a lookup table/texture.
 
-struct filter_kernel *mp_find_filter_kernel(const char *name)
+const struct filter_kernel *mp_find_filter_kernel(const char *name)
 {
     for (const struct filter_kernel *k = mp_filter_kernels; k->name; k++) {
         if (strcmp(k->name, name) == 0)
-            return (struct filter_kernel *)k;
+            return k;
     }
     return NULL;
+}
+
+// sizes = 0-terminated and sorted list of available filter sizes
+// inv_scale = source_size / dest_size
+bool mp_init_filter(struct filter_kernel *filter, const int *sizes,
+                    double inv_scale)
+{
+    // only downscaling requires widening the filter
+    filter->inv_scale = inv_scale >= 1.0 ? inv_scale : 1.0;
+    double support = filter->radius * filter->inv_scale;
+    int size = ceil(2.0 * support);
+    // round up to smallest available size that's still large enough
+    if (size < sizes[0])
+        size = sizes[0];
+    const int *cursize = sizes;
+    while (size > *cursize && *cursize)
+        cursize++;
+    if (*cursize) {
+        filter->size = *cursize;
+        return true;
+    } else {
+        // The filter doesn't fit - instead of failing completely, use the
+        // largest filter available. This is incorrect, but better than refusing
+        // to do anything.
+        filter->size = cursize[-1];
+        filter->inv_scale = filter->size / 2.0 / filter->radius;
+        return false;
+    }
 }
 
 // Calculate the 1D filtering kernel for N sample points.
@@ -50,10 +81,11 @@ struct filter_kernel *mp_find_filter_kernel(const char *name)
 // f = x0 - abs(x0), subpixel position in the range [0,1) or [0,1].
 void mp_compute_weights(struct filter_kernel *filter, double f, float *out_w)
 {
+    assert(filter->size > 0);
     double sum = 0;
     for (int n = 0; n < filter->size; n++) {
         double x = f - (n - filter->size / 2 + 1);
-        double w = filter->weight(filter, fabs(x));
+        double w = filter->weight(filter, fabs(x) / filter->inv_scale);
         out_w[n] = w;
         sum += w;
     }
@@ -220,27 +252,26 @@ static double blackman(kernel *k, double x)
 }
 
 const struct filter_kernel mp_filter_kernels[] = {
-    {"bilinear_slow",  2 * 1,  bilinear},
-    {"hanning",        2 * 1,  hanning},
-    {"hamming",        2 * 1,  hamming},
-    {"hermite",        2 * 1,  hermite},
-    // radius is actually 1.5
-    {"quadric",        4,      quadric},
-    {"bicubic",        2 * 2,  bicubic},
-    {"kaiser",         2 * 1,  kaiser},
-    {"catmull_rom",    2 * 2,  catmull_rom},
-    {"mitchell",       2 * 2,  mitchell},
-    {"spline16",       2 * 2,  spline16},
-    {"spline36",       2 * 3,  spline36},
-    {"gaussian",       2 * 2,  gaussian},
-    {"sinc2",          2 * 2,  sinc},
-    {"sinc3",          2 * 3,  sinc},
-    {"sinc4",          2 * 4,  sinc},
-    {"lanczos2",       2 * 2,  lanczos},
-    {"lanczos3",       2 * 3,  lanczos},
-    {"lanczos4",       2 * 4,  lanczos},
-    {"blackman2",      2 * 2,  blackman},
-    {"blackman3",      2 * 3,  blackman},
-    {"blackman4",      2 * 4,  blackman},
+    {"bilinear_slow",  1,   bilinear},
+    {"hanning",        1,   hanning},
+    {"hamming",        1,   hamming},
+    {"hermite",        1,   hermite},
+    {"quadric",        1.5, quadric},
+    {"bicubic",        2,   bicubic},
+    {"kaiser",         1,   kaiser},
+    {"catmull_rom",    2,   catmull_rom},
+    {"mitchell",       2,   mitchell},
+    {"spline16",       2,   spline16},
+    {"spline36",       3,   spline36},
+    {"gaussian",       2,   gaussian},
+    {"sinc2",          2,   sinc},
+    {"sinc3",          3,   sinc},
+    {"sinc4",          4,   sinc},
+    {"lanczos2",       2,   lanczos},
+    {"lanczos3",       3,   lanczos},
+    {"lanczos4",       4,   lanczos},
+    {"blackman2",      2,   blackman},
+    {"blackman3",      3,   blackman},
+    {"blackman4",      4,   blackman},
     {0}
 };

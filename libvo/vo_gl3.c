@@ -78,18 +78,21 @@ static const char *fixed_scale_filters[] = {
 
 struct convolution_filters {
     char *shader_fn, *shader_fn_sep;
-    bool use_2d;
     GLint internal_format;
     GLenum format;
 };
 
 // indexed with filter_kernel->size
 struct convolution_filters convolution_filters[] = {
-    [2] = {"sample_convolution2", "sample_convolution_sep2", false, GL_RG16F,   GL_RG},
-    [4] = {"sample_convolution4", "sample_convolution_sep4", false, GL_RGBA16F, GL_RGBA},
-    [6] = {"sample_convolution6", "sample_convolution_sep6", true,  GL_RGB16F,  GL_RGB},
-    [8] = {"sample_convolution8", "sample_convolution_sep8", true,  GL_RGBA16F, GL_RGBA},
+    [2] = {"sample_convolution2", "sample_convolution_sep2",    GL_RG16F,   GL_RG},
+    [4] = {"sample_convolution4", "sample_convolution_sep4",    GL_RGBA16F, GL_RGBA},
+    [6] = {"sample_convolution6", "sample_convolution_sep6",    GL_RGB16F,  GL_RGB},
+    [8] = {"sample_convolution8", "sample_convolution_sep8",    GL_RGBA16F, GL_RGBA},
+    [12] = {"sample_convolution12", "sample_convolution_sep12", GL_RGBA16F, GL_RGBA},
+    [16] = {"sample_convolution16", "sample_convolution_sep16", GL_RGBA16F, GL_RGBA},
 };
+
+static const int filter_sizes[] = {2, 4, 6, 8, 12, 16, 0};
 
 struct vertex {
     float position[2];
@@ -133,6 +136,9 @@ struct scaler {
     GLuint gl_lut;
     int texunit;
     const char *lut_name;
+
+    // kernel points here
+    struct filter_kernel kernel_storage;
 };
 
 struct fbotex {
@@ -169,6 +175,7 @@ struct gl_priv {
     int use_gamma;
     int use_srgb;
     int use_scale_sep;
+    int use_fancy_downscaling;
     struct mp_csp_details colorspace;
     bool is_yuv;
     float filter_strength;
@@ -339,13 +346,12 @@ static void matrix_ortho2d(float m[3][3], float x0, float x1,
     m[2][2] = 1.0f;
 }
 
-static bool can_use_filter_kernel(struct filter_kernel *kernel)
+static bool can_use_filter_kernel(const struct filter_kernel *kernel)
 {
     if (!kernel)
         return false;
-    if (kernel->size >= FF_ARRAY_ELEMS(convolution_filters))
-        return false;
-    return !!convolution_filters[kernel->size].shader_fn;
+    struct filter_kernel k = *kernel;
+    return mp_init_filter(&k, filter_sizes, 1);
 }
 
 static void vertex_array_init(GL *gl, struct vertex_array * va)
@@ -446,10 +452,15 @@ static void fbotex_init(struct vo *vo, struct fbotex *fbo, int w, int h)
     struct gl_priv *p = vo->priv;
     GL *gl = p->gl;
 
+    assert(!fbo->fbo);
+    assert(!fbo->texture);
+
     texSize(vo, w, h, &fbo->tex_w, &fbo->tex_h);
 
     fbo->vp_w = w;
     fbo->vp_h = h;
+
+    mp_msg(MSGT_VO, MSGL_V, "[gl] Create FBO: %dx%d\n", fbo->tex_w, fbo->tex_h);
 
     gl->GenFramebuffers(1, &fbo->fbo);
     gl->GenTextures(1, &fbo->texture);
@@ -484,56 +495,6 @@ static void fbotex_uninit(struct vo *vo, struct fbotex *fbo)
     fbo->texture = 0;
     fbo->tex_w = fbo->tex_h = 0;
     fbo->vp_w = fbo->vp_h = 0;
-}
-
-static void scaler_texture(struct vo *vo, GLuint program, struct scaler *scaler)
-{
-    struct gl_priv *p = vo->priv;
-    GL *gl = p->gl;
-
-    if (!scaler->kernel)
-        return;
-
-    int size = scaler->kernel->size;
-    struct convolution_filters *entry = &convolution_filters[size];
-
-    GLint loc = gl->GetUniformLocation(program, scaler->lut_name);
-    if (loc < 0)
-        return;
-
-    gl->Uniform1i(loc, scaler->texunit);
-
-    gl->ActiveTexture(GL_TEXTURE0 + scaler->texunit);
-    GLenum target = entry->use_2d ? GL_TEXTURE_2D : GL_TEXTURE_1D;
-
-    if (scaler->gl_lut) {
-        gl->BindTexture(target, scaler->gl_lut);
-    } else {
-        gl->GenTextures(1, &scaler->gl_lut);
-        gl->BindTexture(target, scaler->gl_lut);
-        gl->PixelStorei(GL_UNPACK_ALIGNMENT, 4);
-        gl->PixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-
-        float *weights = talloc_array(NULL, float, LOOKUP_TEXTURE_SIZE * size);
-        mp_compute_lut(scaler->kernel, LOOKUP_TEXTURE_SIZE, weights);
-        if (entry->use_2d) {
-            gl->TexImage2D(GL_TEXTURE_2D, 0, entry->internal_format, 2,
-                           LOOKUP_TEXTURE_SIZE, 0, entry->format, GL_FLOAT,
-                           weights);
-        } else {
-            gl->TexImage1D(GL_TEXTURE_1D, 0, entry->internal_format,
-                           LOOKUP_TEXTURE_SIZE, 0, entry->format, GL_FLOAT,
-                           weights);
-        }
-        talloc_free(weights);
-
-        gl->TexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        gl->TexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        gl->TexParameteri(target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        gl->TexParameteri(target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    }
-
-    gl->ActiveTexture(GL_TEXTURE0);
 }
 
 static void update_uniforms(struct vo *vo, GLuint program)
@@ -590,8 +551,14 @@ static void update_uniforms(struct vo *vo, GLuint program)
     if (loc >= 0)
         gl->Uniform1i(loc, 2);
 
-    scaler_texture(vo, program, &p->scalers[0]);
-    scaler_texture(vo, program, &p->scalers[1]);
+    for (int n = 0; n < 2; n++) {
+        const char *lut = p->scalers[n].lut_name;
+        if (lut) {
+            GLint loc = gl->GetUniformLocation(program, lut);
+            if (loc >= 0)
+                gl->Uniform1i(loc, p->scalers[n].texunit);
+        }
+    }
 
     loc = gl->GetUniformLocation(program, "filter_strength");
     if (loc >= 0)
@@ -630,6 +597,30 @@ static void update_window_sized_objects(struct vo *vo)
     }
 }
 
+static void initScalers(struct vo *vo);
+static void init_scaler(struct vo *vo, struct scaler *scaler);
+
+static double get_scale_factor(struct vo *vo)
+{
+    struct gl_priv *p = vo->priv;
+
+    double sx = p->dst_rect.width / (double)p->src_rect.width;
+    double sy = p->dst_rect.height / (double)p->src_rect.height;
+    // xxx: actually we should use different scalers in X/Y directions if the
+    // scale factors are different due to anamorphic content
+    return FFMIN(sx, sy);
+}
+
+static bool update_scale_factor(struct vo *vo, struct filter_kernel *kernel)
+{
+    struct gl_priv *p = vo->priv;
+
+    double scale = get_scale_factor(vo);
+    if (!p->use_fancy_downscaling && scale < 1.0)
+        scale = 1.0;
+    return mp_init_filter(kernel, filter_sizes, FFMAX(1.0, 1.0/scale));
+}
+
 static void resize(struct vo *vo)
 {
     struct gl_priv *p = vo->priv;
@@ -652,8 +643,30 @@ static void resize(struct vo *vo)
     p->border_x = borders.left;
     p->border_y = borders.top;
 
-    update_window_sized_objects(vo);
+    bool need_scaler_reinit = false;    // filter size change needed
+    bool need_scaler_update = false;    // filter LUT change needed
+    bool too_small = false;
+    for (int n = 0; n < 2; n++) {
+        if (p->scalers[n].kernel) {
+            struct filter_kernel tkernel = *p->scalers[n].kernel;
+            struct filter_kernel old = tkernel;
+            bool ok = update_scale_factor(vo, &tkernel);
+            too_small |= !ok;
+            need_scaler_reinit |= (tkernel.size != old.size);
+            need_scaler_update |= (tkernel.inv_scale != old.inv_scale);
+        }
+    }
+    if (need_scaler_reinit) {
+        initScalers(vo);
+    } else if (need_scaler_update) {
+        init_scaler(vo, &p->scalers[0]);
+        init_scaler(vo, &p->scalers[1]);
+    }
+    if (too_small)
+        mp_msg(MSGT_VO, MSGL_WARN, "[gl] Can't downscale that much, window "
+               "output may look suboptimal.\n");
 
+    update_window_sized_objects(vo);
     update_all_uniforms(vo);
 
 #ifdef CONFIG_FREETYPE
@@ -825,8 +838,7 @@ static void delete_shaders(struct vo *vo)
     delete_program(gl, &p->final_program);
 }
 
-// Free video resources etc.
-static void uninitVideo(struct vo *vo)
+static void uninitScalers(struct vo *vo)
 {
     struct gl_priv *p = vo->priv;
     GL *gl = p->gl;
@@ -836,7 +848,17 @@ static void uninitVideo(struct vo *vo)
     for (int n = 0; n < 2; n++) {
         gl->DeleteTextures(1, &p->scalers->gl_lut);
         p->scalers->gl_lut = 0;
+        p->scalers->lut_name = NULL;
     }
+}
+
+// Free video resources etc.
+static void uninitVideo(struct vo *vo)
+{
+    struct gl_priv *p = vo->priv;
+    GL *gl = p->gl;
+
+    uninitScalers(vo);
 
     for (int n = 0; n < 3; n++) {
         struct texplane *plane = &p->planes[n];
@@ -1040,7 +1062,10 @@ static void compile_shaders(struct vo *vo)
     shader_def_opt(&header_conv, "USE_COLORMATRIX", p->is_yuv);
     shader_def_opt(&header_final, "USE_GAMMA_POW", p->use_gamma);
 
-    if (p->use_indirect && p->use_scale_sep && p->scalers[0].kernel) {
+    bool use_indirect = p->use_indirect;
+
+    if (p->use_scale_sep && p->scalers[0].kernel) {
+        use_indirect = true;
         header_sep = talloc_strdup(tmp, "");
         shader_setup_scaler(&header_sep, &p->scalers[0], 0);
         shader_setup_scaler(&header_final, &p->scalers[0], 1);
@@ -1050,7 +1075,7 @@ static void compile_shaders(struct vo *vo)
 
     shader_setup_scaler(&header_conv, &p->scalers[1], -1);
 
-    if (p->use_indirect && p->is_yuv) {
+    if (use_indirect && p->is_yuv) {
         // We don't use filtering for the Y-plane (luma), because it's never
         // scaled in this scenario.
         shader_def(&header_conv, "SAMPLE_L", "sample_bilinear");
@@ -1123,6 +1148,78 @@ static int initGL(struct vo *vo)
     return 1;
 }
 
+static void init_scaler(struct vo *vo, struct scaler *scaler)
+{
+    struct gl_priv *p = vo->priv;
+    GL *gl = p->gl;
+
+    if (!scaler->kernel)
+        return;
+
+    update_scale_factor(vo, scaler->kernel);
+
+    int size = scaler->kernel->size;
+    assert(size < FF_ARRAY_ELEMS(convolution_filters));
+    struct convolution_filters *entry = &convolution_filters[size];
+
+    bool use_2d = size > 4;
+    bool is_luma = scaler->id == 0;
+    scaler->lut_name = use_2d
+                       ? (is_luma ? "lut_l_2d" : "lut_c_2d")
+                       : (is_luma ? "lut_l_1d" : "lut_c_1d");
+
+    gl->ActiveTexture(GL_TEXTURE0 + scaler->texunit);
+    GLenum target = use_2d ? GL_TEXTURE_2D : GL_TEXTURE_1D;
+
+    if (!scaler->gl_lut)
+        gl->GenTextures(1, &scaler->gl_lut);
+
+    gl->BindTexture(target, scaler->gl_lut);
+    gl->PixelStorei(GL_UNPACK_ALIGNMENT, 4);
+    gl->PixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+
+    float *weights = talloc_array(NULL, float, LOOKUP_TEXTURE_SIZE * size);
+    mp_compute_lut(scaler->kernel, LOOKUP_TEXTURE_SIZE, weights);
+    if (use_2d) {
+        gl->TexImage2D(GL_TEXTURE_2D, 0, entry->internal_format, (size + 3) / 4,
+                       LOOKUP_TEXTURE_SIZE, 0, entry->format, GL_FLOAT,
+                       weights);
+    } else {
+        gl->TexImage1D(GL_TEXTURE_1D, 0, entry->internal_format,
+                       LOOKUP_TEXTURE_SIZE, 0, entry->format, GL_FLOAT,
+                       weights);
+    }
+    talloc_free(weights);
+
+    gl->TexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    gl->TexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    gl->TexParameteri(target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    gl->TexParameteri(target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    gl->ActiveTexture(GL_TEXTURE0);
+
+    glCheckError(gl, "after initializing scaler");
+}
+
+static void initScalers(struct vo *vo)
+{
+    struct gl_priv *p = vo->priv;
+    GL *gl = p->gl;
+
+    mp_msg(MSGT_VO, MSGL_V, "[gl] Reinit scalers.\n");
+
+    glCheckError(gl, "before scaler initialization");
+
+    uninitScalers(vo);
+
+    init_scaler(vo, &p->scalers[0]);
+    init_scaler(vo, &p->scalers[1]);
+    compile_shaders(vo);
+
+    if (p->indirect_program && !p->indirect_fbo.fbo)
+        fbotex_init(vo, &p->indirect_fbo, p->texture_width, p->texture_height);
+}
+
 static void initVideo(struct vo *vo)
 {
     struct gl_priv *p = vo->priv;
@@ -1137,8 +1234,6 @@ static void initVideo(struct vo *vo)
     if (p->is_yuv)
         eq_caps |= MP_CSP_EQ_CAPS_COLORMATRIX;
     p->video_eq.capabilities = eq_caps;
-
-    compile_shaders(vo);
 
     glCheckError(gl, "before video texture creation");
 
@@ -1179,8 +1274,7 @@ static void initVideo(struct vo *vo)
 
     glCheckError(gl, "after video texture creation");
 
-    if (p->indirect_program)
-        fbotex_init(vo, &p->indirect_fbo, p->texture_width, p->texture_height);
+    initScalers(vo);
 }
 
 
@@ -1691,14 +1785,10 @@ static bool handle_scaler_opt(struct vo *vo, struct scaler *scaler)
             return true;
     }
 
-    scaler->kernel = mp_find_filter_kernel(scaler->name);
-    if (can_use_filter_kernel(scaler->kernel)) {
-        const struct convolution_filters *entry =
-            &convolution_filters[scaler->kernel->size];
-        bool is_luma = scaler->id == 0;
-        scaler->lut_name = entry->use_2d
-                           ? (is_luma ? "lut_l_2d" : "lut_c_2d")
-                           : (is_luma ? "lut_l_1d" : "lut_c_1d");
+    const struct filter_kernel *kernel = mp_find_filter_kernel(scaler->name);
+    if (can_use_filter_kernel(kernel)) {
+        scaler->kernel_storage = *kernel;
+        scaler->kernel = &scaler->kernel_storage;
         return true;
     }
 
@@ -1754,6 +1844,7 @@ static int preinit(struct vo *vo, const char *arg)
         .swap_interval = 1,
         .osd_color = 0xffffff,
         .fbo_format = GL_RGB16,
+        .use_fancy_downscaling = 1,
         .scalers = {
             { .id = 0, .texunit = 5 },
             { .id = 1, .texunit = 6 },
@@ -1780,6 +1871,7 @@ static int preinit(struct vo *vo, const char *arg)
         {"stereo",       OPT_ARG_INT,  &p->stereo_mode,  NULL},
         {"lscale",       OPT_ARG_MSTRZ,&lscale,          NULL},
         {"cscale",       OPT_ARG_MSTRZ,&cscale,          NULL},
+        {"fancy-downscaling", OPT_ARG_BOOL, &p->use_fancy_downscaling, NULL},
         {"debug",        OPT_ARG_BOOL, &p->gl_debug,     NULL},
         {"force-gl2",    OPT_ARG_BOOL, &p->force_gl2,    NULL},
         {"indirect",     OPT_ARG_BOOL, &p->use_indirect, NULL},
@@ -1834,6 +1926,10 @@ static int preinit(struct vo *vo, const char *arg)
                "  swapinterval=<n>\n"
                "    Interval in displayed frames between to buffer swaps.\n"
                "    1 is equivalent to enable VSYNC, 0 to disable VSYNC.\n"
+               "  no-fancy-downscaling\n"
+               "    When using convolution based filters, don't extend the filter\n"
+               "    size when downscaling. Trades downscaling performance for\n"
+               "    reduced quality.\n"
                "  no-npot\n"
                "    Force use of power-of-2 texture sizes.\n"
                "  glfinish\n"
@@ -1872,9 +1968,6 @@ static int preinit(struct vo *vo, const char *arg)
         p->use_indirect = 1;
         p->use_gamma = 1;
     }
-
-    if (p->use_scale_sep)
-        p->use_indirect = 1;
 
     int backend = backend_arg ? mpgl_find_backend(backend_arg) : GLTYPE_AUTO;
     free(backend_arg);

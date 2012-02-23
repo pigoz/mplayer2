@@ -145,6 +145,23 @@ float[8] weights8(sampler2D lookup, float f) {
     return float[8](c1.r, c1.g, c1.b, c1.a, c2.r, c2.g, c2.b, c2.a);
 }
 
+float[12] weights12(sampler2D lookup, float f) {
+    vec4 c1 = texture(lookup, vec2(1.0/6.0, f));
+    vec4 c2 = texture(lookup, vec2(0.5, f));
+    vec4 c3 = texture(lookup, vec2(5.0/6.0, f));
+    return float[12](c1.r, c1.g, c1.b, c1.a,
+                     c2.r, c2.g, c2.b, c2.a,
+                     c3.r, c3.g, c3.b, c3.a);
+}
+
+float[16] weights16(sampler2D lookup, float f) {
+    vec4 c1 = texture(lookup, vec2(0.125, f));
+    vec4 c2 = texture(lookup, vec2(0.375, f));
+    vec4 c3 = texture(lookup, vec2(0.625, f));
+    vec4 c4 = texture(lookup, vec2(0.875, f));
+    return float[16](c1.r, c1.g, c1.b, c1.a, c2.r, c2.g, c2.b, c2.a,
+                     c3.r, c3.g, c3.b, c3.a, c4.r, c4.g, c4.b, c4.a);
+}
 
 #define CONVOLUTION_SEP_N(NAME, N)                                           \
     vec4 NAME(sampler2D tex, vec2 texcoord, vec2 pt, float weights[N]) {     \
@@ -159,6 +176,8 @@ CONVOLUTION_SEP_N(convolution_sep2, 2)
 CONVOLUTION_SEP_N(convolution_sep4, 4)
 CONVOLUTION_SEP_N(convolution_sep6, 6)
 CONVOLUTION_SEP_N(convolution_sep8, 8)
+CONVOLUTION_SEP_N(convolution_sep12, 12)
+CONVOLUTION_SEP_N(convolution_sep16, 16)
 
 // The dir parameter is (0, 1) or (1, 0), and we expect the shader compiler to
 // remove all the redundant multiplications and additions.
@@ -176,6 +195,8 @@ SAMPLE_CONVOLUTION_SEP_N(sample_convolution_sep2, 2, sampler1D, convolution_sep2
 SAMPLE_CONVOLUTION_SEP_N(sample_convolution_sep4, 4, sampler1D, convolution_sep4, weights4)
 SAMPLE_CONVOLUTION_SEP_N(sample_convolution_sep6, 6, sampler2D, convolution_sep6, weights6)
 SAMPLE_CONVOLUTION_SEP_N(sample_convolution_sep8, 8, sampler2D, convolution_sep8, weights8)
+SAMPLE_CONVOLUTION_SEP_N(sample_convolution_sep12, 12, sampler2D, convolution_sep12, weights12)
+SAMPLE_CONVOLUTION_SEP_N(sample_convolution_sep16, 16, sampler2D, convolution_sep16, weights16)
 
 
 #define CONVOLUTION_N(NAME, N)                                               \
@@ -195,6 +216,8 @@ CONVOLUTION_N(convolution2, 2)
 CONVOLUTION_N(convolution4, 4)
 CONVOLUTION_N(convolution6, 6)
 CONVOLUTION_N(convolution8, 8)
+CONVOLUTION_N(convolution12, 12)
+CONVOLUTION_N(convolution16, 16)
 
 #define SAMPLE_CONVOLUTION_N(NAME, N, SAMPLERT, CONV_FUNC, WEIGHTS_FUNC)    \
     vec4 NAME(SAMPLERT lookup, sampler2D tex, vec2 texcoord) {              \
@@ -211,6 +234,8 @@ SAMPLE_CONVOLUTION_N(sample_convolution2, 2, sampler1D, convolution2, weights2)
 SAMPLE_CONVOLUTION_N(sample_convolution4, 4, sampler1D, convolution4, weights4)
 SAMPLE_CONVOLUTION_N(sample_convolution6, 6, sampler2D, convolution6, weights6)
 SAMPLE_CONVOLUTION_N(sample_convolution8, 8, sampler2D, convolution8, weights8)
+SAMPLE_CONVOLUTION_N(sample_convolution12, 12, sampler2D, convolution12, weights12)
+SAMPLE_CONVOLUTION_N(sample_convolution16, 16, sampler2D, convolution16, weights16)
 
 
 // Unsharp masking
