@@ -503,7 +503,6 @@ Use these options if autodetection fails:
   --extra-libs=FLAGS          extra linker flags
   --extra-libs-mplayer=FLAGS  extra linker flags for MPlayer
 
-  --with-freetype-config=PATH path to freetype-config
   --with-sdl-config=PATH      path to sdl*-config
   --with-dvdnav-config=PATH   path to dvdnav-config
   --with-dvdread-config=PATH  path to dvdread-config
@@ -689,7 +688,6 @@ quicktime=auto
 _macosx_finder=no
 _macosx_bundle=auto
 _sortsub=yes
-_freetypeconfig='freetype-config'
 _fribidi=auto
 _enca=auto
 _inet6=auto
@@ -745,9 +743,6 @@ for ac_option do
 
   --with-sdl-config=*)
     _sdlconfig=$(echo $ac_option | cut -d '=' -f 2)
-    ;;
-  --with-freetype-config=*)
-    _freetypeconfig=$(echo $ac_option | cut -d '=' -f 2)
     ;;
   --with-dvdnav-config=*)
     _dvdnavconfig=$(echo $ac_option | cut -d '=' -f 2)
@@ -5407,33 +5402,16 @@ if test "$_iconv" = no ; then
 fi
 
 if test "$_freetype" = auto ; then
-    if ( $_freetypeconfig --version ) >/dev/null 2>&1 ; then
-        cat > $TMPC << EOF
-#include <stdio.h>
-#include <ft2build.h>
-#include FT_FREETYPE_H
-#if ((FREETYPE_MAJOR < 2) || ((FREETYPE_MINOR == 0) && (FREETYPE_PATCH < 9)))
-#error "Need FreeType 2.0.9 or newer"
-#endif
-int main(void) {
-    FT_Library library;
-    FT_Init_FreeType(&library);
-    return 0;
-}
-EOF
-        _freetype=no
-        cc_check $($_freetypeconfig --cflags) $($_freetypeconfig --libs) && _freetype=yes
+    if $_pkg_config --exists --print-errors freetype2 ; then
+        _freetype=yes
+        extra_cflags="$extra_cflags $($_pkg_config --cflags freetype2)"
+        extra_ldflags="$extra_ldflags $($_pkg_config --libs freetype2)"
     else
-        _freetype=no
-    fi
-    if test "$_freetype" != yes ; then
-      die "Unable to find development files for libfreetype. Aborting. If you really mean to compile without FreeType support use --disable-freetype."
+        die "Unable to find development files for libfreetype. Aborting. If you really mean to compile without FreeType support use --disable-freetype."
     fi
 fi
 if test "$_freetype" = yes ; then
     def_freetype='#define CONFIG_FREETYPE 1'
-    extra_cflags="$extra_cflags $($_freetypeconfig --cflags)"
-    extra_ldflags="$extra_ldflags $($_freetypeconfig --libs)"
 else
     def_freetype='#undef CONFIG_FREETYPE'
 fi
@@ -5445,36 +5423,13 @@ if test "$_freetype" = no ; then
 fi
 echocheck "fontconfig"
 if test "$_fontconfig" = auto ; then
-        cat > $TMPC << EOF
-#include <stdio.h>
-#include <stdlib.h>
-#include <fontconfig/fontconfig.h>
-#if FC_VERSION < 20402
-#error At least version 2.4.2 of fontconfig required
-#endif
-int main(void) {
-    int err = FcInit();
-    if (err == FcFalse) {
-        printf("Couldn't initialize fontconfig lib\n");
-        exit(err);
-    }
-    return 0;
-}
-EOF
-  _fontconfig=no
-  for _ld_tmp in "" "-lexpat -lfreetype" "-lexpat -lfreetype -lz" "-lexpat -lfreetype -lz -liconv" ; do
-    _ld_tmp="-lfontconfig $_ld_tmp"
-    cc_check $_ld_tmp && _fontconfig=yes && extra_ldflags="$extra_ldflags $_ld_tmp" && break
-  done
-  if test "$_fontconfig" = no && $_pkg_config --exists fontconfig ; then
-    _inc_tmp=$($_pkg_config --cflags fontconfig)
-    _ld_tmp=$($_pkg_config --libs fontconfig)
-    cc_check $_inc_tmp $_ld_tmp && _fontconfig=yes &&
-      extra_ldflags="$extra_ldflags $_ld_tmp" && extra_cflags="$extra_cflags $_inc_tmp"
-  fi
-  if test "$_fontconfig" != yes ; then
-    die "Unable to find development files for libfontconfig. Aborting. If you really mean to compile without fontconfig support use --disable-fontconfig."
-  fi
+    if $_pkg_config --exists --print-errors "fontconfig >= 2.4.2" ; then
+        _fontconfig=yes
+        extra_cflags="$extra_cflags $($_pkg_config --cflags fontconfig)"
+        extra_ldflags="$extra_ldflags $($_pkg_config --libs fontconfig)"
+    else
+        die "Unable to find development files for libfontconfig. Aborting. If you really mean to compile without fontconfig support use --disable-fontconfig."
+    fi
 fi
 if test "$_fontconfig" = yes ; then
     def_fontconfig='#define CONFIG_FONTCONFIG 1'
