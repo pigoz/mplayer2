@@ -125,7 +125,7 @@ struct texplane {
 
 struct scaler {
     int id;
-    char *name;
+    const char *name;
     struct filter_kernel *kernel;
     GLuint gl_lut;
     int texunit;
@@ -789,6 +789,7 @@ static void uninitScalers(struct gl_priv *p)
         gl->DeleteTextures(1, &p->scalers->gl_lut);
         p->scalers->gl_lut = 0;
         p->scalers->lut_name = NULL;
+        p->scalers->kernel = NULL;
     }
 }
 
@@ -1113,8 +1114,14 @@ static void init_scaler(struct gl_priv *p, struct scaler *scaler)
 {
     GL *gl = p->gl;
 
-    if (!scaler->kernel)
+    assert(scaler->name);
+
+    const struct filter_kernel *t_kernel = mp_find_filter_kernel(scaler->name);
+    if (!t_kernel)
         return;
+
+    scaler->kernel_storage = *t_kernel;
+    scaler->kernel = &scaler->kernel_storage;
 
     update_scale_factor(p, scaler->kernel);
 
@@ -1701,38 +1708,40 @@ static void uninit(struct vo *vo)
     p->gl = NULL;
 }
 
-static bool handle_scaler_opt(struct gl_priv *p, struct scaler *scaler)
+#if 0
+static void print_scalers(void)
 {
-    if (!scaler->name || scaler->name[0] == '\0')
-        scaler->name = talloc_strdup(p, "bilinear");
-
-    if (strcmp(scaler->name, "help") == 0) {
-        mp_msg(MSGT_VO, MSGL_INFO, "Available scalers:\n");
-        for (const char **e = fixed_scale_filters; *e; e++) {
-            mp_msg(MSGT_VO, MSGL_INFO, "    %s\n", *e);
-        }
-        for (const struct filter_kernel *e = mp_filter_kernels; e->name; e++) {
+    mp_msg(MSGT_VO, MSGL_INFO, "Available scalers:\n");
+    for (const char **e = fixed_scale_filters; *e; e++) {
+        mp_msg(MSGT_VO, MSGL_INFO, "    %s\n", *e);
+    }
+    for (const struct filter_kernel *e = mp_filter_kernels; e->name; e++) {
+        if (can_use_filter_kernel(e))
             mp_msg(MSGT_VO, MSGL_INFO, "    %s\n", e->name);
-        }
-        return false;
     }
+}
+#endif
 
-    scaler->kernel = NULL;
+static const char* handle_scaler_opt(const char *name, const char *def)
+{
+    if (!name)
+        name = def ? def : "";
+
+    const struct filter_kernel *kernel = mp_find_filter_kernel(name);
+    if (can_use_filter_kernel(kernel))
+        return kernel->name;
+
     for (const char **filter = fixed_scale_filters; *filter; filter++) {
-        if (strcmp(*filter, scaler->name) == 0)
-            return true;
+        if (strcmp(*filter, name) == 0)
+            return *filter;
     }
 
-    const struct filter_kernel *kernel = mp_find_filter_kernel(scaler->name);
-    if (can_use_filter_kernel(kernel)) {
-        scaler->kernel_storage = *kernel;
-        scaler->kernel = &scaler->kernel_storage;
-        return true;
-    }
+    return NULL;
+}
 
-    mp_msg(MSGT_VO, MSGL_FATAL, "[gl] Error: scaler '%s' not found.\n",
-           scaler->name);
-    return false;
+static int scaler_valid(void *arg)
+{
+    return handle_scaler_opt(*(const char **)arg, NULL) != NULL;
 }
 
 static int backend_valid(void *arg)
@@ -1786,15 +1795,13 @@ static int preinit(struct vo *vo, const char *arg)
         .use_scale_sep = 1,
         .use_fancy_downscaling = 1,
         .scalers = {
-            { .id = 0, .texunit = 5 },
-            { .id = 1, .texunit = 6 },
+            { .id = 0, .texunit = 5, .name = "lanczos2" },
+            { .id = 1, .texunit = 6, .name = "bilinear" },
         },
     };
 
-    p->eosd = eosd_packer_create(vo);
 
-    char *lscale = strdup("lanczos2");
-    char *cscale = NULL;
+    char *scalers[2] = {0};
     char *backend_arg = NULL;
     char *fbo_format = NULL;
 
@@ -1809,8 +1816,8 @@ static int preinit(struct vo *vo, const char *arg)
         {"mipmapgen",    OPT_ARG_BOOL, &p->mipmap_gen,   NULL},
         {"osdcolor",     OPT_ARG_INT,  &p->osd_color,    NULL},
         {"stereo",       OPT_ARG_INT,  &p->stereo_mode,  NULL},
-        {"lscale",       OPT_ARG_MSTRZ,&lscale,          NULL},
-        {"cscale",       OPT_ARG_MSTRZ,&cscale,          NULL},
+        {"lscale",       OPT_ARG_MSTRZ,&scalers[0],      scaler_valid},
+        {"cscale",       OPT_ARG_MSTRZ,&scalers[1],      scaler_valid},
         {"fancy-downscaling", OPT_ARG_BOOL, &p->use_fancy_downscaling, NULL},
         {"debug",        OPT_ARG_BOOL, &p->gl_debug,     NULL},
         {"force-gl2",    OPT_ARG_BOOL, &p->force_gl2,    NULL},
@@ -1834,7 +1841,6 @@ static int preinit(struct vo *vo, const char *arg)
                "    sharpen5: unsharp masking (sharpening) with radius=5.\n"
                "    lanczos2: Lanczos with radius=2 (default, recommended).\n"
                "    lanczos3: Lanczos with radius=3.\n"
-               "    There are more filters - print a list with lscale=help.\n"
                "    Default: lanczos2\n"
                "  filter-strength=<value>\n"
                "    Set the effect strength for the sharpen4/sharpen5 filters.\n"
@@ -1907,7 +1913,7 @@ static int preinit(struct vo *vo, const char *arg)
                "  debug\n"
                "    Request debug OpenGL context. Does nothing.\n"
                "\n");
-        return -1;
+        goto err_out;
     }
 
     if (p->use_srgb) {
@@ -1921,15 +1927,12 @@ static int preinit(struct vo *vo, const char *arg)
     p->fbo_format = fbo_format ? find_fbo_format(fbo_format) : GL_RGBA16;
     free(fbo_format);
 
-    p->scalers[0].name = talloc_strdup(vo, lscale);
-    p->scalers[1].name = talloc_strdup(vo, cscale);
-    free(lscale);
-    free(cscale);
+    p->scalers[0].name = handle_scaler_opt(scalers[0], p->scalers[0].name);
+    free(scalers[0]);
+    p->scalers[1].name = handle_scaler_opt(scalers[1], p->scalers[1].name);
+    free(scalers[1]);
 
-    if (!handle_scaler_opt(p, &p->scalers[0]))
-        goto err_out;
-    if (!handle_scaler_opt(p, &p->scalers[1]))
-        goto err_out;
+    p->eosd = eosd_packer_create(vo);
 
     p->glctx = init_mpglcontext(backend, vo);
     if (!p->glctx)
