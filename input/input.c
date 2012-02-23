@@ -195,13 +195,11 @@ static const mp_cmd_t mp_cmds[] = {
   { MP_CMD_DVDNAV, "dvdnav", 1, { {MP_CMD_ARG_STRING} } },
 #endif
 
-#ifdef CONFIG_MENU
   { MP_CMD_MENU, "menu", 1, { {MP_CMD_ARG_STRING} } },
   { MP_CMD_SET_MENU, "set_menu", 1, { {MP_CMD_ARG_STRING},  {MP_CMD_ARG_STRING} } },
   { MP_CMD_CHELP, "help", 0 },
   { MP_CMD_CEXIT, "exit", 0 },
   { MP_CMD_CHIDE, "hide", 0, { {MP_CMD_ARG_INT, {.i = 3000}} } },
-#endif
 
   { MP_CMD_GET_VO_FULLSCREEN, "get_vo_fullscreen", 0 },
   { MP_CMD_GET_SUB_VISIBILITY, "get_sub_visibility", 0 },

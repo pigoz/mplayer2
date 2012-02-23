@@ -337,16 +337,10 @@ char *current_module; // for debugging
 
 // ---
 
-#ifdef CONFIG_MENU
 #include "m_struct.h"
 #include "libmenu/menu.h"
-static const vf_info_t * const libmenu_vfs[] = {
-    &vf_info_menu,
-    NULL
-};
 int use_menu;
 static char *menu_cfg;
-#endif
 
 
 edl_record_ptr edl_records = NULL; ///< EDL entries memory area
@@ -719,10 +713,8 @@ void exit_player_with_rc(struct MPContext *mpctx, enum exit_reason how, int rc)
 
     current_module = "uninit_input";
     mp_input_uninit(mpctx->input);
-#ifdef CONFIG_MENU
     if (use_menu)
         menu_uninit();
-#endif
 
 #ifdef CONFIG_FREETYPE
     current_module = "uninit_font";
@@ -4250,7 +4242,6 @@ int main(int argc, char *argv[])
     // Set the libstream interrupt callback
     stream_set_interrupt_callback(mp_input_check_interrupt, mpctx->input);
 
-#ifdef CONFIG_MENU
     if (use_menu) {
         if (menu_cfg && menu_init(mpctx, mpctx->mconfig, mpctx->input, menu_cfg))
             mp_tmsg(MSGT_CPLAYER, MSGL_V, "Menu initialized: %s\n", menu_cfg);
@@ -4271,7 +4262,6 @@ int main(int argc, char *argv[])
             }
         }
     }
-#endif
 
     current_module = NULL;
 

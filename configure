@@ -334,7 +334,6 @@ Optional features:
   --disable-freetype     disable FreeType 2 font rendering [autodetect]
   --disable-fontconfig   disable fontconfig font lookup [autodetect]
   --disable-unrarexec    disable using of UnRAR executable [enabled]
-  --enable-menu          enable OSD menu (not DVD menu) [disabled]
   --disable-sortsub      disable subtitle sorting [enabled]
   --enable-fribidi       enable the FriBiDi libs [autodetect]
   --disable-enca         disable ENCA charset oracle library [autodetect]
@@ -679,7 +678,6 @@ _big_endian=auto
 _bitmap_font=yes
 _freetype=auto
 _fontconfig=auto
-_menu=no
 _qtx=auto
 _coreaudio=auto
 _corevideo=auto
@@ -1110,9 +1108,6 @@ for ac_option do
   --disable-dga1) _dga1=no ;;
   --enable-dga2) _dga2=yes ;;
   --disable-dga2) _dga2=no ;;
-
-  --enable-menu) _menu=yes ;;
-  --disable-menu) _menu=no ;;
 
   --enable-qtx) _qtx=yes ;;
   --disable-qtx) _qtx=no ;;
@@ -6403,17 +6398,6 @@ fi
 echores "$_vstream"
 
 
-echocheck "OSD menu"
-if test "$_menu" = yes ; then
-    def_menu='#define CONFIG_MENU 1'
-    test $_dvbin = "yes" && _menu_dvbin=yes
-else
-def_menu='#undef CONFIG_MENU'
-    _menu_dvbin=no
-fi
-echores "$_menu"
-
-
 echocheck "Subtitles sorting"
 if test "$_sortsub" = yes ; then
     def_sortsub='#define CONFIG_SORTSUB 1'
@@ -6732,8 +6716,6 @@ LIBDCA = $_libdca
 LIBDV = $_libdv
 LIBDVDCSS_INTERNAL = $_libdvdcss_internal
 LIBMAD = $_mad
-LIBMENU = $_menu
-LIBMENU_DVBIN = $_menu_dvbin
 LIBNEMESI = $_nemesi
 LIBNUT = $_libnut
 LIBSMBCLIENT = $_smb
@@ -6952,7 +6934,6 @@ $def_charset
 $def_crash_debug
 $def_debug
 $def_fastmemcpy
-$def_menu
 $def_runtime_cpudetection
 $def_sighandler
 $def_sortsub

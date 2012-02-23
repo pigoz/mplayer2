@@ -41,9 +41,7 @@
 #include "spudec.h"
 #include "libavutil/common.h"
 
-#ifdef CONFIG_MENU
 #include "libmenu/menu.h"
-#endif
 
 #define NEW_SPLITTING
 
@@ -1182,7 +1180,6 @@ static int osd_update_ext(struct osd_state *osd, int dxs, int dys,
 	    } else
 		obj->flags&=~OSDFLAG_VISIBLE;
 	    break;
-#ifdef CONFIG_MENU
         case OSDTYPE_MENU:
             if (menu_want_draw()) {
                 obj->flags|=OSDFLAG_VISIBLE|OSDFLAG_CHANGED|OSDFLAG_BBOX;
@@ -1194,7 +1191,6 @@ static int osd_update_ext(struct osd_state *osd, int dxs, int dys,
             } else
                 obj->flags&=~OSDFLAG_VISIBLE;
             break;
-#endif
 	}
 	// check bbox:
 	if(!(obj->flags&OSDFLAG_BBOX)){

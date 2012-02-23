@@ -3558,10 +3558,8 @@ void run_command(MPContext *mpctx, mp_cmd_t *cmd)
                             "Selected button number %d", button);
         }
 #endif
-#ifdef CONFIG_MENU
         if (use_menu && dx >= 0.0 && dy >= 0.0)
             menu_update_mouse_pos(dx, dy);
-#endif
         break;
     }
 
