@@ -854,8 +854,6 @@ const m_option_t mplayer_opts[]={
     OPT_INTRANGE("osd-duration", osd_duration, 0, 0, 3600000),
     OPT_INTRANGE("osd-fractions", osd_fractions, 0, 0, 2),
 
-    {"menu", &use_menu, CONF_TYPE_FLAG, CONF_GLOBAL, 0, 1, NULL},
-    {"nomenu", &use_menu, CONF_TYPE_FLAG, CONF_GLOBAL, 1, 0, NULL},
     {"menu-root", &menu_root, CONF_TYPE_STRING, CONF_GLOBAL, 0, 0, NULL},
     {"menu-cfg", &menu_cfg, CONF_TYPE_STRING, CONF_GLOBAL, 0, 0, NULL},
     {"menu-startup", &menu_startup, CONF_TYPE_FLAG, CONF_GLOBAL, 0, 1, NULL},

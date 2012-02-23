@@ -339,7 +339,6 @@ char *current_module; // for debugging
 
 #include "m_struct.h"
 #include "libmenu/menu.h"
-int use_menu;
 static char *menu_cfg;
 
 
@@ -713,8 +712,7 @@ void exit_player_with_rc(struct MPContext *mpctx, enum exit_reason how, int rc)
 
     current_module = "uninit_input";
     mp_input_uninit(mpctx->input);
-    if (use_menu)
-        menu_uninit();
+    menu_uninit();
 
 #ifdef CONFIG_FREETYPE
     current_module = "uninit_font";
@@ -4242,23 +4240,20 @@ int main(int argc, char *argv[])
     // Set the libstream interrupt callback
     stream_set_interrupt_callback(mp_input_check_interrupt, mpctx->input);
 
-    if (use_menu) {
-        if (menu_cfg && menu_init(mpctx, mpctx->mconfig, mpctx->input, menu_cfg))
+    if (menu_cfg && menu_init(mpctx, mpctx->mconfig, mpctx->input, menu_cfg))
+        mp_tmsg(MSGT_CPLAYER, MSGL_V, "Menu initialized: %s\n", menu_cfg);
+    else {
+        char *menupath = get_path("menu.conf");
+        menu_cfg = talloc_strdup(NULL, menupath);
+        free(menupath);
+        if (menu_init(mpctx, mpctx->mconfig, mpctx->input, menu_cfg))
             mp_tmsg(MSGT_CPLAYER, MSGL_V, "Menu initialized: %s\n", menu_cfg);
         else {
-            char *menupath = get_path("menu.conf");
-            menu_cfg = talloc_strdup(NULL, menupath);
-            free(menupath);
-            if (menu_init(mpctx, mpctx->mconfig, mpctx->input, menu_cfg))
-                mp_tmsg(MSGT_CPLAYER, MSGL_V, "Menu initialized: %s\n", menu_cfg);
+            if (menu_init(mpctx, mpctx->mconfig, mpctx->input,
+                            MPLAYER_CONFDIR "/menu.conf"))
+                mp_tmsg(MSGT_CPLAYER, MSGL_V, "Menu initialized: %s\n", MPLAYER_CONFDIR "/menu.conf");
             else {
-                if (menu_init(mpctx, mpctx->mconfig, mpctx->input,
-                              MPLAYER_CONFDIR "/menu.conf"))
-                    mp_tmsg(MSGT_CPLAYER, MSGL_V, "Menu initialized: %s\n", MPLAYER_CONFDIR "/menu.conf");
-                else {
-                    mp_tmsg(MSGT_CPLAYER, MSGL_ERR, "Menu init failed.\n");
-                    use_menu = 0;
-                }
+                mp_tmsg(MSGT_CPLAYER, MSGL_ERR, "Menu init failed.\n");
             }
         }
     }

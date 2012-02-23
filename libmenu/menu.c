@@ -405,6 +405,8 @@ int menu_init(struct MPContext *mpctx, struct m_config *mconfig,
 // Destroy all this stuff
 void menu_uninit(void) {
   int i;
+  if (!global_menu_state)
+    return;
   global_menu_state = NULL;
   for(i = 0 ; menu_list && menu_list[i].name ; i++) {
     free(menu_list[i].name);
