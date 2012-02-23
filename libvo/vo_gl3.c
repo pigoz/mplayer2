@@ -1844,6 +1844,7 @@ static int preinit(struct vo *vo, const char *arg)
         .swap_interval = 1,
         .osd_color = 0xffffff,
         .fbo_format = GL_RGB16,
+        .use_scale_sep = 1,
         .use_fancy_downscaling = 1,
         .scalers = {
             { .id = 0, .texunit = 5 },
@@ -1898,13 +1899,6 @@ static int preinit(struct vo *vo, const char *arg)
                "  filter-strength=<value>\n"
                "    Set the effect strength for the sharpen4/sharpen5 filters.\n"
                "    Default: 0.5\n"
-               "  cscale=<n>\n"
-               "    As lscale but for chroma (2x slower with little visible effect).\n"
-               "  scale-sep\n"
-               "    When using a separable scale filter for luma, do two filter\n"
-               "    passes. This is often faster. Note that chroma scalers will\n"
-               "    still be done as 1-pass filter.\n"
-               "    Forces the option 'indirect', and scaling will be done in RGB.\n"
                "  osdcolor=<0xAARRGGBB>\n"
                "    Use the given color for the OSD.\n"
                "  stereo=<n>\n"
@@ -1926,6 +1920,18 @@ static int preinit(struct vo *vo, const char *arg)
                "  swapinterval=<n>\n"
                "    Interval in displayed frames between to buffer swaps.\n"
                "    1 is equivalent to enable VSYNC, 0 to disable VSYNC.\n"
+               "  no-scale-sep\n"
+               "    When using a separable scale filter for luma, usually two filter\n"
+               "    passes are done. This is often faster. However, it forces\n"
+               "    conversion to RGB in an extra pass, so it can actually be slower\n"
+               "    if used with fast filters on small screen resolutions. Using\n"
+               "    this options will make rendering a single operation.\n"
+               "    Note that chroma scalers are always done as 1-pass filters.\n"
+               "  cscale=<n>\n"
+               "    As lscale but for chroma (2x slower with little visible effect).\n"
+               "    Note that with some scaling filters, upscaling is always done\n"
+               "    in RGB. Setting this option doesn't necessarily help with\n"
+               "    anything.\n"
                "  no-fancy-downscaling\n"
                "    When using convolution based filters, don't extend the filter\n"
                "    size when downscaling. Trades downscaling performance for\n"
