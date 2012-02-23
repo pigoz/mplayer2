@@ -123,12 +123,6 @@ struct texplane {
     uint8_t clear_val;
 };
 
-struct vertex_array {
-    GLuint buffer;
-    GLuint vao;
-    int vertex_count;
-};
-
 struct scaler {
     int id;
     char *name;
@@ -156,7 +150,9 @@ struct gl_priv {
     int gl_debug;
     int force_gl2;
 
-    struct vertex_array va_osd, va_eosd, va_tmp;
+    GLuint vertex_buffer;
+    GLuint vao;
+
     GLuint osd_program, eosd_program;
     GLuint indirect_program, scale_sep_program, final_program;
 
@@ -353,55 +349,19 @@ static bool can_use_filter_kernel(const struct filter_kernel *kernel)
     return mp_init_filter(&k, filter_sizes, 1);
 }
 
-static void vertex_array_init(GL *gl, struct vertex_array * va)
+static void draw_triangles(struct gl_priv *p, struct vertex *vb, int vert_count)
 {
-    size_t stride = sizeof(struct vertex);
+    GL *gl = p->gl;
 
-    *va = (struct vertex_array) {0};
+    assert(vert_count % 3 == 0);
 
-    gl->GenBuffers(1, &va->buffer);
-    gl->GenVertexArrays(1, &va->vao);
-
-    gl->BindBuffer(GL_ARRAY_BUFFER, va->buffer);
-    gl->BindVertexArray(va->vao);
-
-    gl->EnableVertexAttribArray(VERTEX_ATTRIB_POSITION);
-    gl->VertexAttribPointer(VERTEX_ATTRIB_POSITION, 2, GL_FLOAT, GL_FALSE,
-                            stride, (void*)offsetof(struct vertex, position));
-
-    gl->EnableVertexAttribArray(VERTEX_ATTRIB_COLOR);
-    gl->VertexAttribPointer(VERTEX_ATTRIB_COLOR, 4, GL_UNSIGNED_BYTE, GL_TRUE,
-                            stride, (void*)offsetof(struct vertex, color));
-
-    gl->EnableVertexAttribArray(VERTEX_ATTRIB_TEXCOORD);
-    gl->VertexAttribPointer(VERTEX_ATTRIB_TEXCOORD, 2, GL_FLOAT, GL_FALSE,
-                            stride, (void*)offsetof(struct vertex, texcoord));
-
-    gl->BindBuffer(GL_ARRAY_BUFFER, 0);
-    gl->BindVertexArray(0);
-}
-
-static void vertex_array_uninit(GL *gl, struct vertex_array *va)
-{
-    gl->DeleteVertexArrays(1, &va->vao);
-    gl->DeleteBuffers(1, &va->buffer);
-    *va = (struct vertex_array) {0};
-}
-
-static void vertex_array_upload(GL *gl, struct vertex_array *va,
-                                struct vertex *vb, int vertex_count)
-{
-    gl->BindBuffer(GL_ARRAY_BUFFER, va->buffer);
-    gl->BufferData(GL_ARRAY_BUFFER, vertex_count * sizeof(struct vertex), vb,
+    gl->BindBuffer(GL_ARRAY_BUFFER, p->vertex_buffer);
+    gl->BufferData(GL_ARRAY_BUFFER, vert_count * sizeof(struct vertex), vb,
                    GL_DYNAMIC_DRAW);
     gl->BindBuffer(GL_ARRAY_BUFFER, 0);
-    va->vertex_count = vertex_count;
-}
 
-static void vertex_array_draw(GL *gl, struct vertex_array *va)
-{
-    gl->BindVertexArray(va->vao);
-    gl->DrawArrays(GL_TRIANGLES, 0, va->vertex_count);
+    gl->BindVertexArray(p->vao);
+    gl->DrawArrays(GL_TRIANGLES, 0, vert_count);
     gl->BindVertexArray(0);
 
     glCheckError(gl, "after rendering");
@@ -781,9 +741,6 @@ static void genEOSD(struct gl_priv *p, mp_eosd_images_t *imgs)
                    p->eosd_texture_width, p->eosd_texture_height,
                    color, false);
     }
-
-    vertex_array_upload(gl, &p->va_eosd, p->eosd_va,
-                        p->eosd->targets_count * VERTICES_PER_QUAD);
 }
 
 static void draw_eosd(struct gl_priv *p, mp_eosd_images_t *imgs)
@@ -799,7 +756,7 @@ static void draw_eosd(struct gl_priv *p, mp_eosd_images_t *imgs)
     gl->BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     gl->BindTexture(GL_TEXTURE_2D, p->eosd_texture);
     gl->UseProgram(p->eosd_program);
-    vertex_array_draw(gl, &p->va_eosd);
+    draw_triangles(p, p->eosd_va, p->eosd->targets_count * VERTICES_PER_QUAD);
     gl->UseProgram(0);
     gl->BindTexture(GL_TEXTURE_2D, 0);
     gl->Disable(GL_BLEND);
@@ -870,9 +827,8 @@ static void uninitGL(struct gl_priv *p)
 
     uninitVideo(p);
 
-    vertex_array_uninit(gl, &p->va_osd);
-    vertex_array_uninit(gl, &p->va_eosd);
-    vertex_array_uninit(gl, &p->va_tmp);
+    gl->DeleteVertexArrays(1, &p->vao);
+    gl->DeleteBuffers(1, &p->vertex_buffer);
 
     clearOSD(p);
     gl->DeleteTextures(1, &p->eosd_texture);
@@ -1092,6 +1048,23 @@ static void compile_shaders(struct gl_priv *p)
 }
 
 
+static void setup_vertex_array(GL *gl)
+{
+    size_t stride = sizeof(struct vertex);
+
+    gl->EnableVertexAttribArray(VERTEX_ATTRIB_POSITION);
+    gl->VertexAttribPointer(VERTEX_ATTRIB_POSITION, 2, GL_FLOAT, GL_FALSE,
+                            stride, (void*)offsetof(struct vertex, position));
+
+    gl->EnableVertexAttribArray(VERTEX_ATTRIB_COLOR);
+    gl->VertexAttribPointer(VERTEX_ATTRIB_COLOR, 4, GL_UNSIGNED_BYTE, GL_TRUE,
+                            stride, (void*)offsetof(struct vertex, color));
+
+    gl->EnableVertexAttribArray(VERTEX_ATTRIB_TEXCOORD);
+    gl->VertexAttribPointer(VERTEX_ATTRIB_TEXCOORD, 2, GL_FLOAT, GL_FALSE,
+                            stride, (void*)offsetof(struct vertex, texcoord));
+}
+
 // First-time initialization of the GL state.
 static int initGL(struct gl_priv *p)
 {
@@ -1113,9 +1086,14 @@ static int initGL(struct gl_priv *p)
     gl->Disable(GL_CULL_FACE);
     gl->DrawBuffer(GL_BACK);
 
-    vertex_array_init(gl, &p->va_eosd);
-    vertex_array_init(gl, &p->va_osd);
-    vertex_array_init(gl, &p->va_tmp);
+    gl->GenBuffers(1, &p->vertex_buffer);
+    gl->GenVertexArrays(1, &p->vao);
+
+    gl->BindBuffer(GL_ARRAY_BUFFER, p->vertex_buffer);
+    gl->BindVertexArray(p->vao);
+    setup_vertex_array(gl);
+    gl->BindBuffer(GL_ARRAY_BUFFER, 0);
+    gl->BindVertexArray(0);
 
     GLint max_texture_size;
     gl->GetIntegerv(GL_MAX_TEXTURE_SIZE, &max_texture_size);
@@ -1388,8 +1366,6 @@ static void draw_osd(struct vo *vo, struct osd_state *osd)
                           p->border_y, p->border_x,
                           p->border_y, p->image_width,
                           p->image_height, create_osd_texture, p);
-        vertex_array_upload(gl, &p->va_osd, &p->osd_va[0],
-                            p->osdtexCnt * VERTICES_PER_QUAD);
     }
 
     if (p->osdtexCnt > 0) {
@@ -1398,15 +1374,13 @@ static void draw_osd(struct vo *vo, struct osd_state *osd)
         gl->BlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
         gl->UseProgram(p->osd_program);
-        gl->BindVertexArray(p->va_osd.vao);
 
         for (int n = 0; n < p->osdtexCnt; n++) {
             gl->BindTexture(GL_TEXTURE_2D, p->osdtex[n]);
-            gl->DrawArrays(GL_TRIANGLES, n * VERTICES_PER_QUAD,
+            draw_triangles(p, &p->osd_va[n * VERTICES_PER_QUAD],
                            VERTICES_PER_QUAD);
         }
 
-        gl->BindVertexArray(0);
         gl->UseProgram(0);
 
         gl->Disable(GL_BLEND);
@@ -1427,8 +1401,7 @@ static void render_to_fbo(struct gl_priv *p, struct fbotex *fbo, int w, int h,
                0, 0, w, h,
                tex_w, tex_h,
                NULL, false);
-    vertex_array_upload(gl, &p->va_tmp, vb, VERTICES_PER_QUAD);
-    vertex_array_draw(gl, &p->va_tmp);
+    draw_triangles(p, vb, VERTICES_PER_QUAD);
 
     gl->BindFramebuffer(GL_FRAMEBUFFER, 0);
     gl->Viewport(p->vp_x, p->vp_y, p->vp_w, p->vp_h);
@@ -1453,7 +1426,7 @@ static void handle_pass(struct gl_priv *p, struct fbotex **source,
 static void do_render(struct gl_priv *p)
 {
     GL *gl = p->gl;
-    struct vertex vb[VERTICES_PER_QUAD * 2];
+    struct vertex vb[VERTICES_PER_QUAD];
     bool is_flipped = p->mpi_flipped ^ p->vo_flipped;
 
     // Order of processing:
@@ -1481,6 +1454,9 @@ static void do_render(struct gl_priv *p)
     if (p->stereo_mode) {
         int w = p->src_rect.width;
         int imgw = p->image_width;
+
+        glEnable3DLeft(gl, p->stereo_mode);
+
         write_quad(vb,
                    p->dst_rect.left, p->dst_rect.top,
                    p->dst_rect.right, p->dst_rect.bottom,
@@ -1488,25 +1464,20 @@ static void do_render(struct gl_priv *p)
                    p->src_rect.left / 2 + w / 2, p->src_rect.bottom,
                    final_texw, final_texh,
                    NULL, is_flipped);
-        write_quad(vb + VERTICES_PER_QUAD,
+        draw_triangles(p, vb, VERTICES_PER_QUAD);
+
+        glEnable3DRight(gl, p->stereo_mode);
+
+        write_quad(vb,
                    p->dst_rect.left, p->dst_rect.top,
                    p->dst_rect.right, p->dst_rect.bottom,
                    p->src_rect.left / 2 + imgw / 2, p->src_rect.top,
                    p->src_rect.left / 2 + imgw / 2 + w / 2, p->src_rect.bottom,
                    final_texw, final_texh,
                    NULL, is_flipped);
+        draw_triangles(p, vb, VERTICES_PER_QUAD);
 
-        vertex_array_upload(gl, &p->va_tmp, vb, VERTICES_PER_QUAD * 2);
-
-        gl->BindVertexArray(p->va_tmp.vao);
-
-        glEnable3DLeft(gl, p->stereo_mode);
-        gl->DrawArrays(GL_TRIANGLES, 0, VERTICES_PER_QUAD);
-        glEnable3DRight(gl, p->stereo_mode);
-        gl->DrawArrays(GL_TRIANGLES, VERTICES_PER_QUAD, VERTICES_PER_QUAD);
         glDisable3D(gl, p->stereo_mode);
-
-        gl->BindVertexArray(0);
     } else {
         write_quad(vb,
                    p->dst_rect.left, p->dst_rect.top,
@@ -1515,9 +1486,7 @@ static void do_render(struct gl_priv *p)
                    p->src_rect.right, p->src_rect.bottom,
                    final_texw, final_texh,
                    NULL, is_flipped);
-
-        vertex_array_upload(gl, &p->va_tmp, vb, VERTICES_PER_QUAD);
-        vertex_array_draw(gl, &p->va_tmp);
+        draw_triangles(p, vb, VERTICES_PER_QUAD);
     }
 
     if (p->use_srgb)
