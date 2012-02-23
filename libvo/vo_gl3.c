@@ -1854,7 +1854,7 @@ static int preinit(struct vo *vo, const char *arg)
 
     p->eosd = eosd_packer_create(vo);
 
-    char *lscale = NULL;
+    char *lscale = strdup("lanczos2");
     char *cscale = NULL;
     char *backend_arg = NULL;
     char *fbo_format = NULL;
@@ -1889,13 +1889,14 @@ static int preinit(struct vo *vo, const char *arg)
                "\nOptions:\n"
                "  lscale=<filter>\n"
                "    Set the scaling filter. Possible choices:\n"
-               "    bilinear: bilinear texture filtering (default/fastest).\n"
+               "    bilinear: bilinear texture filtering (fastest).\n"
                "    bicubic_fast: bicubic filter (without lookup texture).\n"
                "    sharpen3: unsharp masking (sharpening) with radius=3.\n"
                "    sharpen5: unsharp masking (sharpening) with radius=5.\n"
-               "    lanczos2: Lanczos with radius=2 (recommended).\n"
+               "    lanczos2: Lanczos with radius=2 (default, recommended).\n"
                "    lanczos3: Lanczos with radius=3.\n"
                "    There are more filters - print a list with lscale=help.\n"
+               "    Default: lanczos2\n"
                "  filter-strength=<value>\n"
                "    Set the effect strength for the sharpen4/sharpen5 filters.\n"
                "    Default: 0.5\n"
