@@ -335,6 +335,7 @@ typedef struct {
     int chrom_texw;
     int chrom_texh;
     float filter_strength;
+    float noise_strength;
 } gl_conversion_params_t;
 
 int glAutodetectYUVConversion(GL *gl);
@@ -398,6 +399,8 @@ typedef struct MPGLContext {
     void (*ontop)(struct vo *vo);
 } MPGLContext;
 
+int mpgl_find_backend(const char *name);
+
 MPGLContext *init_mpglcontext(enum MPGLType type, struct vo *vo);
 void uninit_mpglcontext(MPGLContext *ctx);
 
@@ -426,7 +429,6 @@ struct GL {
     void (GLAPIENTRY *TexEnvf)(GLenum, GLenum, GLfloat);
     void (GLAPIENTRY *TexEnvi)(GLenum, GLenum, GLint);
     void (GLAPIENTRY *Color4ub)(GLubyte, GLubyte, GLubyte, GLubyte);
-    void (GLAPIENTRY *Color3f)(GLfloat, GLfloat, GLfloat);
     void (GLAPIENTRY *Color4f)(GLfloat, GLfloat, GLfloat, GLfloat);
     void (GLAPIENTRY *ClearColor)(GLclampf, GLclampf, GLclampf, GLclampf);
     void (GLAPIENTRY *ClearDepth)(GLclampd);

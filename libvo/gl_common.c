@@ -218,8 +218,8 @@ int glFindFormat(uint32_t fmt, int have_texture_rg, int *bpp, GLint *gl_texfmt,
     // we do not support palettized formats, although the format the
     // swscale produces works
     case IMGFMT_RGB8:
-        gl_format = GL_RGB;
-        gl_type = GL_UNSIGNED_BYTE_2_3_3_REV;
+        *gl_format = GL_RGB;
+        *gl_type = GL_UNSIGNED_BYTE_2_3_3_REV;
         break;
 #endif
     case IMGFMT_RGB15:
@@ -232,12 +232,12 @@ int glFindFormat(uint32_t fmt, int have_texture_rg, int *bpp, GLint *gl_texfmt,
         break;
 #if 0
     case IMGFMT_BGR8:
-        // special case as red and blue have a differen number of bits.
+        // special case as red and blue have a different number of bits.
         // GL_BGR and GL_UNSIGNED_BYTE_3_3_2 isn't supported at least
         // by nVidia drivers, and in addition would give more bits to
         // blue than to red, which isn't wanted
-        gl_format = GL_RGB;
-        gl_type = GL_UNSIGNED_BYTE_3_3_2;
+        *gl_format = GL_RGB;
+        *gl_type = GL_UNSIGNED_BYTE_3_3_2;
         break;
 #endif
     case IMGFMT_BGR15:
@@ -329,7 +329,6 @@ static const extfunc_desc_t extfuncs[] = {
     DEF_FUNC_DESC(TexEnvf),
     DEF_FUNC_DESC(TexEnvi),
     DEF_FUNC_DESC(Color4ub),
-    DEF_FUNC_DESC(Color3f),
     DEF_FUNC_DESC(Color4f),
     DEF_FUNC_DESC(ClearColor),
     DEF_FUNC_DESC(ClearDepth),
@@ -861,11 +860,41 @@ static void gen_spline_lookup_tex(GL *gl, GLenum unit)
     free(tex);
 }
 
+#define NOISE_RES 2048
+
+/**
+ * \brief creates the 1D lookup texture needed to generate pseudo-random numbers.
+ * \param unit texture unit to attach texture to
+ */
+static void gen_noise_lookup_tex(GL *gl, GLenum unit) {
+    GLfloat *tex = calloc(NOISE_RES, sizeof(*tex));
+    uint32_t lcg = 0x79381c11;
+    int i;
+    for (i = 0; i < NOISE_RES; i++)
+        tex[i] = (double)i / (NOISE_RES - 1);
+    for (i = 0; i < NOISE_RES - 1; i++) {
+        int remain = NOISE_RES - i;
+        int idx = i + (lcg >> 16) % remain;
+        GLfloat tmp = tex[i];
+        tex[i] = tex[idx];
+        tex[idx] = tmp;
+        lcg = lcg * 1664525 + 1013904223;
+    }
+    gl->ActiveTexture(unit);
+    gl->TexImage1D(GL_TEXTURE_1D, 0, 1, NOISE_RES, 0, GL_RED, GL_FLOAT, tex);
+    gl->TexParameterf(GL_TEXTURE_1D, GL_TEXTURE_PRIORITY, 1.0);
+    gl->TexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    gl->TexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    gl->TexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    gl->ActiveTexture(GL_TEXTURE0);
+    free(tex);
+}
+
 #define SAMPLE(dest, coord, texture) \
     "TEX textemp, " coord ", " texture ", $tex_type;\n" \
     "MOV " dest ", textemp.r;\n"
 
-static const char *bilin_filt_template =
+static const char bilin_filt_template[] =
     SAMPLE("yuv.$out_comp","fragment.texcoord[$in_tex]","texture[$in_tex]");
 
 #define BICUB_FILT_MAIN \
@@ -882,7 +911,7 @@ static const char *bilin_filt_template =
     /* x-interpolation */ \
     "LRP yuv.$out_comp, parmx.b, a.bbbb, a.aaaa;\n"
 
-static const char *bicub_filt_template_2D =
+static const char bicub_filt_template_2D[] =
     "MAD coord.xy, fragment.texcoord[$in_tex], {$texw, $texh}, {0.5, 0.5};\n"
     "TEX parmx, coord.x, texture[$texs], 1D;\n"
     "MUL cdelta.xz, parmx.rrgg, {-$ptw, 0, $ptw, 0};\n"
@@ -890,7 +919,7 @@ static const char *bicub_filt_template_2D =
     "MUL cdelta.yw, parmy.rrgg, {0, -$pth, 0, $pth};\n"
     BICUB_FILT_MAIN;
 
-static const char *bicub_filt_template_RECT =
+static const char bicub_filt_template_RECT[] =
     "ADD coord, fragment.texcoord[$in_tex], {0.5, 0.5};\n"
     "TEX parmx, coord.x, texture[$texs], 1D;\n"
     "MUL cdelta.xz, parmx.rrgg, {-1, 0, 1, 0};\n"
@@ -908,7 +937,7 @@ static const char *bicub_filt_template_RECT =
     "ADD "t ".x, "t ".xxxx, "s ";\n" \
     "SUB "t ".y, "t ".yyyy, "s ";\n"
 
-static const char *bicub_notex_filt_template_2D =
+static const char bicub_notex_filt_template_2D[] =
     "MAD coord.xy, fragment.texcoord[$in_tex], {$texw, $texh}, {0.5, 0.5};\n"
     "FRC coord.xy, coord.xyxy;\n"
     CALCWEIGHTS("parmx", "coord.xxxx")
@@ -917,7 +946,7 @@ static const char *bicub_notex_filt_template_2D =
     "MUL cdelta.yw, parmy.rrgg, {0, -$pth, 0, $pth};\n"
     BICUB_FILT_MAIN;
 
-static const char *bicub_notex_filt_template_RECT =
+static const char bicub_notex_filt_template_RECT[] =
     "ADD coord, fragment.texcoord[$in_tex], {0.5, 0.5};\n"
     "FRC coord.xy, coord.xyxy;\n"
     CALCWEIGHTS("parmx", "coord.xxxx")
@@ -934,19 +963,19 @@ static const char *bicub_notex_filt_template_RECT =
     /* x-interpolation */ \
     "LRP yuv.$out_comp, parmx.b, a.rrrr, b.rrrr;\n"
 
-static const char *bicub_x_filt_template_2D =
+static const char bicub_x_filt_template_2D[] =
     "MAD coord.x, fragment.texcoord[$in_tex], {$texw}, {0.5};\n"
     "TEX parmx, coord, texture[$texs], 1D;\n"
     "MUL cdelta.xyz, parmx.rrgg, {-$ptw, 0, $ptw};\n"
     BICUB_X_FILT_MAIN;
 
-static const char *bicub_x_filt_template_RECT =
+static const char bicub_x_filt_template_RECT[] =
     "ADD coord.x, fragment.texcoord[$in_tex], {0.5};\n"
     "TEX parmx, coord, texture[$texs], 1D;\n"
     "MUL cdelta.xyz, parmx.rrgg, {-1, 0, 1};\n"
     BICUB_X_FILT_MAIN;
 
-static const char *unsharp_filt_template =
+static const char unsharp_filt_template[] =
     "PARAM dcoord$out_comp = {$ptw_05, $pth_05, $ptw_05, -$pth_05};\n"
     "ADD coord, fragment.texcoord[$in_tex].xyxy, dcoord$out_comp;\n"
     "SUB coord2, fragment.texcoord[$in_tex].xyxy, dcoord$out_comp;\n"
@@ -961,7 +990,7 @@ static const char *unsharp_filt_template =
     "MAD textemp.r, b.r, {$strength}, a.r;\n"
     "MOV yuv.$out_comp, textemp.r;\n";
 
-static const char *unsharp_filt_template2 =
+static const char unsharp_filt_template2[] =
     "PARAM dcoord$out_comp = {$ptw_12, $pth_12, $ptw_12, -$pth_12};\n"
     "PARAM dcoord2$out_comp = {$ptw_15, 0, 0, $pth_15};\n"
     "ADD coord, fragment.texcoord[$in_tex].xyxy, dcoord$out_comp;\n"
@@ -986,7 +1015,7 @@ static const char *unsharp_filt_template2 =
     "MAD textemp.r, b.r, {$strength}, a.r;\n"
     "MOV yuv.$out_comp, textemp.r;\n";
 
-static const char *yuv_prog_template =
+static const char yuv_prog_template[] =
     "PARAM ycoef = {$cm11, $cm21, $cm31};\n"
     "PARAM ucoef = {$cm12, $cm22, $cm32};\n"
     "PARAM vcoef = {$cm13, $cm23, $cm33};\n"
@@ -994,10 +1023,9 @@ static const char *yuv_prog_template =
     "TEMP res;\n"
     "MAD res.rgb, yuv.rrrr, ycoef, offsets;\n"
     "MAD res.rgb, yuv.gggg, ucoef, res;\n"
-    "MAD result.color.rgb, yuv.bbbb, vcoef, res;\n"
-    "END";
+    "MAD res.rgb, yuv.bbbb, vcoef, res;\n";
 
-static const char *yuv_pow_prog_template =
+static const char yuv_pow_prog_template[] =
     "PARAM ycoef = {$cm11, $cm21, $cm31};\n"
     "PARAM ucoef = {$cm12, $cm22, $cm32};\n"
     "PARAM vcoef = {$cm13, $cm23, $cm33};\n"
@@ -1007,12 +1035,11 @@ static const char *yuv_pow_prog_template =
     "MAD res.rgb, yuv.rrrr, ycoef, offsets;\n"
     "MAD res.rgb, yuv.gggg, ucoef, res;\n"
     "MAD_SAT res.rgb, yuv.bbbb, vcoef, res;\n"
-    "POW result.color.r, res.r, gamma.r;\n"
-    "POW result.color.g, res.g, gamma.g;\n"
-    "POW result.color.b, res.b, gamma.b;\n"
-    "END";
+    "POW res.r, res.r, gamma.r;\n"
+    "POW res.g, res.g, gamma.g;\n"
+    "POW res.b, res.b, gamma.b;\n";
 
-static const char *yuv_lookup_prog_template =
+static const char yuv_lookup_prog_template[] =
     "PARAM ycoef = {$cm11, $cm21, $cm31, 0};\n"
     "PARAM ucoef = {$cm12, $cm22, $cm32, 0};\n"
     "PARAM vcoef = {$cm13, $cm23, $cm33, 0};\n"
@@ -1021,16 +1048,23 @@ static const char *yuv_lookup_prog_template =
     "MAD res, yuv.rrrr, ycoef, offsets;\n"
     "MAD res.rgb, yuv.gggg, ucoef, res;\n"
     "MAD res.rgb, yuv.bbbb, vcoef, res;\n"
-    "TEX result.color.r, res.raaa, texture[$conv_tex0], 2D;\n"
+    "TEX res.r, res.raaa, texture[$conv_tex0], 2D;\n"
     "ADD res.a, res.a, 0.25;\n"
-    "TEX result.color.g, res.gaaa, texture[$conv_tex0], 2D;\n"
+    "TEX res.g, res.gaaa, texture[$conv_tex0], 2D;\n"
     "ADD res.a, res.a, 0.25;\n"
-    "TEX result.color.b, res.baaa, texture[$conv_tex0], 2D;\n"
-    "END";
+    "TEX res.b, res.baaa, texture[$conv_tex0], 2D;\n";
 
-static const char *yuv_lookup3d_prog_template =
-    "TEX result.color, yuv, texture[$conv_tex0], 3D;\n"
-    "END";
+static const char yuv_lookup3d_prog_template[] =
+    "TEMP res;\n"
+    "TEX res, yuv, texture[$conv_tex0], 3D;\n";
+
+static const char noise_filt_template[] =
+    "MUL coord.xy, fragment.texcoord[0], {$noise_sx, $noise_sy};\n"
+    "TEMP rand;\n"
+    "TEX rand.r, coord.x, texture[$noise_filt_tex], 1D;\n"
+    "ADD rand.r, rand.r, coord.y;\n"
+    "TEX rand.r, rand.r, texture[$noise_filt_tex], 1D;\n"
+    "MAD res.rgb, rand.rrrr, {$noise_str, $noise_str, $noise_str}, res;\n";
 
 /**
  * \brief creates and initializes helper textures needed for scaling texture read
@@ -1275,10 +1309,12 @@ static void glSetupYUVFragprog(GL *gl, gl_conversion_params_t *params)
     char lum_scale_texs[1];
     char chrom_scale_texs[1];
     char conv_texs[1];
+    char filt_texs[1] = {0};
     GLint i;
     // this is the conversion matrix, with y, u, v factors
     // for red, green, blue and the constant offsets
     float yuv2rgb[3][4];
+    int noise = params->noise_strength != 0;
     create_conv_textures(gl, params, &cur_texu, conv_texs);
     create_scaler_textures(gl, YUV_LUM_SCALER(type), &cur_texu, lum_scale_texs);
     if (YUV_CHROM_SCALER(type) == YUV_LUM_SCALER(type))
@@ -1286,6 +1322,12 @@ static void glSetupYUVFragprog(GL *gl, gl_conversion_params_t *params)
     else
         create_scaler_textures(gl, YUV_CHROM_SCALER(type), &cur_texu,
                                chrom_scale_texs);
+
+    if (noise) {
+        gen_noise_lookup_tex(gl, cur_texu);
+        filt_texs[0] = '0' + cur_texu++;
+    }
+
     gl->GetIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &i);
     if (i < cur_texu)
         mp_msg(MSGT_VO, MSGL_ERR,
@@ -1334,6 +1376,25 @@ static void glSetupYUVFragprog(GL *gl, gl_conversion_params_t *params)
     replace_var_float(prog, "gamma_g", (float)1.0 / params->csp_params.ggamma);
     replace_var_float(prog, "gamma_b", (float)1.0 / params->csp_params.bgamma);
     replace_var_char(prog, "conv_tex0", conv_texs[0]);
+
+    if (noise) {
+        // 1.0 strength is suitable for dithering 8 to 6 bit
+        double str = params->noise_strength * (1.0 / 64);
+        double scale_x = (double)NOISE_RES / texw;
+        double scale_y = (double)NOISE_RES / texh;
+        if (rect) {
+            scale_x /= texw;
+            scale_y /= texh;
+        }
+        append_template(prog, noise_filt_template);
+        replace_var_float(prog, "noise_sx", scale_x);
+        replace_var_float(prog, "noise_sy", scale_y);
+        replace_var_char(prog, "noise_filt_tex", filt_texs[0]);
+        replace_var_float(prog, "noise_str", str);
+    }
+
+    append_template(prog, "MOV result.color.rgb, res;\nEND");
+
     mp_msg(MSGT_VO, MSGL_DBG2, "[gl] generated fragment program:\n%s\n",
            yuv_prog);
     loadGPUProgram(gl, GL_FRAGMENT_PROGRAM, yuv_prog);
@@ -2025,6 +2086,36 @@ static void new_sdl_update_xinerama_info(struct vo *vo) { sdl_update_xinerama_in
 static void new_vo_sdl_fullscreen(struct vo *vo) { vo_sdl_fullscreen(); }
 
 #endif
+
+struct backend {
+    const char *name;
+    enum MPGLType type;
+};
+
+static struct backend backends[] = {
+    {"auto", GLTYPE_AUTO},
+    {"cocoa", GLTYPE_COCOA},
+    {"win", GLTYPE_W32},
+    {"x11", GLTYPE_X11},
+    {"sdl", GLTYPE_SDL},
+    // mplayer-svn aliases (note that mplayer-svn couples these with the numeric
+    // values of the internal GLTYPE_* constants)
+    {"-1", GLTYPE_AUTO},
+    { "0", GLTYPE_W32},
+    { "1", GLTYPE_X11},
+    { "2", GLTYPE_SDL},
+
+    {0}
+};
+
+int mpgl_find_backend(const char *name)
+{
+    for (const struct backend *entry = backends; entry->name; entry++) {
+        if (strcmp(entry->name, name) == 0)
+            return entry->type;
+    }
+    return -1;
+}
 
 MPGLContext *init_mpglcontext(enum MPGLType type, struct vo *vo)
 {
