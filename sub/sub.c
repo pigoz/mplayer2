@@ -520,6 +520,7 @@ TODO: support for separated graphics symbols (where six rectangles does not touc
 
 int vo_osd_progbar_type=-1;
 int vo_osd_progbar_value=100;   // 0..256
+int progbar_align=50;
 
 // if we have n=256 bars then OSD progbar looks like below
 //
@@ -546,7 +547,7 @@ inline static void vo_update_text_progbar(mp_osd_obj_t* obj,int dxs,int dys){
 
     // calculate bbox corners:
     {	int h=0;
-        int y=(dys-vo_font->height)/2;
+        int y=((dys-vo_font->height)*progbar_align)/100;
         int delimw=vo_font->width[OSD_PB_START]
      		  +vo_font->width[OSD_PB_END]
      		  +vo_font->charspace;

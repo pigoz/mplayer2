@@ -947,6 +947,8 @@ const m_option_t mplayer_opts[]={
     {"help", (void *) help_text, CONF_TYPE_PRINT, CONF_NOCFG|CONF_GLOBAL, 0, 0, NULL},
     {"h", (void *) help_text, CONF_TYPE_PRINT, CONF_NOCFG|CONF_GLOBAL, 0, 0, NULL},
 
+    {"progbar-align", &progbar_align, CONF_TYPE_INT, CONF_GLOBAL, 0, 100, NULL},
+
     {NULL, NULL, 0, 0, 0, 0, NULL}
 };
 

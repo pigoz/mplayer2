@@ -30,6 +30,7 @@ extern char ** video_fm_list;
 extern char ** video_driver_list;
 extern char ** audio_driver_list;
 extern float  audio_delay;
+extern int progbar_align;
 
 extern unsigned int osd_visible;
 
