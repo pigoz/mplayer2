@@ -1620,8 +1620,7 @@ static uint32_t draw_image(struct gl_priv *p, mp_image_t *mpi)
         gl->ActiveTexture(GL_TEXTURE0 + n);
         gl->BindTexture(GL_TEXTURE_2D, plane->gl_texture);
         glUploadTex(gl, GL_TEXTURE_2D, p->gl_format, p->gl_type, plane_ptr,
-                    mpi->stride[n], mpi->x >> xs, mpi->y >> ys, w >> xs,
-                    h >> ys, 0);
+                    mpi->stride[n], 0, 0, w >> xs, h >> ys, 0);
     }
     gl->ActiveTexture(GL_TEXTURE0);
     gl->BindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
