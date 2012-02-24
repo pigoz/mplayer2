@@ -1722,11 +1722,8 @@ static void print_scalers(void)
 }
 #endif
 
-static const char* handle_scaler_opt(const char *name, const char *def)
+static const char* handle_scaler_opt(const char *name)
 {
-    if (!name)
-        name = def ? def : "";
-
     const struct filter_kernel *kernel = mp_find_filter_kernel(name);
     if (can_use_filter_kernel(kernel))
         return kernel->name;
@@ -1741,7 +1738,7 @@ static const char* handle_scaler_opt(const char *name, const char *def)
 
 static int scaler_valid(void *arg)
 {
-    return handle_scaler_opt(*(const char **)arg, NULL) != NULL;
+    return handle_scaler_opt(*(const char **)arg) != NULL;
 }
 
 static int backend_valid(void *arg)
@@ -1924,13 +1921,15 @@ static int preinit(struct vo *vo, const char *arg)
     int backend = backend_arg ? mpgl_find_backend(backend_arg) : GLTYPE_AUTO;
     free(backend_arg);
 
-    p->fbo_format = fbo_format ? find_fbo_format(fbo_format) : GL_RGBA16;
+    if (fbo_format)
+        p->fbo_format = find_fbo_format(fbo_format);
     free(fbo_format);
 
-    p->scalers[0].name = handle_scaler_opt(scalers[0], p->scalers[0].name);
-    free(scalers[0]);
-    p->scalers[1].name = handle_scaler_opt(scalers[1], p->scalers[1].name);
-    free(scalers[1]);
+    for (int n = 0; n < 2; n++) {
+        if (scalers[n])
+            p->scalers[n].name = handle_scaler_opt(scalers[n]);
+        free(scalers[n]);
+    }
 
     p->eosd = eosd_packer_create(vo);
 
