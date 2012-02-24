@@ -158,14 +158,13 @@ struct gl_priv {
 
     //! Textures for OSD
     GLuint osdtex[MAX_OSD_PARTS];
+    int osdtex_count;
     GLuint eosd_texture;
     GLuint eosd_buffer;
     int eosd_texture_width, eosd_texture_height;
     struct eosd_packer *eosd;
     struct vertex *eosd_va;
     struct vertex osd_va[MAX_OSD_PARTS * VERTICES_PER_QUAD];
-    //! How many parts the OSD currently consists of
-    int osdtexCnt;
     int osd_color;
 
     int use_indirect;           // convert YUV to RGB texture first
@@ -315,7 +314,7 @@ static void default_tex_params(struct GL *gl, GLenum target, GLint filter)
     gl->TexParameteri(target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 }
 
-static void texSize(struct gl_priv *p, int w, int h, int *texw, int *texh)
+static void tex_size(struct gl_priv *p, int w, int h, int *texw, int *texh)
 {
     if (p->use_npot) {
         *texw = w;
@@ -413,7 +412,7 @@ static void fbotex_init(struct gl_priv *p, struct fbotex *fbo, int w, int h)
     assert(!fbo->fbo);
     assert(!fbo->texture);
 
-    texSize(p, w, h, &fbo->tex_w, &fbo->tex_h);
+    tex_size(p, w, h, &fbo->tex_w, &fbo->tex_h);
 
     fbo->vp_w = w;
     fbo->vp_h = h;
@@ -549,7 +548,7 @@ static void update_window_sized_objects(struct gl_priv *p)
     }
 }
 
-static void initScalers(struct gl_priv *p);
+static void reinit_rendering(struct gl_priv *p);
 static void init_scaler(struct gl_priv *p, struct scaler *scaler);
 
 static double get_scale_factor(struct gl_priv *p)
@@ -605,7 +604,7 @@ static void resize(struct gl_priv *p)
         }
     }
     if (need_scaler_reinit) {
-        initScalers(p);
+        reinit_rendering(p);
     } else if (need_scaler_update) {
         init_scaler(p, &p->scalers[0]);
         init_scaler(p, &p->scalers[1]);
@@ -630,21 +629,21 @@ static void resize(struct gl_priv *p)
 /**
  * \brief remove all OSD textures and display-lists, thus clearing it.
  */
-static void clearOSD(struct gl_priv *p)
+static void clear_osd(struct gl_priv *p)
 {
     GL *gl = p->gl;
 
-    if (!p->osdtexCnt)
+    if (!p->osdtex_count)
         return;
-    gl->DeleteTextures(p->osdtexCnt, p->osdtex);
-    p->osdtexCnt = 0;
+    gl->DeleteTextures(p->osdtex_count, p->osdtex);
+    p->osdtex_count = 0;
 }
 
 /**
  * \brief construct display list from ass image list
  * \param img image list to create OSD from.
  */
-static void genEOSD(struct gl_priv *p, mp_eosd_images_t *imgs)
+static void gen_eosd(struct gl_priv *p, mp_eosd_images_t *imgs)
 {
     GL *gl = p->gl;
 
@@ -663,8 +662,8 @@ static void genEOSD(struct gl_priv *p, mp_eosd_images_t *imgs)
     gl->BindTexture(GL_TEXTURE_2D, p->eosd_texture);
 
     if (need_allocate) {
-        texSize(p, p->eosd->surface.w, p->eosd->surface.h,
-                &p->eosd_texture_width, &p->eosd_texture_height);
+        tex_size(p, p->eosd->surface.w, p->eosd->surface.h,
+                 &p->eosd_texture_width, &p->eosd_texture_height);
         gl->TexImage2D(GL_TEXTURE_2D, 0, GL_RED,
                        p->eosd_texture_width, p->eosd_texture_height, 0,
                        GL_RED, GL_UNSIGNED_BYTE, NULL);
@@ -747,7 +746,7 @@ static void draw_eosd(struct gl_priv *p, mp_eosd_images_t *imgs)
 {
     GL *gl = p->gl;
 
-    genEOSD(p, imgs);
+    gen_eosd(p, imgs);
 
     if (p->eosd->targets_count == 0)
         return;
@@ -779,7 +778,7 @@ static void delete_shaders(struct gl_priv *p)
     delete_program(gl, &p->final_program);
 }
 
-static void uninitScalers(struct gl_priv *p)
+static void uninit_rendering(struct gl_priv *p)
 {
     GL *gl = p->gl;
 
@@ -794,11 +793,11 @@ static void uninitScalers(struct gl_priv *p)
 }
 
 // Free video resources etc.
-static void uninitVideo(struct gl_priv *p)
+static void uninit_video(struct gl_priv *p)
 {
     GL *gl = p->gl;
 
-    uninitScalers(p);
+    uninit_rendering(p);
 
     for (int n = 0; n < 3; n++) {
         struct texplane *plane = &p->planes[n];
@@ -818,7 +817,7 @@ static void uninitVideo(struct gl_priv *p)
 /**
  * \brief uninitialize OpenGL context, freeing textures, buffers etc.
  */
-static void uninitGL(struct gl_priv *p)
+static void uninit_gl(struct gl_priv *p)
 {
     GL *gl = p->gl;
 
@@ -826,12 +825,12 @@ static void uninitGL(struct gl_priv *p)
     if (!(p->glctx && p->gl->DeleteTextures))
         return;
 
-    uninitVideo(p);
+    uninit_video(p);
 
     gl->DeleteVertexArrays(1, &p->vao);
     gl->DeleteBuffers(1, &p->vertex_buffer);
 
-    clearOSD(p);
+    clear_osd(p);
     gl->DeleteTextures(1, &p->eosd_texture);
     gl->DeleteBuffers(1, &p->eosd_buffer);
     eosd_packer_reinit(p->eosd, 0, 0);
@@ -1067,11 +1066,11 @@ static void setup_vertex_array(GL *gl)
 }
 
 // First-time initialization of the GL state.
-static int initGL(struct gl_priv *p)
+static int init_gl(struct gl_priv *p)
 {
     GL *gl = p->gl;
 
-    glCheckError(p->gl, "before initGL");
+    glCheckError(p->gl, "before init_gl");
 
     const char *vendor     = gl->GetString(GL_VENDOR);
     const char *version    = gl->GetString(GL_VERSION);
@@ -1105,7 +1104,7 @@ static int initGL(struct gl_priv *p)
     if (gl->SwapInterval && p->swap_interval >= 0)
         gl->SwapInterval(p->swap_interval);
 
-    glCheckError(gl, "after initGL");
+    glCheckError(gl, "after init_gl");
 
     return 1;
 }
@@ -1168,15 +1167,15 @@ static void init_scaler(struct gl_priv *p, struct scaler *scaler)
     glCheckError(gl, "after initializing scaler");
 }
 
-static void initScalers(struct gl_priv *p)
+static void reinit_rendering(struct gl_priv *p)
 {
     GL *gl = p->gl;
 
-    mp_msg(MSGT_VO, MSGL_V, "[gl] Reinit scalers.\n");
+    mp_msg(MSGT_VO, MSGL_V, "[gl] Reinit rendering.\n");
 
     glCheckError(gl, "before scaler initialization");
 
-    uninitScalers(p);
+    uninit_rendering(p);
 
     init_scaler(p, &p->scalers[0]);
     init_scaler(p, &p->scalers[1]);
@@ -1186,7 +1185,7 @@ static void initScalers(struct gl_priv *p)
         fbotex_init(p, &p->indirect_fbo, p->texture_width, p->texture_height);
 }
 
-static void initVideo(struct gl_priv *p)
+static void init_video(struct gl_priv *p)
 {
     GL *gl = p->gl;
 
@@ -1202,8 +1201,8 @@ static void initVideo(struct gl_priv *p)
 
     glCheckError(gl, "before video texture creation");
 
-    texSize(p, p->image_width, p->image_height,
-            &p->texture_width, &p->texture_height);
+    tex_size(p, p->image_width, p->image_height,
+             &p->texture_width, &p->texture_height);
 
     void *tmp = NULL;
     if (!p->use_npot)
@@ -1239,7 +1238,7 @@ static void initVideo(struct gl_priv *p)
 
     glCheckError(gl, "after video texture creation");
 
-    initScalers(p);
+    reinit_rendering(p);
 }
 
 
@@ -1268,7 +1267,7 @@ static int config(struct vo *vo, uint32_t width, uint32_t height,
         return -1;
 
     if (!vo->config_count)
-        initGL(p);
+        init_gl(p);
 
     p->image_d_width = d_width;
     p->image_d_height = d_height;
@@ -1277,11 +1276,11 @@ static int config(struct vo *vo, uint32_t width, uint32_t height,
     if (p->image_format != format || p->image_width != width
         || p->image_height != height)
     {
-        uninitVideo(p);
+        uninit_video(p);
         p->image_height = height;
         p->image_width = width;
         p->image_format = format;
-        initVideo(p);
+        init_video(p);
     }
 
     resize(p);
@@ -1295,9 +1294,9 @@ static void check_events(struct vo *vo)
 
     int e = p->glctx->check_events(vo);
     if (e & VO_EVENT_REINIT) {
-        uninitGL(p);
-        initGL(p);
-        initVideo(p);
+        uninit_gl(p);
+        init_gl(p);
+        init_video(p);
         resize(p);
     }
     if (e & VO_EVENT_RESIZE)
@@ -1325,15 +1324,15 @@ static void create_osd_texture(void *ctx, int x0, int y0, int w, int h,
         mp_msg(MSGT_VO, MSGL_V, "Invalid dimensions OSD for part!\n");
         return;
     }
-    texSize(p, w, h, &sx, &sy);
+    tex_size(p, w, h, &sx, &sy);
 
-    if (p->osdtexCnt >= MAX_OSD_PARTS) {
+    if (p->osdtex_count >= MAX_OSD_PARTS) {
         mp_msg(MSGT_VO, MSGL_ERR, "Too many OSD parts, contact the developers!\n");
         return;
     }
 
-    gl->GenTextures(1, &p->osdtex[p->osdtexCnt]);
-    gl->BindTexture(GL_TEXTURE_2D, p->osdtex[p->osdtexCnt]);
+    gl->GenTextures(1, &p->osdtex[p->osdtex_count]);
+    gl->BindTexture(GL_TEXTURE_2D, p->osdtex[p->osdtex_count]);
     gl->TexImage2D(GL_TEXTURE_2D, 0, GL_RG, sx, sy, 0, GL_RG, GL_UNSIGNED_BYTE,
                    NULL);
     default_tex_params(gl, GL_TEXTURE_2D, GL_NEAREST);
@@ -1355,11 +1354,11 @@ static void create_osd_texture(void *ctx, int x0, int y0, int w, int h,
     uint8_t color[4] = {(p->osd_color >> 16) & 0xff, (p->osd_color >> 8) & 0xff,
                         p->osd_color & 0xff, 0xff - (p->osd_color >> 24)};
 
-    write_quad(&p->osd_va[p->osdtexCnt * VERTICES_PER_QUAD],
+    write_quad(&p->osd_va[p->osdtex_count * VERTICES_PER_QUAD],
                x0, y0, x0 + w, y0 + h, 0, 0, w, h,
                sx, sy, color, false);
 
-    p->osdtexCnt++;
+    p->osdtex_count++;
 }
 
 static void draw_osd(struct vo *vo, struct osd_state *osd)
@@ -1368,21 +1367,21 @@ static void draw_osd(struct vo *vo, struct osd_state *osd)
     GL *gl = p->gl;
 
     if (vo_osd_changed(0)) {
-        clearOSD(p);
+        clear_osd(p);
         osd_draw_text_ext(osd, vo->dwidth, vo->dheight, p->border_x,
                           p->border_y, p->border_x,
                           p->border_y, p->image_width,
                           p->image_height, create_osd_texture, p);
     }
 
-    if (p->osdtexCnt > 0) {
+    if (p->osdtex_count > 0) {
         gl->Enable(GL_BLEND);
         // OSD bitmaps use premultiplied alpha.
         gl->BlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
         gl->UseProgram(p->osd_program);
 
-        for (int n = 0; n < p->osdtexCnt; n++) {
+        for (int n = 0; n < p->osdtex_count; n++) {
             gl->BindTexture(GL_TEXTURE_2D, p->osdtex[n]);
             draw_triangles(p, &p->osd_va[n * VERTICES_PER_QUAD],
                            VERTICES_PER_QUAD);
@@ -1702,7 +1701,7 @@ static void uninit(struct vo *vo)
 {
     struct gl_priv *p = vo->priv;
 
-    uninitGL(p);
+    uninit_gl(p);
     uninit_mpglcontext(p->glctx);
     p->glctx = NULL;
     p->gl = NULL;
@@ -1941,7 +1940,7 @@ static int preinit(struct vo *vo, const char *arg)
     if (true) {
         if (create_window(p, 320, 200, VOFLAG_HIDDEN) == SET_WINDOW_FAILED)
             goto err_out;
-        if (!initGL(p))
+        if (!init_gl(p))
             goto err_out;
         // We created a window to test whether the GL context could be
         // created and so on. Destroy that window to make sure all state
