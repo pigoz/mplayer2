@@ -93,6 +93,7 @@ static const struct {
     // YUVJ are YUV formats that use the full Y range and not just
     // 16 - 235 (see colorspaces.txt).
     // Currently they are all treated the same way.
+    {IMGFMT_VDA_VLD,  PIX_FMT_VDA_VLD},
     {IMGFMT_YV12,  PIX_FMT_YUVJ420P},
     {IMGFMT_422P,  PIX_FMT_YUVJ422P},
     {IMGFMT_444P,  PIX_FMT_YUVJ444P},

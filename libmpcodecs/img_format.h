@@ -215,7 +215,12 @@
 #define IMGFMT_VDPAU_VC1           (IMGFMT_VDPAU|0x05)
 #define IMGFMT_VDPAU_MPEG4         (IMGFMT_VDPAU|0x06)
 
-#define IMGFMT_IS_HWACCEL(fmt) (IMGFMT_IS_VDPAU(fmt) || IMGFMT_IS_XVMC(fmt))
+// VDA specific format.
+#define IMGFMT_VDA_VLD             0x1DC90000
+#define IMGFMT_VDA_MASK            0xFFFF0000
+#define IMGFMT_IS_VDA(fmt)       (((fmt)&IMGFMT_VDPAU_MASK)==IMGFMT_VDPAU)
+
+#define IMGFMT_IS_HWACCEL(fmt) (IMGFMT_IS_VDPAU(fmt) || IMGFMT_IS_XVMC(fmt) || IMGFMT_IS_VDA(fmt))
 
 typedef struct {
     void* data;
