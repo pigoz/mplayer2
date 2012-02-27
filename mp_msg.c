@@ -23,7 +23,7 @@
 
 #include "config.h"
 #include "osdep/getch2.h"
-#include "osdep/unicode-win.h"
+#include "osdep/io.h"
 
 #ifdef CONFIG_TRANSLATION
 #include <locale.h>
@@ -228,7 +228,7 @@ static void print_msg_module(FILE* stream, int mod)
     HANDLE *wstream = stream == stderr ? hSTDERR : hSTDOUT;
     if (mp_msg_color)
         SetConsoleTextAttribute(wstream, ansi2win32[c2&7] | FOREGROUND_INTENSITY);
-    mp_fprintf(stream, "%9s", module_text[mod]);
+    fprintf(stream, "%9s", module_text[mod]);
     if (mp_msg_color)
         SetConsoleTextAttribute(wstream, stdoutAttrs);
 #else
@@ -273,7 +273,7 @@ void mp_msg_va(int mod, int lev, const char *format, va_list va)
 
         if (msgiconv == (iconv_t)(-1))
         {
-            mp_fprintf(stderr,"iconv: conversion from %s to %s unsupported\n"
+            fprintf(stderr,"iconv: conversion from %s to %s unsupported\n"
                 ,MSG_CHARSET,mp_msg_charset);
         }
         else
@@ -299,7 +299,7 @@ void mp_msg_va(int mod, int lev, const char *format, va_list va)
      * status line, and does not end with a '\n'. If we're printing a normal
      * line instead after the status one print '\n' to change line. */
     if (statusline && lev != MSGL_STATUS)
-        mp_fprintf(stream, "\n");
+        fprintf(stream, "\n");
     statusline = lev == MSGL_STATUS;
 
     if (header)
@@ -309,7 +309,7 @@ void mp_msg_va(int mod, int lev, const char *format, va_list va)
     size_t len = strlen(tmp);
     header = len && (tmp[len-1] == '\n' || tmp[len-1] == '\r');
 
-    mp_fprintf(stream, "%s", tmp);
+    fprintf(stream, "%s", tmp);
 
     if (mp_msg_color)
     {

@@ -36,11 +36,8 @@
 #include <unistd.h>
 #include <string.h>
 #include <limits.h>
+#include "osdep/io.h"
 #if defined(__MINGW32__) || defined(__CYGWIN__)
-#ifdef __MINGW32__
-#include <io.h>
-#define mkdir(a,b) mkdir(a)
-#endif
 #include <windows.h>
 #if HAVE_WINSOCK2_H
 #include <winsock2.h>

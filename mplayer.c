@@ -25,9 +25,10 @@
 #include "config.h"
 #include "talloc.h"
 
+#include "osdep/io.h"
+
 #if defined(__MINGW32__) || defined(__CYGWIN__)
 #include <windows.h>
-#include "osdep/unicode-win.h"
 #endif
 #include <string.h>
 #include <unistd.h>
@@ -877,11 +878,7 @@ static void parse_cfgfiles(struct MPContext *mpctx, m_config_t *conf)
     if ((conffile = get_path("")) == NULL)
         mp_tmsg(MSGT_CPLAYER, MSGL_WARN, "Cannot find HOME directory.\n");
     else {
-#ifdef __MINGW32__
-        mkdir(conffile);
-#else
         mkdir(conffile, 0777);
-#endif
         free(conffile);
         if ((conffile = get_path("config")) == NULL)
             mp_tmsg(MSGT_CPLAYER, MSGL_ERR, "get_path(\"config\") problem\n");
@@ -980,10 +977,10 @@ static int try_load_config(m_config_t *conf, const char *file)
 static void load_per_file_config(m_config_t *conf, const char * const file)
 {
     char *confpath;
-    char cfg[PATH_MAX];
+    char cfg[MP_PATH_MAX];
     const char *name;
 
-    if (strlen(file) > PATH_MAX - 14) {
+    if (strlen(file) > MP_PATH_MAX - 14) {
         mp_msg(MSGT_CPLAYER, MSGL_WARN, "Filename is too long, "
                "can not load file or directory specific config files\n");
         return;
@@ -992,7 +989,7 @@ static void load_per_file_config(m_config_t *conf, const char * const file)
 
     name = mp_basename(cfg);
     if (use_filedir_conf) {
-        char dircfg[PATH_MAX];
+        char dircfg[MP_PATH_MAX];
         strcpy(dircfg, cfg);
         strcpy(dircfg + (name - cfg), "mplayer.conf");
         try_load_config(conf, dircfg);

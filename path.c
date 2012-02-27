@@ -47,7 +47,7 @@
 #include "talloc.h"
 
 #include "osdep/osdep.h"
-#include "osdep/unicode-win.h"
+#include "osdep/io.h"
 
 char *get_path(const char *filename){
 	char *homedir;

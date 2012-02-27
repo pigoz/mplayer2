@@ -404,7 +404,7 @@ SRCS_COMMON = asxparser.c \
               libmpdemux/yuv4mpeg_ratio.c \
               libvo/osd.c \
               osdep/numcores.c \
-              osdep/unicode-win.c \
+              osdep/io.c \
               osdep/$(GETCH) \
               osdep/$(TIMER) \
               stream/open.c \

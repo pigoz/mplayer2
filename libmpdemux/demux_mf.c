@@ -23,6 +23,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include "osdep/io.h"
+
 #include "talloc.h"
 #include "config.h"
 #include "mp_msg.h"

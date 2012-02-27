@@ -22,6 +22,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "osdep/io.h"
+
 #include "font_load.h"
 #include "mp_msg.h"
 #include "libavutil/attributes.h"

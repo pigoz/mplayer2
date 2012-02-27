@@ -26,7 +26,7 @@
 #include <stdio.h>
 #include <stddef.h>
 
-#include "osdep/unicode-win.h"
+#include "osdep/io.h"
 #include "talloc.h"
 
 //copied and modified from libav
@@ -55,6 +55,9 @@ char *mp_to_utf8(void *talloc_ctx, const wchar_t *s)
 #endif // _WIN32
 
 #ifdef __MINGW32__
+
+#include <io.h>
+#include <fcntl.h>
 
 //http://git.libav.org/?p=libav.git;a=blob;f=cmdutils.c;h=ade3f10ce2fc030e32e375a85fbd06c26d43a433#l161
 
@@ -149,20 +152,7 @@ int mp_fprintf(FILE *stream, const char *format, ...)
     return done;
 }
 
-// On MinGW programs are directly linked to MSVCRT. This means calls like
-// open, fopen etc. always use a legacy codepage. Override the MSVCRT functions
-// with custom wrappers, that assume UTF-8 and use "proper" API calls like
-// _wopen etc. to deal with unicode filenames.
-// This is not perfectly clean, but still somewhat sane, and much better than
-// littering the rest of the mplayer code with MinGW specific hacks.
-
-#include <io.h>
-#include <fcntl.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <dirent.h>
-
-int __cdecl open(const char *Filename, int OpenFlag, ...)
+int mp_open(const char *Filename, int OpenFlag, ...)
 {
     int mode = 0;
     if (OpenFlag & _O_CREAT) {
@@ -177,13 +167,13 @@ int __cdecl open(const char *Filename, int OpenFlag, ...)
     return res;
 }
 
-int __cdecl creat(const char *Filename, int PermissionMode)
+int mp_creat(const char *Filename, int PermissionMode)
 {
     return open(Filename, O_CREAT|O_WRONLY|O_TRUNC, PermissionMode);
 }
 
-FILE *__cdecl fopen(const char * __restrict__ Filename,
-                    const char * __restrict Mode)
+FILE *mp_fopen(const char * __restrict__ Filename,
+               const char * __restrict Mode)
 {
     wchar_t *wpath = mp_from_utf8(NULL, Filename);
     wchar_t *wmode = mp_from_utf8(wpath, Mode);
@@ -200,14 +190,13 @@ struct mp_dir {
         // dirent has space only for FILENAME_MAX bytes. _wdirent has space for
         // FILENAME_MAX wchar_t, which might end up bigger as UTF-8 in some
         // cases. Guarantee we can always hold _wdirent.d_name converted to
-        // UTF-8, and in the worst case each wchar_t is encoded to 3 bytes of
-        // UTF-8.
+        // UTF-8 (see MP_PATH_MAX).
         // This works because dirent.d_name is the last member of dirent.
-        char space[FILENAME_MAX * 3];
+        char space[MP_PATH_MAX];
     };
 };
 
-DIR* __cdecl __MINGW_NOTHROW opendir(const char *path)
+DIR* mp_opendir(const char *path)
 {
     wchar_t *wpath = mp_from_utf8(NULL, path);
     _WDIR *wdir = _wopendir(wpath);
@@ -222,7 +211,7 @@ DIR* __cdecl __MINGW_NOTHROW opendir(const char *path)
     return (DIR*)mpdir;
 }
 
-struct dirent* __cdecl __MINGW_NOTHROW readdir(DIR *dir)
+struct dirent* mp_readdir(DIR *dir)
 {
     struct mp_dir *mpdir = (struct mp_dir*)dir;
     struct _wdirent *wdirent = _wreaddir(mpdir->wdir);
@@ -237,7 +226,7 @@ struct dirent* __cdecl __MINGW_NOTHROW readdir(DIR *dir)
     return &mpdir->dirent;
 }
 
-int __cdecl __MINGW_NOTHROW closedir(DIR *dir)
+int mp_closedir(DIR *dir)
 {
     struct mp_dir *mpdir = (struct mp_dir*)dir;
     int res = _wclosedir(mpdir->wdir);
@@ -245,7 +234,7 @@ int __cdecl __MINGW_NOTHROW closedir(DIR *dir)
     return res;
 }
 
-int __cdecl mkdir(const char *path)
+int mp_mkdir(const char *path, int mode)
 {
     wchar_t *wpath = mp_from_utf8(NULL, path);
     int res = _wmkdir(wpath);

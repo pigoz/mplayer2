@@ -31,6 +31,8 @@
 #include <ctype.h>
 #include <assert.h>
 
+#include "osdep/io.h"
+
 #include "input.h"
 #include "mp_fifo.h"
 #include "keycodes.h"
