@@ -1778,6 +1778,8 @@ static int mp_property_sub(m_option_t *prop, int action, void *arg,
         d_sub->id = -2;
         d_sub->sh = NULL;
     }
+#else
+    (void)reset_spu; //silence compiler warning
 #endif
 
     update_subtitles(mpctx, 0, 0, true);
