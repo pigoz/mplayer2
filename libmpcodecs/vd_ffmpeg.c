@@ -158,7 +158,7 @@ static int init(sh_video_t *sh)
     avctx->codec_id = lavc_codec->id;
 
     if (lavc_codec->capabilities & CODEC_CAP_HWACCEL   // XvMC
-        || lavc_codec->capabilities & CODEC_CAP_HWACCEL_VDPAU) {
+        || lavc_codec->capabilities & CODEC_CAP_HWACCEL_VDPAU || 1) {
         ctx->do_dr1    = true;
         ctx->do_slices = true;
         lavc_param->threads    = 1;
@@ -776,6 +776,7 @@ static struct mp_image *decode(struct sh_video *sh, struct demux_packet *packet,
 static enum PixelFormat get_format(struct AVCodecContext *avctx,
                                    const enum PixelFormat *fmt)
 {
+    return PIX_FMT_VDA_VLD;
     sh_video_t *sh = avctx->opaque;
     int i;
 
