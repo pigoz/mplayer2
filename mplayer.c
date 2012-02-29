@@ -684,11 +684,12 @@ void uninit_player(struct MPContext *mpctx, unsigned int mask)
     if (mask & INITIALIZED_AO) {
         mpctx->initialized_flags &= ~INITIALIZED_AO;
         current_module = "uninit_ao";
-        if (mpctx->edl_muted)
-            mixer_mute(&mpctx->mixer);
-        if (mpctx->ao)
+        if (mpctx->ao) {
+            mixer_uninit(&mpctx->mixer);
             ao_uninit(mpctx->ao, mpctx->stop_play != AT_END_OF_FILE);
+        }
         mpctx->ao = NULL;
+        mpctx->mixer.ao = NULL;
     }
 
     current_module = NULL;
@@ -696,8 +697,6 @@ void uninit_player(struct MPContext *mpctx, unsigned int mask)
 
 void exit_player_with_rc(struct MPContext *mpctx, enum exit_reason how, int rc)
 {
-    if (mpctx->user_muted && !mpctx->edl_muted)
-        mixer_mute(&mpctx->mixer);
     uninit_player(mpctx, INITIALIZED_ALL);
 #if defined(__MINGW32__) || defined(__CYGWIN__)
     timeEndPeriod(1);
@@ -1607,7 +1606,7 @@ void set_osd_bar(struct MPContext *mpctx, int type, const char *name,
     if (opts->osd_level < 1)
         return;
 
-    if (mpctx->sh_video) {
+    if (mpctx->sh_video && opts->term_osd != 1) {
         mpctx->osd_visible = (GetTimerMS() + 1000) | 1;
         vo_osd_progbar_type = type;
         vo_osd_progbar_value = 256 * (val - min) / (max - min);
@@ -1662,25 +1661,30 @@ static void update_osd_msg(struct MPContext *mpctx)
     if (mpctx->add_osd_seek_info) {
         double percentage = get_percent_pos(mpctx);
         set_osd_bar(mpctx, 0, "Position", 0, 100, percentage);
-        if (mpctx->sh_video)
+        if (mpctx->sh_video && opts->term_osd != 1)
             mpctx->osd_show_percentage_until = (GetTimerMS() + 1000) | 1;
         mpctx->add_osd_seek_info = false;
     }
 
     // Look if we have a msg
     if ((msg = get_osd_msg(mpctx))) {
-        if (strcmp(osd->osd_text, msg->msg)) {
-            osd_set_text(osd, msg->msg);
-            if (mpctx->sh_video)
+        if (mpctx->sh_video && opts->term_osd != 1) {
+            if (strcmp(osd->osd_text, msg->msg)) {
+                osd_set_text(osd, msg->msg);
                 vo_osd_changed(OSDTYPE_OSD);
-            else if (opts->term_osd)
+            }
+        } else if (opts->term_osd) {
+            if (strcmp(mpctx->terminal_osd_text, msg->msg)) {
+                talloc_free(mpctx->terminal_osd_text);
+                mpctx->terminal_osd_text = talloc_strdup(mpctx, msg->msg);
                 mp_msg(MSGT_CPLAYER, MSGL_STATUS, "%s%s\n", opts->term_osd_esc,
-                       msg->msg);
+                       mpctx->terminal_osd_text);
+            }
         }
         return;
     }
 
-    if (mpctx->sh_video) {
+    if (mpctx->sh_video && opts->term_osd != 1) {
         // fallback on the timer
         if (opts->osd_level >= 2) {
             int len = get_time_length(mpctx);
@@ -1745,9 +1749,9 @@ static void update_osd_msg(struct MPContext *mpctx)
     }
 
     // Clear the term osd line
-    if (opts->term_osd && osd->osd_text[0]) {
-        osd->osd_text[0] = 0;
-        printf("%s\n", opts->term_osd_esc);
+    if (opts->term_osd && mpctx->terminal_osd_text[0]) {
+        mpctx->terminal_osd_text[0] = '\0';
+        mp_msg(MSGT_CPLAYER, MSGL_STATUS, "%s\n", opts->term_osd_esc);
     }
 }
 
@@ -1819,6 +1823,7 @@ void reinit_audio_chain(struct MPContext *mpctx)
     }
     mpctx->mixer.ao = ao;
     mpctx->mixer.volstep = volstep;
+    mixer_reinit(&mpctx->mixer);
     mpctx->syncing_audio = true;
     return;
 
@@ -2668,8 +2673,11 @@ int reinit_video_chain(struct MPContext *mpctx)
 {
     struct MPOpts *opts = &mpctx->opts;
     sh_video_t * const sh_video = mpctx->sh_video;
-    if (!sh_video)
+    if (!sh_video){
+        uninit_player(mpctx, INITIALIZED_VO);
         return 0;
+    }
+
     double ar = -1.0;
     //================== Init VIDEO (codec & libvo) ==========================
     if (!opts->fixed_vo || !(mpctx->initialized_flags & INITIALIZED_VO)) {
@@ -3098,26 +3106,6 @@ static void pause_loop(struct MPContext *mpctx)
     }
 }
 
-
-// Find the right mute status and record position for new file position
-static void edl_seek_reset(MPContext *mpctx)
-{
-    mpctx->edl_muted = 0;
-    next_edl_record = edl_records;
-
-    while (next_edl_record) {
-        if (next_edl_record->start_sec >= get_current_time(mpctx))
-            break;
-
-        if (next_edl_record->action == EDL_MUTE)
-            mpctx->edl_muted = !mpctx->edl_muted;
-        next_edl_record = next_edl_record->next;
-    }
-    if ((mpctx->user_muted | mpctx->edl_muted) != mpctx->mixer.muted)
-        mixer_mute(&mpctx->mixer);
-}
-
-
 // Execute EDL command for the current position if one exists
 static void edl_update(MPContext *mpctx)
 {
@@ -3141,10 +3129,7 @@ static void edl_update(MPContext *mpctx)
                    "[%f], length [%f]\n", next_edl_record->start_sec,
                    next_edl_record->stop_sec, next_edl_record->length_sec);
         } else if (next_edl_record->action == EDL_MUTE) {
-            mpctx->edl_muted = !mpctx->edl_muted;
-            if ((mpctx->user_muted | mpctx->edl_muted) != mpctx->mixer.muted)
-                mixer_mute(&mpctx->mixer);
-            mp_msg(MSGT_CPLAYER, MSGL_DBG4, "EDL_MUTE: [%f]\n",
+            mp_msg(MSGT_CPLAYER, MSGL_DBG4, "EDL_MUTE: [%f] ignored\n",
                    next_edl_record->start_sec);
         }
         next_edl_record = next_edl_record->next;
@@ -3197,8 +3182,6 @@ static void seek_reset(struct MPContext *mpctx, bool reset_ao)
         current_module = "seek_vobsub_reset";
         vobsub_seek(vo_vobsub, mpctx->sh_video->pts);
     }
-
-    edl_seek_reset(mpctx);
 
     mpctx->hrseek_active = false;
     mpctx->hrseek_framedrop = false;
@@ -3984,6 +3967,7 @@ int main(int argc, char *argv[])
         .file_format = DEMUXER_TYPE_UNKNOWN,
         .last_dvb_step = 1,
         .paused_cache_fill = -1,
+        .terminal_osd_text = talloc_strdup(mpctx, ""),
     };
 
     InitTimer();
@@ -3991,6 +3975,7 @@ int main(int argc, char *argv[])
 
     mp_msg_init();
     init_libav();
+    screenshot_init(mpctx);
 
 #ifdef CONFIG_X11
     mpctx->x11_state = vo_x11_init_state();
@@ -4641,6 +4626,9 @@ goto_enable_cache:
     if (mpctx->demuxer->type == DEMUXER_TYPE_EDL)
         build_edl_timeline(mpctx);
 
+    if (mpctx->demuxer->type == DEMUXER_TYPE_CUE)
+        build_cue_timeline(mpctx);
+
     if (mpctx->timeline) {
         mpctx->timeline_part = 0;
         mpctx->demuxer = mpctx->timeline[0].source->demuxer;
@@ -5014,6 +5002,9 @@ goto_enable_cache:
     if (mpctx->sh_video)
         vo_control(mpctx->video_out,
                    mpctx->paused ? VOCTRL_PAUSE : VOCTRL_RESUME, NULL);
+
+    if (mpctx->opts.start_paused)
+        pause_player(mpctx);
 
     while (!mpctx->stop_play)
         run_playloop(mpctx);

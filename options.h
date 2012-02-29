@@ -67,6 +67,7 @@ typedef struct MPOpts {
     int doubleclick_time;
     int list_properties;
     double seek_to_sec;
+    int start_paused;
     int audio_id;
     int video_id;
     int sub_id;
@@ -81,6 +82,11 @@ typedef struct MPOpts {
     char *audio_demuxer_name;
     char *sub_demuxer_name;
     int extension_parsing;
+
+    int screenshot_jpeg_quality;
+    int screenshot_png_compression;
+    char *screenshot_filetype;
+    char *screenshot_template;
 
     int audio_output_channels;
     int audio_output_format;

@@ -20,16 +20,26 @@
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
+#include <setjmp.h>
+#include <time.h>
 
 #include <libswscale/swscale.h>
 #include <libavcodec/avcodec.h>
 
 #include "config.h"
+
+#ifdef CONFIG_JPEG
+#include <jpeglib.h>
+#endif
+
 #include "talloc.h"
 #include "screenshot.h"
 #include "mp_core.h"
+#include "m_property.h"
+#include "bstr.h"
 #include "mp_msg.h"
 #include "path.h"
+#include "metadata.h"
 #include "libmpcodecs/img_format.h"
 #include "libmpcodecs/mp_image.h"
 #include "libmpcodecs/dec_video.h"
@@ -38,30 +48,36 @@
 
 #include "fmt-conversion.h"
 
-//for sws_getContextFromCmdLine and mp_sws_set_colorspace
+//for sws_getContextFromCmdLine_hq and mp_sws_set_colorspace
 #include "libmpcodecs/vf_scale.h"
 #include "libvo/csputils.h"
 
 typedef struct screenshot_ctx {
+    struct MPContext *mpctx;
+
     int full_window;
     int each_frame;
     int using_vf_screenshot;
 
     int frameno;
-    char fname[102];
 } screenshot_ctx;
 
-static screenshot_ctx *screenshot_get_ctx(MPContext *mpctx)
+struct img_writer {
+    const char *file_ext;
+    int (*write)(screenshot_ctx *ctx, mp_image_t *image, FILE *fp);
+};
+
+void screenshot_init(struct MPContext *mpctx)
 {
-    if (!mpctx->screenshot_ctx)
-        mpctx->screenshot_ctx = talloc_zero(mpctx, screenshot_ctx);
-    return mpctx->screenshot_ctx;
+    mpctx->screenshot_ctx = talloc(mpctx, screenshot_ctx);
+    *mpctx->screenshot_ctx = (screenshot_ctx) {
+        .mpctx = mpctx,
+        .frameno = 1,
+    };
 }
 
-static int write_png(screenshot_ctx *ctx, struct mp_image *image)
+static int write_png(screenshot_ctx *ctx, struct mp_image *image, FILE *fp)
 {
-    char *fname = ctx->fname;
-    FILE *fp = NULL;
     void *outbuffer = NULL;
     int success = 0;
 
@@ -71,14 +87,14 @@ static int write_png(screenshot_ctx *ctx, struct mp_image *image)
 
     if (avcodec_open(avctx, avcodec_find_encoder(CODEC_ID_PNG))) {
         mp_msg(MSGT_CPLAYER, MSGL_INFO, "Could not open libavcodec PNG encoder"
-               " for saving screenshot\n");
+               " for saving screenshot!\n");
         goto error_exit;
     }
 
     avctx->width = image->width;
     avctx->height = image->height;
     avctx->pix_fmt = PIX_FMT_RGB24;
-    avctx->compression_level = 0;
+    avctx->compression_level = ctx->mpctx->opts.screenshot_png_compression;
 
     size_t outbuffer_size = image->width * image->height * 3 * 2;
     outbuffer = malloc(outbuffer_size);
@@ -92,14 +108,6 @@ static int write_png(screenshot_ctx *ctx, struct mp_image *image)
     if (size < 1)
         goto error_exit;
 
-    fp = fopen(fname, "wb");
-    if (fp == NULL) {
-        avcodec_close(avctx);
-        mp_msg(MSGT_CPLAYER, MSGL_ERR, "\nPNG Error opening %s for writing!\n",
-               fname);
-        goto error_exit;
-    }
-
     fwrite(outbuffer, size, 1, fp);
     fflush(fp);
 
@@ -110,10 +118,84 @@ static int write_png(screenshot_ctx *ctx, struct mp_image *image)
 error_exit:
     if (avctx)
         avcodec_close(avctx);
-    if (fp)
-        fclose(fp);
     free(outbuffer);
     return success;
+}
+
+#ifdef CONFIG_JPEG
+
+static void write_jpeg_error_exit(j_common_ptr cinfo)
+{
+  // NOTE: do not write error message, too much effort to connect the libjpeg
+  //       log callbacks with mplayer's log function mp_msp()
+
+  // Return control to the setjmp point
+  longjmp(*(jmp_buf*)cinfo->client_data, 1);
+}
+
+static int write_jpeg(screenshot_ctx *ctx, mp_image_t *image, FILE *fp)
+{
+    struct jpeg_compress_struct cinfo;
+    struct jpeg_error_mgr jerr;
+
+    cinfo.err = jpeg_std_error(&jerr);
+    jerr.error_exit = write_jpeg_error_exit;
+
+    jmp_buf error_return_jmpbuf;
+    cinfo.client_data = &error_return_jmpbuf;
+    if (setjmp(cinfo.client_data)) {
+        jpeg_destroy_compress(&cinfo);
+        return 0;
+    }
+
+    jpeg_create_compress(&cinfo);
+    jpeg_stdio_dest(&cinfo, fp);
+
+    cinfo.image_width = image->width;
+    cinfo.image_height = image->height;
+    cinfo.input_components = 3;
+    cinfo.in_color_space = JCS_RGB;
+
+    jpeg_set_defaults(&cinfo);
+    jpeg_set_quality(&cinfo, ctx->mpctx->opts.screenshot_jpeg_quality, 1);
+
+    jpeg_start_compress(&cinfo, TRUE);
+
+    while (cinfo.next_scanline < cinfo.image_height) {
+        JSAMPROW row_pointer[1];
+        row_pointer[0] = image->planes[0] +
+                         cinfo.next_scanline * image->stride[0];
+        jpeg_write_scanlines(&cinfo, row_pointer,1);
+    }
+
+    jpeg_finish_compress(&cinfo);
+
+    jpeg_destroy_compress(&cinfo);
+
+    return 1;
+}
+
+#endif
+
+static const struct img_writer img_writers[] = {
+    { "png", write_png },
+#ifdef CONFIG_JPEG
+    { "jpg", write_jpeg },
+    { "jpeg", write_jpeg },
+#endif
+};
+
+static const struct img_writer *get_writer(screenshot_ctx *ctx)
+{
+    const char *type = ctx->mpctx->opts.screenshot_filetype;
+
+    for (size_t n = 0; n < sizeof(img_writers) / sizeof(img_writers[0]); n++) {
+        const struct img_writer *writer = &img_writers[n];
+        if (type && strcmp(type, writer->file_ext) == 0)
+            return writer;
+    }
+
+    return &img_writers[0];
 }
 
 static int fexists(char *fname)
@@ -121,62 +203,281 @@ static int fexists(char *fname)
     return mp_path_exists(fname);
 }
 
-static void gen_fname(screenshot_ctx *ctx)
+static char *stripext(void *talloc_ctx, const char *s)
 {
-    do {
-        snprintf(ctx->fname, 100, "shot%04d.png", ++ctx->frameno);
-    } while (fexists(ctx->fname) && ctx->frameno < 100000);
-    if (fexists(ctx->fname)) {
-        ctx->fname[0] = '\0';
-        return;
+    const char *end = strrchr(s, '.');
+    if (!end)
+        end = s + strlen(s);
+    return talloc_asprintf(talloc_ctx, "%.*s", end - s, s);
+}
+
+static char *format_time(void *talloc_ctx, double time, bool sub_seconds)
+{
+    int h, m, s = time;
+    h = s / 3600;
+    s -= h * 3600;
+    m = s / 60;
+    s -= m * 60;
+    char *res = talloc_asprintf(talloc_ctx, "%02d:%02d:%02d", h, m, s);
+    if (sub_seconds)
+        res = talloc_asprintf_append(res, ".%03d",
+                                     (int)((time - (int)time) * 1000));
+    return res;
+}
+
+static char *do_format_property(struct MPContext *mpctx, struct bstr s) {
+    struct bstr prop_name = s;
+    int fallbackpos = bstrchr(s, ':');
+    if (fallbackpos >= 0)
+        prop_name = bstr_splice(prop_name, 0, fallbackpos);
+    char *pn = bstrdup0(NULL, prop_name);
+    char *res = mp_property_print(pn, mpctx);
+    talloc_free(pn);
+    if (!res && fallbackpos >= 0)
+        res = bstrdup0(NULL, bstr_cut(s, fallbackpos + 1));
+    return res;
+}
+
+#ifdef _WIN32
+#define ILLEGAL_FILENAME_CHARS "?\"/\\<>*|:"
+#else
+#define ILLEGAL_FILENAME_CHARS "/"
+#endif
+
+// Replace all characters disallowed in filenames with '_' and return the newly
+// allocated result string.
+static char *sanitize_filename(void *talloc_ctx, const char *s)
+{
+    char *res = talloc_strdup(talloc_ctx, s);
+    char *cur = res;
+    while (*cur) {
+        if (strchr(ILLEGAL_FILENAME_CHARS, *cur) || ((unsigned char)*cur) < 32)
+            *cur = '_';
+        cur++;
+    }
+    return res;
+}
+
+static void append_filename(char **s, const char *f)
+{
+    char *append = sanitize_filename(NULL, f);
+    *s = talloc_strdup_append(*s, append);
+    talloc_free(append);
+}
+
+static char *create_fname(struct MPContext *mpctx, char *template,
+                          const char *file_ext, int *sequence, int *frameno)
+{
+    char *res = talloc_strdup(NULL, ""); //empty string, non-NULL context
+
+    time_t raw_time = time(NULL);
+    struct tm *local_time = localtime(&raw_time);
+
+    if (!template || *template == '\0')
+        template = "shot%n";
+
+    for (;;) {
+        char *next = strchr(template, '%');
+        if (!next)
+            break;
+        res = talloc_strndup_append(res, template, next - template);
+        template = next + 1;
+        char fmt = *template++;
+        switch (fmt) {
+        case '#':
+        case '0':
+        case 'n': {
+            int digits = '4';
+            if (fmt == '#') {
+                if (!*sequence) {
+                    *frameno = 1;
+                }
+                fmt = *template++;
+            }
+            if (fmt == '0') {
+                digits = *template++;
+                if (digits < '0' || digits > '9')
+                    goto error_exit;
+                fmt = *template++;
+            }
+            if (fmt != 'n')
+                goto error_exit;
+            char fmtstr[] = {'%', '0', digits, 'd', '\0'};
+            res = talloc_asprintf_append(res, fmtstr, *frameno);
+            if (*frameno < 100000 - 1) {
+                (*frameno) += 1;
+                (*sequence) += 1;
+            }
+            break;
+        }
+        case 'f':
+        case 'F': {
+            char *video_file = get_metadata(mpctx, META_NAME);
+            if (video_file) {
+                char *name = video_file;
+                if (fmt == 'F')
+                    name = stripext(res, video_file);
+                append_filename(&res, name);
+            }
+            talloc_free(video_file);
+            break;
+        }
+        case 'p':
+        case 'P':
+            append_filename(&res,
+                    format_time(res, get_current_time(mpctx), fmt == 'P'));
+            break;
+        case 't': {
+            char fmt = *template;
+            if (!fmt)
+                goto error_exit;
+            template++;
+            char fmtstr[] = {'%', fmt, '\0'};
+            char buffer[80];
+            if (strftime(buffer, sizeof(buffer), fmtstr, local_time) == 0)
+                buffer[0] = '\0';
+            append_filename(&res, buffer);
+            break;
+        }
+        case '{': {
+            char *end = strchr(template, '}');
+            if (!end)
+                goto error_exit;
+            struct bstr prop = bstr_splice(bstr(template), 0, end - template);
+            template = end + 1;
+            char *s = do_format_property(mpctx, prop);
+            if (s)
+                append_filename(&res, s);
+            talloc_free(s);
+            break;
+        }
+        case '%':
+            res = talloc_strdup_append(res, "%");
+            break;
+        default:
+            goto error_exit;
+        }
     }
 
-    mp_msg(MSGT_CPLAYER, MSGL_INFO, "*** screenshot '%s' ***\n", ctx->fname);
+    res = talloc_strdup_append(res, template);
+    return talloc_asprintf_append(res, ".%s", file_ext);
 
+error_exit:
+    talloc_free(res);
+    return NULL;
+}
+
+static char *gen_fname(screenshot_ctx *ctx)
+{
+    int sequence = 0;
+    for (;;) {
+        int prev_sequence = sequence;
+        char *fname = create_fname(ctx->mpctx,
+                                   ctx->mpctx->opts.screenshot_template,
+                                   get_writer(ctx)->file_ext,
+                                   &sequence,
+                                   &ctx->frameno);
+
+        if (!fname) {
+            mp_msg(MSGT_CPLAYER, MSGL_ERR, "Invalid screenshot filename "
+                   "template! Fix or remove the --screenshot-template option."
+                   "\n");
+            return NULL;
+        }
+
+        if (!fexists(fname))
+            return fname;
+
+        talloc_free(fname);
+
+        if (sequence == prev_sequence) {
+            mp_msg(MSGT_CPLAYER, MSGL_ERR, "Can't save screenshot, file "
+                   "already exists!\n");
+            return NULL;
+        }
+    }
 }
 
 void screenshot_save(struct MPContext *mpctx, struct mp_image *image)
 {
-    screenshot_ctx *ctx = screenshot_get_ctx(mpctx);
-    struct mp_image *dst = alloc_mpi(image->w, image->h, IMGFMT_RGB24);
+    screenshot_ctx *ctx = mpctx->screenshot_ctx;
+    const struct img_writer *writer = get_writer(ctx);
+    struct mp_image *allocated_image = NULL;
+    const int destfmt = IMGFMT_RGB24;
 
-    struct SwsContext *sws = sws_getContextFromCmdLine(image->width,
-                                                       image->height,
-                                                       image->imgfmt,
-                                                       dst->width,
-                                                       dst->height,
-                                                       dst->imgfmt);
+    if (image->imgfmt != destfmt) {
+        struct mp_image *dst = alloc_mpi(image->w, image->h, destfmt);
 
-    struct mp_csp_details colorspace;
-    get_detected_video_colorspace(mpctx->sh_video, &colorspace);
-    // this is a property of the output device; images always use full-range RGB
-    colorspace.levels_out = MP_CSP_LEVELS_PC;
-    mp_sws_set_colorspace(sws, &colorspace);
+        struct SwsContext *sws = sws_getContextFromCmdLine_hq(image->width,
+                                                              image->height,
+                                                              image->imgfmt,
+                                                              dst->width,
+                                                              dst->height,
+                                                              dst->imgfmt);
 
-    sws_scale(sws, (const uint8_t **)image->planes, image->stride, 0,
-              image->height, dst->planes, dst->stride);
+        struct mp_csp_details colorspace;
+        get_detected_video_colorspace(mpctx->sh_video, &colorspace);
+        // this is a property of the output device; images always use
+        // full-range RGB
+        colorspace.levels_out = MP_CSP_LEVELS_PC;
+        mp_sws_set_colorspace(sws, &colorspace);
 
-    gen_fname(ctx);
-    write_png(ctx, dst);
+        sws_scale(sws, (const uint8_t **)image->planes, image->stride, 0,
+                image->height, dst->planes, dst->stride);
 
-    sws_freeContext(sws);
-    free_mp_image(dst);
+        sws_freeContext(sws);
+
+        allocated_image = dst;
+        image = dst;
+    }
+
+    char *filename = gen_fname(ctx);
+    if (filename) {
+        FILE *fp = fopen(filename, "wb");
+        if (fp == NULL) {
+            mp_msg(MSGT_CPLAYER, MSGL_ERR, "\nError opening %s for writing!\n",
+                   filename);
+        } else {
+            mp_msg(MSGT_CPLAYER, MSGL_INFO, "*** screenshot '%s' ***\n",
+                   filename);
+            int success = writer->write(ctx, image, fp);
+            success = !fclose(fp) && success;
+            if (!success)
+                mp_msg(MSGT_CPLAYER, MSGL_ERR, "Error writing screenshot!\n");
+        }
+        talloc_free(filename);
+    }
+
+    free_mp_image(allocated_image);
 }
 
 static void vf_screenshot_callback(void *pctx, struct mp_image *image)
 {
     struct MPContext *mpctx = (struct MPContext *)pctx;
-    screenshot_ctx *ctx = screenshot_get_ctx(mpctx);
+    screenshot_ctx *ctx = mpctx->screenshot_ctx;
     screenshot_save(mpctx, image);
     if (ctx->each_frame)
         screenshot_request(mpctx, 0, ctx->full_window);
+}
+
+static bool force_vf(struct MPContext *mpctx)
+{
+    if (mpctx->sh_video) {
+        struct vf_instance *vf = mpctx->sh_video->vfilter;
+        while (vf) {
+            if (strcmp(vf->info->name, "screenshot_force") == 0)
+                return true;
+            vf = vf->next;
+        }
+    }
+    return false;
 }
 
 void screenshot_request(struct MPContext *mpctx, bool each_frame,
                         bool full_window)
 {
     if (mpctx->video_out && mpctx->video_out->config_ok) {
-        screenshot_ctx *ctx = screenshot_get_ctx(mpctx);
+        screenshot_ctx *ctx = mpctx->screenshot_ctx;
 
         ctx->using_vf_screenshot = 0;
 
@@ -188,7 +489,9 @@ void screenshot_request(struct MPContext *mpctx, bool each_frame,
         }
 
         struct voctrl_screenshot_args args = { .full_window = full_window };
-        if (vo_control(mpctx->video_out, VOCTRL_SCREENSHOT, &args) == true) {
+        if (!force_vf(mpctx)
+            && vo_control(mpctx->video_out, VOCTRL_SCREENSHOT, &args) == true)
+        {
             screenshot_save(mpctx, args.out_image);
             free_mp_image(args.out_image);
         } else {
@@ -210,7 +513,7 @@ void screenshot_request(struct MPContext *mpctx, bool each_frame,
 
 void screenshot_flip(struct MPContext *mpctx)
 {
-    screenshot_ctx *ctx = screenshot_get_ctx(mpctx);
+    screenshot_ctx *ctx = mpctx->screenshot_ctx;
 
     if (!ctx->each_frame)
         return;

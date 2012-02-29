@@ -21,6 +21,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <stdbool.h>
+#include <assert.h>
 
 #include "config.h"
 #include "talloc.h"
@@ -719,10 +720,6 @@ static int mp_property_volume(m_option_t *prop, int action, void *arg,
         return M_PROPERTY_NOT_IMPLEMENTED;
     }
 
-    if (mpctx->edl_muted)
-        return M_PROPERTY_DISABLED;
-    mpctx->user_muted = 0;
-
     switch (action) {
     case M_PROPERTY_SET:
         if (!arg)
@@ -756,30 +753,17 @@ static int mp_property_mute(m_option_t *prop, int action, void *arg,
 
     switch (action) {
     case M_PROPERTY_SET:
-        if (mpctx->edl_muted)
-            return M_PROPERTY_DISABLED;
         if (!arg)
             return M_PROPERTY_ERROR;
-        if ((!!*(int *) arg) != mpctx->mixer.muted)
-            mixer_mute(&mpctx->mixer);
-        mpctx->user_muted = mpctx->mixer.muted;
+        mixer_setmuted(&mpctx->mixer, *(int *) arg);
         return M_PROPERTY_OK;
     case M_PROPERTY_STEP_UP:
     case M_PROPERTY_STEP_DOWN:
-        if (mpctx->edl_muted)
-            return M_PROPERTY_DISABLED;
         mixer_mute(&mpctx->mixer);
-        mpctx->user_muted = mpctx->mixer.muted;
         return M_PROPERTY_OK;
-    case M_PROPERTY_PRINT:
-        if (!arg)
-            return M_PROPERTY_ERROR;
-        if (mpctx->edl_muted) {
-            *(char **) arg = talloc_strdup(NULL, mp_gtext("enabled (EDL)"));
-            return M_PROPERTY_OK;
-        }
     default:
-        return m_property_flag(prop, action, arg, &mpctx->mixer.muted);
+        return m_property_flag_ro(prop, action, arg,
+                                  mixer_getmuted(&mpctx->mixer));
 
     }
 }
@@ -2806,6 +2790,28 @@ static void remove_subtitle_range(MPContext *mpctx, int start, int count)
     }
 }
 
+static void do_clear_pt(struct play_tree *node, struct play_tree *exclude)
+{
+    while (node) {
+        do_clear_pt(node->child, exclude);
+        struct play_tree *next = node->next;
+        // do not delete root node, or nodes that could lead to "exclude" node
+        if (node->parent && !node->child && node != exclude)
+            play_tree_remove(node, 1, 1);
+        node = next;
+    }
+}
+
+static void clear_play_tree(MPContext *mpctx)
+{
+    struct play_tree *exclude = NULL;
+    if (mpctx->playtree_iter) {
+        assert(mpctx->playtree == mpctx->playtree_iter->root);
+        exclude = mpctx->playtree_iter->tree;
+    }
+    do_clear_pt(mpctx->playtree, exclude);
+}
+
 void run_command(MPContext *mpctx, mp_cmd_t *cmd)
 {
     struct MPOpts *opts = &mpctx->opts;
@@ -3134,6 +3140,10 @@ void run_command(MPContext *mpctx, mp_cmd_t *cmd)
         }
         break;
     }
+
+    case MP_CMD_PLAY_TREE_CLEAR:
+        clear_play_tree(mpctx);
+        break;
 
     case MP_CMD_STOP:
         // Go back to the starting point.

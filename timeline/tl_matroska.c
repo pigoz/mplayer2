@@ -21,6 +21,9 @@
 #include <inttypes.h>
 #include <assert.h>
 #include <dirent.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <libavutil/common.h>
 
 #include "osdep/io.h"
@@ -35,6 +38,25 @@
 #include "mpcommon.h"
 #include "stream/stream.h"
 
+struct find_entry {
+    char *name;
+    int matchlen;
+    off_t size;
+};
+
+static int cmp_entry(const void *pa, const void *pb)
+{
+    const struct find_entry *a = pa, *b = pb;
+    // check "similar" filenames first
+    int matchdiff = b->matchlen - a->matchlen;
+    if (matchdiff)
+        return FFSIGN(matchdiff);
+    // check small files first
+    off_t sizediff = a->size - b->size;
+    if (sizediff)
+        return FFSIGN(sizediff);
+    return 0;
+}
 
 static char **find_files(const char *original_file, const char *suffix)
 {
@@ -48,9 +70,8 @@ static char **find_files(const char *original_file, const char *suffix)
         talloc_free(tmpmem);
         return results;
     }
+    struct find_entry *entries = NULL;
     struct dirent *ep;
-    char ***names_by_matchlen = talloc_zero_array(tmpmem, char **,
-                                                  strlen(basename) + 1);
     int num_results = 0;
     while ((ep = readdir(dp))) {
         int suffix_offset = strlen(ep->d_name) - strlen(suffix);
@@ -67,22 +88,26 @@ static char **find_files(const char *original_file, const char *suffix)
         int matchlen = 0;
         while (*s1 && *s1++ == *s2++)
             matchlen++;
-        int oldcount = MP_TALLOC_ELEMS(names_by_matchlen[matchlen]);
-        names_by_matchlen[matchlen] = talloc_realloc(names_by_matchlen,
-                                                  names_by_matchlen[matchlen],
-                                                  char *, oldcount + 1);
-        names_by_matchlen[matchlen][oldcount] = name;
+        // be a bit more fuzzy about matching the filename
+        matchlen = (matchlen + 3) / 5;
+
+        struct stat statbuf;
+        if (stat(name, &statbuf) != 0)
+            continue;
+        off_t size = statbuf.st_size;
+
+        entries = talloc_realloc(entries, entries, struct find_entry,
+                                 num_results + 1);
+        entries[num_results] = (struct find_entry) { name, matchlen, size };
         num_results++;
     }
     closedir(dp);
+    // NOTE: maybe should make it compare pointers instead
+    qsort(entries, num_results, sizeof(struct find_entry), cmp_entry);
     results = talloc_realloc(NULL, results, char *, num_results);
-    char **resptr = results;
-    for (int i = strlen(basename); i >= 0; i--) {
-        char **p = names_by_matchlen[i];
-        for (int j = 0; j < talloc_get_size(p) / sizeof(char *); j++)
-            *resptr++ = p[j];
+    for (int i = 0; i < num_results; i++) {
+        results[i] = entries[i].name;
     }
-    assert(resptr == results + num_results);
     talloc_free(tmpmem);
     return results;
 }

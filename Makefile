@@ -369,6 +369,7 @@ SRCS_COMMON = asxparser.c \
               libmpdemux/demux_avi.c \
               libmpdemux/demux_demuxers.c \
               libmpdemux/demux_edl.c \
+              libmpdemux/demux_cue.c \
               libmpdemux/demux_film.c \
               libmpdemux/demux_fli.c \
               libmpdemux/demux_lavf.c \
@@ -403,6 +404,7 @@ SRCS_COMMON = asxparser.c \
               libmpdemux/yuv4mpeg.c \
               libmpdemux/yuv4mpeg_ratio.c \
               libvo/osd.c \
+              libvo/eosd_packer.c \
               osdep/numcores.c \
               osdep/io.c \
               osdep/$(GETCH) \
@@ -427,6 +429,7 @@ SRCS_COMMON = asxparser.c \
               sub/vobsub.c \
               timeline/tl_edl.c \
               timeline/tl_matroska.c \
+              timeline/tl_cue.c \
               $(SRCS_COMMON-yes)
 
 

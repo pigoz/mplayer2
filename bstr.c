@@ -185,6 +185,27 @@ struct bstr *bstr_splitlines(void *talloc_ctx, struct bstr str)
     return r;
 }
 
+struct bstr bstr_getline(struct bstr str, struct bstr *rest)
+{
+    int pos = bstrchr(str, '\n');
+    if (pos < 0)
+        pos = str.len;
+    if (rest)
+        *rest = bstr_cut(str, pos + 1);
+    str.len = pos;
+    if (str.len > 0 && str.start[str.len - 1] == '\r')
+        str.len -= 1;
+    return str;
+}
+
+bool bstr_eatstart(struct bstr *s, struct bstr prefix)
+{
+    if (!bstr_startswith(*s, prefix))
+        return false;
+    *s = bstr_cut(*s, prefix.len);
+    return true;
+}
+
 void bstr_lower(struct bstr str)
 {
     for (int i = 0; i < str.len; i++)
@@ -200,4 +221,64 @@ int bstr_sscanf(struct bstr str, const char *format, ...)
     va_end(va);
     talloc_free(ptr);
     return ret;
+}
+
+int bstr_parse_utf8_code_length(unsigned char b)
+{
+    if (b < 128)
+        return 1;
+    int bytes = 7 - av_log2(b ^ 255);
+    return (bytes >= 2 && bytes <= 4) ? bytes : -1;
+}
+
+int bstr_decode_utf8(struct bstr s, struct bstr *out_next)
+{
+    if (s.len == 0)
+        return -1;
+    unsigned int codepoint = s.start[0];
+    s.start++; s.len--;
+    if (codepoint >= 128) {
+        int bytes = bstr_parse_utf8_code_length(codepoint);
+        if (bytes < 0 || s.len < bytes - 1)
+            return -1;
+        codepoint &= 127 >> bytes;
+        for (int n = 1; n < bytes; n++) {
+            int tmp = s.start[0];
+            if ((tmp & 0xC0) != 0x80)
+                return -1;
+            codepoint = (codepoint << 6) | (tmp & ~0xC0);
+            s.start++; s.len--;
+        }
+    }
+    if (out_next)
+        *out_next = s;
+    return codepoint;
+}
+
+bool bstr_case_startswith(struct bstr s, struct bstr prefix)
+{
+    struct bstr start = bstr_splice(s, 0, prefix.len);
+    return start.len == prefix.len && bstrcasecmp(start, prefix) == 0;
+}
+
+bool bstr_case_endswith(struct bstr s, struct bstr suffix)
+{
+    struct bstr end = bstr_cut(s, -suffix.len);
+    return end.len == suffix.len && bstrcasecmp(end, suffix) == 0;
+}
+
+struct bstr bstr_strip_ext(struct bstr str)
+{
+    int dotpos = bstrrchr(str, '.');
+    if (dotpos < 0)
+        return str;
+    return (struct bstr){str.start, dotpos};
+}
+
+struct bstr bstr_get_ext(struct bstr s)
+{
+    int dotpos = bstrrchr(s, '.');
+    if (dotpos < 0)
+        return (struct bstr){NULL, 0};
+    return bstr_splice(s, dotpos + 1, s.len);
 }

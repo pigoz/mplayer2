@@ -38,6 +38,7 @@
 #include "osd.h"
 #include "sub/font_load.h"
 #include "sub/sub.h"
+#include "eosd_packer.h"
 
 #include "gl_common.h"
 #include "aspect.h"
@@ -49,18 +50,16 @@ static int preinit_nosw(struct vo *vo, const char *arg);
 //! How many parts the OSD may consist of at most
 #define MAX_OSD_PARTS 20
 
-#define LARGE_EOSD_TEX_SIZE 512
-#define TINYTEX_SIZE 16
-#define TINYTEX_COLS (LARGE_EOSD_TEX_SIZE / TINYTEX_SIZE)
-#define TINYTEX_MAX (TINYTEX_COLS * TINYTEX_COLS)
-#define SMALLTEX_SIZE 32
-#define SMALLTEX_COLS (LARGE_EOSD_TEX_SIZE / SMALLTEX_SIZE)
-#define SMALLTEX_MAX (SMALLTEX_COLS * SMALLTEX_COLS)
-
 //for gl_priv.use_yuv
 #define MASK_ALL_YUV (~(1 << YUV_CONVERSION_NONE))
 #define MASK_NOT_COMBINERS (~((1 << YUV_CONVERSION_NONE) | (1 << YUV_CONVERSION_COMBINERS)))
 #define MASK_GAMMA_SUPPORT (MASK_NOT_COMBINERS & ~(1 << YUV_CONVERSION_FRAGMENT))
+
+struct vertex_eosd {
+    float x, y;
+    uint8_t color[4];
+    float u, v;
+};
 
 struct gl_priv {
     MPGLContext *glctx;
@@ -74,17 +73,17 @@ struct gl_priv {
     //! Alpha textures for OSD
     GLuint osdatex[MAX_OSD_PARTS];
 #endif
-    GLuint *eosdtex;
-    GLuint largeeosdtex[2];
+    GLuint eosd_texture;
+    int eosd_texture_width, eosd_texture_height;
+    struct eosd_packer *eosd;
+    struct vertex_eosd *eosd_va;
     //! Display lists that draw the OSD parts
     GLuint osdDispList[MAX_OSD_PARTS];
 #ifndef FAST_OSD
     GLuint osdaDispList[MAX_OSD_PARTS];
 #endif
-    GLuint eosdDispList;
     //! How many parts the OSD currently consists of
     int osdtexCnt;
-    int eosdtexCnt;
     int osd_color;
 
     int use_ycbcr;
@@ -94,6 +93,7 @@ struct gl_priv {
     int lscale;
     int cscale;
     float filter_strength;
+    float noise_strength;
     int yuvconvtype;
     int use_rectangle;
     int err_shown;
@@ -215,7 +215,8 @@ static void update_yuvconv(struct vo *vo)
     mp_csp_copy_equalizer_values(&cparams, &p->video_eq);
     gl_conversion_params_t params = {
         p->target, p->yuvconvtype, cparams,
-        p->texture_width, p->texture_height, 0, 0, p->filter_strength
+        p->texture_width, p->texture_height, 0, 0, p->filter_strength,
+        p->noise_strength
     };
     mp_get_chroma_shift(p->image_format, &xs, &ys, &depth);
     params.chrom_texw = params.texw >> xs;
@@ -285,150 +286,111 @@ static void clearOSD(struct vo *vo)
 }
 
 /**
- * \brief remove textures, display list and free memory used by EOSD
- */
-static void clearEOSD(struct vo *vo)
-{
-    struct gl_priv *p = vo->priv;
-    GL *gl = p->gl;
-
-    if (p->eosdDispList)
-        gl->DeleteLists(p->eosdDispList, 1);
-    p->eosdDispList = 0;
-    if (p->eosdtexCnt)
-        gl->DeleteTextures(p->eosdtexCnt, p->eosdtex);
-    p->eosdtexCnt = 0;
-    free(p->eosdtex);
-    p->eosdtex = NULL;
-}
-
-static inline int is_tinytex(ASS_Image *i, int tinytexcur)
-{
-    return i->w < TINYTEX_SIZE && i->h < TINYTEX_SIZE
-           && tinytexcur < TINYTEX_MAX;
-}
-
-static inline int is_smalltex(ASS_Image *i, int smalltexcur)
-{
-    return i->w < SMALLTEX_SIZE && i->h < SMALLTEX_SIZE
-           && smalltexcur < SMALLTEX_MAX;
-}
-
-static inline void tinytex_pos(int tinytexcur, int *x, int *y)
-{
-    *x = (tinytexcur % TINYTEX_COLS) * TINYTEX_SIZE;
-    *y = (tinytexcur / TINYTEX_COLS) * TINYTEX_SIZE;
-}
-
-static inline void smalltex_pos(int smalltexcur, int *x, int *y)
-{
-    *x = (smalltexcur % SMALLTEX_COLS) * SMALLTEX_SIZE;
-    *y = (smalltexcur / SMALLTEX_COLS) * SMALLTEX_SIZE;
-}
-
-/**
  * \brief construct display list from ass image list
  * \param img image list to create OSD from.
- *            A value of NULL has the same effect as clearEOSD()
  */
 static void genEOSD(struct vo *vo, mp_eosd_images_t *imgs)
 {
     struct gl_priv *p = vo->priv;
     GL *gl = p->gl;
 
-    int sx, sy;
-    int tinytexcur = 0;
-    int smalltexcur = 0;
-    GLuint *curtex;
-    GLint scale_type = p->scaled_osd ? GL_LINEAR : GL_NEAREST;
-    ASS_Image *img = imgs->imgs;
-    ASS_Image *i;
+    bool need_repos, need_upload, need_allocate;
+    eosd_packer_generate(p->eosd, imgs, &need_repos, &need_upload,
+                         &need_allocate);
 
-    if (imgs->changed == 0) // there are elements, but they are unchanged
+    if (!need_repos)
         return;
-    if (img && imgs->changed == 1) // there are elements, but they just moved
-        goto skip_upload;
 
-    clearEOSD(vo);
-    if (!img)
+    if (!p->eosd_texture)
+        gl->GenTextures(1, &p->eosd_texture);
+
+    gl->BindTexture(p->target, p->eosd_texture);
+
+    if (need_allocate) {
+        texSize(vo, p->eosd->surface.w, p->eosd->surface.h,
+                &p->eosd_texture_width, &p->eosd_texture_height);
+        // xxx it doesn't need to be cleared, that's a waste of time
+        glCreateClearTex(gl, p->target, GL_ALPHA, GL_ALPHA, GL_UNSIGNED_BYTE,
+                         GL_NEAREST, p->eosd_texture_width,
+                         p->eosd_texture_height, 0);
+    }
+
+    // 2 triangles primitives per quad = 6 vertices per quad
+    // not using GL_QUADS, as it is deprecated in OpenGL 3.x and later
+    p->eosd_va = talloc_realloc_size(p->eosd, p->eosd_va,
+                                     p->eosd->targets_count
+                                     * sizeof(struct vertex_eosd) * 6);
+
+    float eosd_w = p->eosd_texture_width;
+    float eosd_h = p->eosd_texture_height;
+
+    if (p->use_rectangle == 1)
+        eosd_w = eosd_h = 1.0f;
+
+    for (int n = 0; n < p->eosd->targets_count; n++) {
+        struct eosd_target *target = &p->eosd->targets[n];
+        ASS_Image *i = target->ass_img;
+
+        if (need_upload) {
+            glUploadTex(gl, p->target, GL_ALPHA, GL_UNSIGNED_BYTE, i->bitmap,
+                        i->stride, target->source.x0, target->source.y0,
+                        i->w, i->h, 0);
+        }
+
+        uint8_t color[4] = { i->color >> 24, (i->color >> 16) & 0xff,
+                            (i->color >> 8) & 0xff, 255 - (i->color & 0xff) };
+
+        float x0 = target->dest.x0;
+        float y0 = target->dest.y0;
+        float x1 = target->dest.x1;
+        float y1 = target->dest.y1;
+        float tx0 = target->source.x0 / eosd_w;
+        float ty0 = target->source.y0 / eosd_h;
+        float tx1 = target->source.x1 / eosd_w;
+        float ty1 = target->source.y1 / eosd_h;
+
+#define COLOR_INIT {color[0], color[1], color[2], color[3]}
+        struct vertex_eosd *va = &p->eosd_va[n * 6];
+        va[0] = (struct vertex_eosd) { x0, y0, COLOR_INIT, tx0, ty0 };
+        va[1] = (struct vertex_eosd) { x0, y1, COLOR_INIT, tx0, ty1 };
+        va[2] = (struct vertex_eosd) { x1, y0, COLOR_INIT, tx1, ty0 };
+        va[3] = (struct vertex_eosd) { x1, y1, COLOR_INIT, tx1, ty1 };
+        va[4] = va[2];
+        va[5] = va[1];
+#undef COLOR_INIT
+    }
+
+    gl->BindTexture(p->target, 0);
+}
+
+// Note: relies on state being setup, like projection matrix and blending
+static void drawEOSD(struct vo *vo)
+{
+    struct gl_priv *p = vo->priv;
+    GL *gl = p->gl;
+
+    if (p->eosd->targets_count == 0)
         return;
-    if (!p->largeeosdtex[0]) {
-        gl->GenTextures(2, p->largeeosdtex);
-        for (int n = 0; n < 2; n++) {
-            gl->BindTexture(p->target, p->largeeosdtex[n]);
-            glCreateClearTex(gl, p->target, GL_ALPHA, GL_ALPHA,
-                             GL_UNSIGNED_BYTE, scale_type,
-                             LARGE_EOSD_TEX_SIZE, LARGE_EOSD_TEX_SIZE, 0);
-        }
-    }
-    for (i = img; i; i = i->next) {
-        if (i->w <= 0 || i->h <= 0 || i->stride < i->w)
-            continue;
-        if (is_tinytex(i, tinytexcur))
-            tinytexcur++;
-        else if (is_smalltex(i, smalltexcur))
-            smalltexcur++;
-        else
-            p->eosdtexCnt++;
-    }
-    mp_msg(MSGT_VO, MSGL_DBG2, "EOSD counts (tiny, small, all): %i, %i, %i\n",
-           tinytexcur, smalltexcur, p->eosdtexCnt);
-    if (p->eosdtexCnt) {
-        p->eosdtex = calloc(p->eosdtexCnt, sizeof(GLuint));
-        gl->GenTextures(p->eosdtexCnt, p->eosdtex);
-    }
-    tinytexcur = smalltexcur = 0;
-    for (i = img, curtex = p->eosdtex; i; i = i->next) {
-        int x = 0, y = 0;
-        if (i->w <= 0 || i->h <= 0 || i->stride < i->w) {
-            mp_msg(MSGT_VO, MSGL_V, "Invalid dimensions OSD for part!\n");
-            continue;
-        }
-        if (is_tinytex(i, tinytexcur)) {
-            tinytex_pos(tinytexcur, &x, &y);
-            gl->BindTexture(p->target, p->largeeosdtex[0]);
-            tinytexcur++;
-        } else if (is_smalltex(i, smalltexcur)) {
-            smalltex_pos(smalltexcur, &x, &y);
-            gl->BindTexture(p->target, p->largeeosdtex[1]);
-            smalltexcur++;
-        } else {
-            texSize(vo, i->w, i->h, &sx, &sy);
-            gl->BindTexture(p->target, *curtex++);
-            glCreateClearTex(gl, p->target, GL_ALPHA, GL_ALPHA,
-                             GL_UNSIGNED_BYTE, scale_type, sx, sy, 0);
-        }
-        glUploadTex(gl, p->target, GL_ALPHA, GL_UNSIGNED_BYTE, i->bitmap,
-                    i->stride, x, y, i->w, i->h, 0);
-    }
-    p->eosdDispList = gl->GenLists(1);
-skip_upload:
-    gl->NewList(p->eosdDispList, GL_COMPILE);
-    tinytexcur = smalltexcur = 0;
-    for (i = img, curtex = p->eosdtex; i; i = i->next) {
-        int x = 0, y = 0;
-        if (i->w <= 0 || i->h <= 0 || i->stride < i->w)
-            continue;
-        gl->Color4ub(i->color >> 24, (i->color >> 16) & 0xff,
-                     (i->color >> 8) & 0xff, 255 - (i->color & 0xff));
-        if (is_tinytex(i, tinytexcur)) {
-            tinytex_pos(tinytexcur, &x, &y);
-            sx = sy = LARGE_EOSD_TEX_SIZE;
-            gl->BindTexture(p->target, p->largeeosdtex[0]);
-            tinytexcur++;
-        } else if (is_smalltex(i, smalltexcur)) {
-            smalltex_pos(smalltexcur, &x, &y);
-            sx = sy = LARGE_EOSD_TEX_SIZE;
-            gl->BindTexture(p->target, p->largeeosdtex[1]);
-            smalltexcur++;
-        } else {
-            texSize(vo, i->w, i->h, &sx, &sy);
-            gl->BindTexture(p->target, *curtex++);
-        }
-        glDrawTex(gl, i->dst_x, i->dst_y, i->w, i->h, x, y, i->w, i->h, sx, sy,
-                  p->use_rectangle == 1, 0, 0);
-    }
-    gl->EndList();
+
+    gl->BindTexture(p->target, p->eosd_texture);
+
+    struct vertex_eosd *va = p->eosd_va;
+    size_t stride = sizeof(struct vertex_eosd);
+
+    gl->VertexPointer(2, GL_FLOAT, stride, &va[0].x);
+    gl->ColorPointer(4, GL_UNSIGNED_BYTE, stride, &va[0].color[0]);
+    gl->TexCoordPointer(2, GL_FLOAT, stride, &va[0].u);
+
+    gl->EnableClientState(GL_VERTEX_ARRAY);
+    gl->EnableClientState(GL_TEXTURE_COORD_ARRAY);
+    gl->EnableClientState(GL_COLOR_ARRAY);
+
+    gl->DrawArrays(GL_TRIANGLES, 0, p->eosd->targets_count * 6);
+
+    gl->DisableClientState(GL_VERTEX_ARRAY);
+    gl->DisableClientState(GL_TEXTURE_COORD_ARRAY);
+    gl->DisableClientState(GL_COLOR_ARRAY);
+
     gl->BindTexture(p->target, 0);
 }
 
@@ -450,10 +412,10 @@ static void uninitGl(struct vo *vo)
         gl->DeleteTextures(i, p->default_texs);
     p->default_texs[0] = 0;
     clearOSD(vo);
-    clearEOSD(vo);
-    if (p->largeeosdtex[0])
-        gl->DeleteTextures(2, p->largeeosdtex);
-    p->largeeosdtex[0] = 0;
+    if (p->eosd_texture)
+        gl->DeleteTextures(1, &p->eosd_texture);
+    eosd_packer_reinit(p->eosd, 0, 0);
+    p->eosd_texture = 0;
     if (gl->DeleteBuffers && p->buffer)
         gl->DeleteBuffers(1, &p->buffer);
     p->buffer = 0;
@@ -633,6 +595,10 @@ static int initGl(struct vo *vo, uint32_t d_width, uint32_t d_height)
         update_yuvconv(vo);
     }
 
+    GLint max_texture_size;
+    gl->GetIntegerv(GL_MAX_TEXTURE_SIZE, &max_texture_size);
+    eosd_packer_reinit(p->eosd, max_texture_size, max_texture_size);
+
     resize(vo, d_width, d_height);
 
     gl->ClearColor(0.0f, 0.0f, 0.0f, 0.0f);
@@ -786,7 +752,7 @@ static void do_render_osd(struct vo *vo, int type)
     GL *gl = p->gl;
 
     int draw_osd  = (type & RENDER_OSD) && p->osdtexCnt > 0;
-    int draw_eosd = (type & RENDER_EOSD) && p->eosdDispList;
+    int draw_eosd = (type & RENDER_EOSD);
     if (!draw_osd && !draw_eosd)
         return;
     // set special rendering parameters
@@ -799,7 +765,7 @@ static void do_render_osd(struct vo *vo, int type)
     gl->Enable(GL_BLEND);
     if (draw_eosd) {
         gl->BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        gl->CallList(p->eosdDispList);
+        drawEOSD(vo);
     }
     if (draw_osd) {
         gl->Color4ub((p->osd_color >> 16) & 0xff, (p->osd_color >> 8) & 0xff,
@@ -847,7 +813,7 @@ static void do_render(struct vo *vo)
 //  Enable(GL_TEXTURE_2D);
 //  BindTexture(GL_TEXTURE_2D, texture_id);
 
-    gl->Color3f(1, 1, 1);
+    gl->Color4f(1, 1, 1, 1);
     if (p->is_yuv || p->custom_prog)
         glEnableYUVConversion(gl, p->target, p->yuvconvtype);
     if (p->stereo_mode) {
@@ -1091,7 +1057,7 @@ static uint32_t draw_image(struct vo *vo, mp_image_t *mpi)
         slice = 0; // always "upload" full texture
     }
     glUploadTex(gl, p->target, p->gl_format, p->gl_type, planes[0],
-                stride[0], mpi->x, mpi->y, w, h, slice);
+                stride[0], 0, 0, w, h, slice);
     if (p->is_yuv) {
         int xs, ys;
         mp_get_chroma_shift(p->image_format, &xs, &ys, NULL);
@@ -1102,8 +1068,7 @@ static uint32_t draw_image(struct vo *vo, mp_image_t *mpi)
         }
         gl->ActiveTexture(GL_TEXTURE1);
         glUploadTex(gl, p->target, p->gl_format, p->gl_type, planes[1],
-                    stride[1], mpi->x >> xs, mpi->y >> ys, w >> xs, h >> ys,
-                    slice);
+                    stride[1], 0, 0, w >> xs, h >> ys, slice);
         if ((mpi->flags & MP_IMGFLAG_DIRECT) && !(mpi->flags & MP_IMGFLAG_COMMON_PLANE)) {
             gl->BindBuffer(GL_PIXEL_UNPACK_BUFFER, p->buffer_uv[1]);
             gl->UnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
@@ -1111,8 +1076,7 @@ static uint32_t draw_image(struct vo *vo, mp_image_t *mpi)
         }
         gl->ActiveTexture(GL_TEXTURE2);
         glUploadTex(gl, p->target, p->gl_format, p->gl_type, planes[2],
-                    stride[2], mpi->x >> xs, mpi->y >> ys, w >> xs, h >> ys,
-                    slice);
+                    stride[2], 0, 0, w >> xs, h >> ys, slice);
         gl->ActiveTexture(GL_TEXTURE0);
     }
     if (mpi->flags & MP_IMGFLAG_DIRECT) {
@@ -1217,8 +1181,12 @@ static void uninit(struct vo *vo)
     p->gl = NULL;
 }
 
-static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
-                            enum MPGLType gltype)
+static int backend_valid(void *arg)
+{
+    return mpgl_find_backend(*(const char **)arg) >= 0;
+}
+
+static int preinit_internal(struct vo *vo, const char *arg, int allow_sw)
 {
     struct gl_priv *p = talloc_zero(vo, struct gl_priv);
     vo->priv = p;
@@ -1239,10 +1207,13 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
         .osd_color = 0xffffff,
     };
 
+    p->eosd = eosd_packer_create(vo);
+
     //essentially unused; for legacy warnings only
     int user_colorspace = 0;
     int levelconv = -1;
     int aspect = -1;
+    char *backend_arg = NULL;
 
     const opt_t subopts[] = {
         {"manyfmts",     OPT_ARG_BOOL, &p->many_fmts,    NULL},
@@ -1255,6 +1226,7 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
         {"lscale",       OPT_ARG_INT,  &p->lscale,       int_non_neg},
         {"cscale",       OPT_ARG_INT,  &p->cscale,       int_non_neg},
         {"filter-strength", OPT_ARG_FLOAT, &p->filter_strength, NULL},
+        {"noise-strength", OPT_ARG_FLOAT, &p->noise_strength, NULL},
         {"ati-hack",     OPT_ARG_BOOL, &p->ati_hack,     NULL},
         {"force-pbo",    OPT_ARG_BOOL, &p->force_pbo,    NULL},
         {"glfinish",     OPT_ARG_BOOL, &p->use_glFinish, NULL},
@@ -1266,6 +1238,7 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
         {"mipmapgen",    OPT_ARG_BOOL, &p->mipmap_gen,   NULL},
         {"osdcolor",     OPT_ARG_INT,  &p->osd_color,    NULL},
         {"stereo",       OPT_ARG_INT,  &p->stereo_mode,  NULL},
+        {"backend",      OPT_ARG_MSTRZ,&backend_arg,     backend_valid},
         // Removed options.
         // They are only parsed to notify the user about the replacements.
         {"aspect",       OPT_ARG_BOOL, &aspect,          NULL},
@@ -1322,6 +1295,8 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
                "    as lscale but for chroma (2x slower with little visible effect).\n"
                "  filter-strength=<value>\n"
                "    set the effect strength for some lscale/cscale filters\n"
+               "  noise-strength=<value>\n"
+               "    set how much noise to add. 1.0 is suitable for dithering to 6 bit.\n"
                "  customprog=<filename>\n"
                "    use a custom YUV conversion program\n"
                "  customtex=<filename>\n"
@@ -1339,6 +1314,12 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
                "    1: side-by-side to red-cyan stereo\n"
                "    2: side-by-side to green-magenta stereo\n"
                "    3: side-by-side to quadbuffer stereo\n"
+               "  backend=<sys>\n"
+               "    auto: auto-select (default)\n"
+               "    cocoa: Cocoa/OSX\n"
+               "    win: Win32/WGL\n"
+               "    x11: X11/GLX\n"
+               "    sdl: SDL\n"
                "\n");
         return -1;
     }
@@ -1358,7 +1339,11 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
                " been removed, using yuv=2 instead.\n");
         p->use_yuv = 2;
     }
-    p->glctx = init_mpglcontext(gltype, vo);
+
+    int backend = backend_arg ? mpgl_find_backend(backend_arg) : GLTYPE_AUTO;
+    free(backend_arg);
+
+    p->glctx = init_mpglcontext(backend, vo);
     if (!p->glctx)
         goto err_out;
     p->gl = p->glctx->gl;
@@ -1382,7 +1367,7 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw,
         // acceleration and so on. Destroy that window to make sure all state
         // associated with it is lost.
         uninit(vo);
-        p->glctx = init_mpglcontext(gltype, vo);
+        p->glctx = init_mpglcontext(backend, vo);
         if (!p->glctx)
             goto err_out;
         p->gl = p->glctx->gl;
@@ -1402,7 +1387,7 @@ err_out:
 
 static int preinit(struct vo *vo, const char *arg)
 {
-    return preinit_internal(vo, arg, 1, GLTYPE_AUTO);
+    return preinit_internal(vo, arg, 1);
 }
 
 static int control(struct vo *vo, uint32_t request, void *data)
@@ -1527,7 +1512,7 @@ const struct vo_driver video_out_gl = {
 
 static int preinit_nosw(struct vo *vo, const char *arg)
 {
-    return preinit_internal(vo, arg, 0, GLTYPE_AUTO);
+    return preinit_internal(vo, arg, 0);
 }
 
 const struct vo_driver video_out_gl_nosw =
@@ -1548,28 +1533,3 @@ const struct vo_driver video_out_gl_nosw =
     .check_events = check_events,
     .uninit = uninit,
 };
-
-#ifdef CONFIG_GL_SDL
-static int preinit_sdl(struct vo *vo, const char *arg)
-{
-    return preinit_internal(vo, arg, 1, GLTYPE_SDL);
-}
-
-const struct vo_driver video_out_gl_sdl = {
-    .is_new = true,
-    .info = &(const vo_info_t) {
-        "OpenGL with SDL",
-        "gl_sdl",
-        "Reimar Doeffinger <Reimar.Doeffinger@gmx.de>",
-        ""
-    },
-    .preinit = preinit_sdl,
-    .config = config,
-    .control = control,
-    .draw_slice = draw_slice,
-    .draw_osd = draw_osd,
-    .flip_page = flip_page,
-    .check_events = check_events,
-    .uninit = uninit,
-};
-#endif

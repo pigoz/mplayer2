@@ -90,6 +90,7 @@ typedef struct MPContext {
     struct mp_fifo *key_fifo;
     struct input_ctx *input;
     struct osd_state *osd;
+    char *terminal_osd_text;
     struct sub_data *subdata; // current sub_data style subtitles if any
     // last sub_data style sub line if any, used by log_sub() only
     struct subtitle *vo_sub_last;
@@ -187,9 +188,6 @@ typedef struct MPContext {
     double last_chapter_pts;
 
     float begin_skip; ///< start time of the current skip while on edlout mode
-    // audio is muted if either EDL or user activates mute
-    short edl_muted; ///< Stores whether EDL is currently in muted mode.
-    short user_muted; ///< Stores whether user wanted muted mode.
 
     int global_sub_size; // this encompasses all subtitle sources
     int global_sub_pos; // this encompasses all subtitle sources
@@ -264,5 +262,7 @@ void update_subtitles(struct MPContext *mpctx, double refpts,
 void build_ordered_chapter_timeline(struct MPContext *mpctx);
 // timeline/tl_edl.c
 void build_edl_timeline(struct MPContext *mpctx);
+// timeline/tl_cue.c
+void build_cue_timeline(struct MPContext *mpctx);
 
 #endif /* MPLAYER_MP_CORE_H */

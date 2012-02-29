@@ -50,6 +50,7 @@ enum mp_command_type {
     MP_CMD_MUTE,
     MP_CMD_LOADFILE,
     MP_CMD_LOADLIST,
+    MP_CMD_PLAY_TREE_CLEAR,
     MP_CMD_VF_CHANGE_RECTANGLE,
     MP_CMD_GAMMA,
     MP_CMD_SUB_VISIBILITY,
@@ -153,10 +154,10 @@ enum mp_command_type {
 };
 
 // The arg types
-#define MP_CMD_ARG_INT 0
-#define MP_CMD_ARG_FLOAT 1
-#define MP_CMD_ARG_STRING 2
-#define MP_CMD_ARG_VOID 3
+#define MP_CMD_ARG_VOID 0
+#define MP_CMD_ARG_INT 1
+#define MP_CMD_ARG_FLOAT 2
+#define MP_CMD_ARG_STRING 3
 
 #ifndef MP_CMD_MAX_ARGS
 #define MP_CMD_MAX_ARGS 10
@@ -184,7 +185,6 @@ struct mp_cmd_arg {
         int i;
         float f;
         char *s;
-        void *v;
     } v;
 };
 
@@ -194,7 +194,6 @@ typedef struct mp_cmd {
     int nargs;
     struct mp_cmd_arg args[MP_CMD_MAX_ARGS];
     int pausing;
-    struct mp_cmd *queue_prev;
     struct mp_cmd *queue_next;
 } mp_cmd_t;
 

@@ -485,6 +485,9 @@ const m_option_t common_opts[] = {
     {"sb", &seek_to_byte, CONF_TYPE_POSITION, CONF_MIN, 0, 0, NULL},
     OPT_TIME("ss", seek_to_sec, 0),
 
+    // start paused
+    OPT_FLAG_ON("pause", start_paused, 0),
+
     // stop at given position
     {"endpos", &end_at, CONF_TYPE_TIME_SIZE, 0, 0, 0, NULL},
 
@@ -907,7 +910,15 @@ const m_option_t mplayer_opts[]={
     OPT_STRING("rtc-device", rtc_device, 0),
 #endif
 
-    OPT_MAKE_FLAGS("term-osd", term_osd, 0),
+    OPT_CHOICE("term-osd", term_osd, M_OPT_IMPLICIT_DEFAULT,
+               ({"force", 1},
+                {"auto", 2},
+                {"off", 0})),
+
+    // set term_osd to 0
+    // this is for compatibility
+    {"noterm-osd", NULL, &m_option_type_flag, 0, 1, 0, NULL, 1, offsetof(struct MPOpts, term_osd)},
+
     OPT_STRING("term-osd-esc", term_osd_esc, 0),
     OPT_STRING("playing-msg", playing_msg, 0),
 
@@ -924,9 +935,13 @@ const m_option_t mplayer_opts[]={
     {"tvscan", "MPlayer was compiled without TV interface support.\n", CONF_TYPE_PRINT, 0, 0, 0, NULL},
 #endif /* CONFIG_TV */
 
+    OPT_INTRANGE("screenshot-jpeg-quality", screenshot_jpeg_quality, 0, 0, 100),
+    OPT_INTRANGE("screenshot-png-compression", screenshot_png_compression, 0, 0, 9),
+    OPT_STRING("screenshot-filetype", screenshot_filetype, 0),
+    OPT_STRING("screenshot-template", screenshot_template, 0),
+
     OPT_FLAG_ON("list-properties", list_properties, CONF_GLOBAL),
     {"identify", &mp_msg_levels[MSGT_IDENTIFY], CONF_TYPE_FLAG, CONF_GLOBAL, 0, MSGL_V, NULL},
-    {"-help", (void *) help_text, CONF_TYPE_PRINT, CONF_NOCFG|CONF_GLOBAL, 0, 0, NULL},
     {"help", (void *) help_text, CONF_TYPE_PRINT, CONF_NOCFG|CONF_GLOBAL, 0, 0, NULL},
     {"h", (void *) help_text, CONF_TYPE_PRINT, CONF_NOCFG|CONF_GLOBAL, 0, 0, NULL},
 

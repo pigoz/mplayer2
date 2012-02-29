@@ -34,6 +34,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #ifdef CONFIG_IOCTL
@@ -57,6 +58,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 
+#include "bstr.h"
 #include "mp_fifo.h"
 #include "input/keycodes.h"
 #include "getch2.h"
@@ -201,6 +203,16 @@ void getch2(struct mp_fifo *fifo)
                         len = 2;
                 }
                 code = KEY_ENTER;
+            } else {
+                int utf8len = bstr_parse_utf8_code_length(code);
+                if (utf8len > 0 && utf8len <= getch2_len) {
+                    struct bstr s = { getch2_buf, utf8len };
+                    int unicode = bstr_decode_utf8(s, NULL);
+                    if (unicode > 0) {
+                        len = utf8len;
+                        code = unicode;
+                    }
+                }
             }
         }
         else if (getch2_len > 1) {
@@ -225,7 +237,7 @@ void getch2(struct mp_fifo *fifo)
             }
             if ((c == '[' || c == 'O') && getch2_len >= 3) {
                 int c = getch2_buf[2];
-                const short ctable[] = {
+                const int ctable[] = {
                     KEY_UP, KEY_DOWN, KEY_RIGHT, KEY_LEFT, 0,
                     KEY_END, KEY_PGDWN, KEY_HOME, KEY_PGUP, 0, 0, KEY_INS, 0, 0, 0,
                     KEY_F+1, KEY_F+2, KEY_F+3, KEY_F+4};
@@ -270,27 +282,41 @@ void getch2(struct mp_fifo *fifo)
     }
 }
 
-static int getch2_status=0;
+static volatile int getch2_status=0;
 
-void getch2_enable(void){
+static void do_enable_getch2(void)
+{
 #ifdef HAVE_TERMIOS
-struct termios tio_new;
-    tcgetattr(0,&tio_orig);
-    tio_new=tio_orig;
+    struct termios tio_new;
+    tcgetattr(0,&tio_new);
     tio_new.c_lflag &= ~(ICANON|ECHO); /* Clear ICANON and ECHO. */
     tio_new.c_cc[VMIN] = 0;
     tio_new.c_cc[VTIME] = 0;
     tcsetattr(0,TCSANOW,&tio_new);
 #endif
+}
+
+static void continue_sighandler(int signum)
+{
+    if (getch2_status)
+        do_enable_getch2();
+}
+
+void getch2_enable(void){
+#ifdef HAVE_TERMIOS
+    tcgetattr(0,&tio_orig);
+    do_enable_getch2();
+#endif
     getch2_status=1;
+    signal(SIGCONT,continue_sighandler);
 }
 
 void getch2_disable(void){
     if(!getch2_status) return; // already disabled / never enabled
+    getch2_status=0;
 #ifdef HAVE_TERMIOS
     tcsetattr(0,TCSANOW,&tio_orig);
 #endif
-    getch2_status=0;
 }
 
 #ifdef CONFIG_ICONV

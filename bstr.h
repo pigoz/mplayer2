@@ -69,8 +69,41 @@ double bstrtod(struct bstr str, struct bstr *rest);
 void bstr_lower(struct bstr str);
 int bstr_sscanf(struct bstr str, const char *format, ...);
 
+// Decode the UTF-8 code point at the start of the string,, and return the
+// character.
+// After calling this function, *out_next will point to the next character.
+// out_next can be NULL.
+// On error, -1 is returned, and *out_next is not modified.
+int bstr_decode_utf8(struct bstr str, struct bstr *out_next);
+
+// Return the length of the UTF-8 sequence that starts with the given byte.
+// Given a string char *s, the next UTF-8 code point is to be expected at
+//      s + bstr_parse_utf8_code_length(s[0])
+// On error, -1 is returned. On success, it returns a value in the range [1, 4].
+int bstr_parse_utf8_code_length(unsigned char b);
+
+// Return the text before the next line break, and return it. Change *rest to
+// point to the text following this line break. (rest can be NULL.)
+// Unlike bstr_splitlines, possible \r characters coming from files with CR+LF
+// line breaks are stripped.
+struct bstr bstr_getline(struct bstr str, struct bstr *rest);
+
+// If s starts with prefix, return true and return the rest of the string in s.
+bool bstr_eatstart(struct bstr *s, struct bstr prefix);
+
+bool bstr_case_startswith(struct bstr s, struct bstr prefix);
+bool bstr_case_endswith(struct bstr s, struct bstr suffix);
+struct bstr bstr_strip_ext(struct bstr str);
+struct bstr bstr_get_ext(struct bstr s);
+
+
 static inline struct bstr bstr_cut(struct bstr str, int n)
 {
+    if (n < 0) {
+        n += str.len;
+        if (n < 0)
+            n = 0;
+    }
     if (n > str.len)
         n = str.len;
     return (struct bstr){str.start + n, str.len - n};
