@@ -39,6 +39,7 @@
 #include "sub/font_load.h"
 #include "sub/sub.h"
 #include "eosd_packer.h"
+#include "eosd_render.h"
 
 #include "gl_common.h"
 #include "aspect.h"
@@ -67,6 +68,7 @@ struct gl_priv {
 
     int use_osd;
     int scaled_osd;
+    int use_cpu_eosd;
     //! Textures for OSD
     GLuint osdtex[MAX_OSD_PARTS];
 #ifndef FAST_OSD
@@ -74,9 +76,11 @@ struct gl_priv {
     GLuint osdatex[MAX_OSD_PARTS];
 #endif
     GLuint eosd_texture;
+    unsigned char *eosd_image;
     int eosd_texture_width, eosd_texture_height;
     struct eosd_packer *eosd;
     struct vertex_eosd *eosd_va;
+    int eosd_va_count;
     //! Display lists that draw the OSD parts
     GLuint osdDispList[MAX_OSD_PARTS];
 #ifndef FAST_OSD
@@ -286,6 +290,45 @@ static void clearOSD(struct vo *vo)
     p->osdtexCnt = 0;
 }
 
+// Write a textured quad to a vertex array.
+// va = destination vertex array, 6 entries will be overwritten
+// x0, y0, x1, y1 = destination coordinates of the quad
+// tx0, ty0, tx1, ty1 = source texture coordinates (usually in pixels)
+// texture_w, texture_h = size of the texture, or an inverse factor
+// color = optional color for all vertices, NULL for opaque white
+// flip = flip vertically
+static void write_quad(struct vertex_eosd *va,
+                       float x0, float y0, float x1, float y1,
+                       float tx0, float ty0, float tx1, float ty1,
+                       float texture_w, float texture_h,
+                       const uint8_t color[4], bool flip)
+{
+    static const uint8_t white[4] = { 255, 255, 255, 255 };
+
+    if (!color)
+        color = white;
+
+    tx0 /= texture_w;
+    ty0 /= texture_h;
+    tx1 /= texture_w;
+    ty1 /= texture_h;
+
+    if (flip) {
+        float tmp = ty0;
+        ty0 = ty1;
+        ty1 = tmp;
+    }
+
+#define COLOR_INIT {color[0], color[1], color[2], color[3]}
+    va[0] = (struct vertex_eosd) { x0, y0, COLOR_INIT, tx0, ty0 };
+    va[1] = (struct vertex_eosd) { x0, y1, COLOR_INIT, tx0, ty1 };
+    va[2] = (struct vertex_eosd) { x1, y0, COLOR_INIT, tx1, ty0 };
+    va[3] = (struct vertex_eosd) { x1, y1, COLOR_INIT, tx1, ty1 };
+    va[4] = va[2];
+    va[5] = va[1];
+#undef COLOR_INIT
+}
+
 /**
  * \brief construct display list from ass image list
  * \param img image list to create OSD from.
@@ -295,15 +338,64 @@ static void genEOSD(struct vo *vo, mp_eosd_images_t *imgs)
     struct gl_priv *p = vo->priv;
     GL *gl = p->gl;
 
+    if (!p->eosd_texture)
+        gl->GenTextures(1, &p->eosd_texture);
+
+    if (p->use_cpu_eosd) {
+        gl->BindTexture(p->target, p->eosd_texture);
+        int w = vo->dwidth;
+        int h = vo->dheight;
+        if (p->scaled_osd) {
+            w = p->image_width;
+            h = p->image_height;
+        }
+        int tw, th;
+        texSize(vo, w, h, &tw, &th);
+        if (p->eosd_texture_width < tw || p->eosd_texture_height < th) {
+            p->eosd_texture_width = tw;
+            p->eosd_texture_height = th;
+            // xxx it doesn't need to be cleared, that's a waste of time
+            glCreateClearTex(gl, p->target, GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE,
+                             GL_NEAREST, p->eosd_texture_width,
+                             p->eosd_texture_height, 0);
+            talloc_free(p->eosd_image);
+            p->eosd_image = talloc_size(vo, p->eosd_texture_width
+                                        * p->eosd_texture_height * 4);
+            p->eosd_va = talloc_realloc_size(p->eosd, p->eosd_va,
+                                             sizeof(struct vertex_eosd) * 6);
+        }
+        if (imgs->changed) {
+            size_t stride = p->eosd_texture_width * 4;
+            int bx, by, bw, bh;
+            eosd_bounding_box(imgs, &bx, &by, &bw, &bh);
+            p->eosd_va_count = 0;
+            if (bw > 0 && bh > 0) {
+                rgba_clear(p->eosd_image, stride, bx, by, bw, bh);
+                eosd_render_rgba(p->eosd_image, stride, w, h, imgs);
+                glUploadTex(gl, p->target, GL_RGBA, GL_UNSIGNED_BYTE,
+                            p->eosd_image + by * stride + bx * 4,
+                            stride, bx, by, bw, bh, 0);
+                float eosd_w = p->eosd_texture_width;
+                float eosd_h = p->eosd_texture_height;
+                if (p->use_rectangle == 1)
+                    eosd_w = eosd_h = 1.0f;
+                write_quad(p->eosd_va,
+                           bx, by, bx + bw, by + bh,
+                           bx, by, bx + bw, by + bh,
+                           eosd_w, eosd_h, NULL, false);
+                p->eosd_va_count = 6;
+            }
+        }
+        gl->BindTexture(p->target, 0);
+        return;
+    }
+
     bool need_repos, need_upload, need_allocate;
     eosd_packer_generate(p->eosd, imgs, &need_repos, &need_upload,
                          &need_allocate);
 
     if (!need_repos)
         return;
-
-    if (!p->eosd_texture)
-        gl->GenTextures(1, &p->eosd_texture);
 
     gl->BindTexture(p->target, p->eosd_texture);
 
@@ -341,25 +433,15 @@ static void genEOSD(struct vo *vo, mp_eosd_images_t *imgs)
         uint8_t color[4] = { i->color >> 24, (i->color >> 16) & 0xff,
                             (i->color >> 8) & 0xff, 255 - (i->color & 0xff) };
 
-        float x0 = target->dest.x0;
-        float y0 = target->dest.y0;
-        float x1 = target->dest.x1;
-        float y1 = target->dest.y1;
-        float tx0 = target->source.x0 / eosd_w;
-        float ty0 = target->source.y0 / eosd_h;
-        float tx1 = target->source.x1 / eosd_w;
-        float ty1 = target->source.y1 / eosd_h;
-
-#define COLOR_INIT {color[0], color[1], color[2], color[3]}
-        struct vertex_eosd *va = &p->eosd_va[n * 6];
-        va[0] = (struct vertex_eosd) { x0, y0, COLOR_INIT, tx0, ty0 };
-        va[1] = (struct vertex_eosd) { x0, y1, COLOR_INIT, tx0, ty1 };
-        va[2] = (struct vertex_eosd) { x1, y0, COLOR_INIT, tx1, ty0 };
-        va[3] = (struct vertex_eosd) { x1, y1, COLOR_INIT, tx1, ty1 };
-        va[4] = va[2];
-        va[5] = va[1];
-#undef COLOR_INIT
+        write_quad(&p->eosd_va[n * 6],
+                   target->dest.x0, target->dest.y0,
+                   target->dest.x1, target->dest.y1,
+                   target->source.x0, target->source.y0,
+                   target->source.x1, target->source.y1,
+                   eosd_w, eosd_h, color, false);
     }
+
+    p->eosd_va_count = p->eosd->targets_count * 6;
 
     gl->BindTexture(p->target, 0);
 }
@@ -370,7 +452,7 @@ static void drawEOSD(struct vo *vo)
     struct gl_priv *p = vo->priv;
     GL *gl = p->gl;
 
-    if (p->eosd->targets_count == 0)
+    if (p->eosd_va_count == 0)
         return;
 
     gl->BindTexture(p->target, p->eosd_texture);
@@ -386,7 +468,7 @@ static void drawEOSD(struct vo *vo)
     gl->EnableClientState(GL_TEXTURE_COORD_ARRAY);
     gl->EnableClientState(GL_COLOR_ARRAY);
 
-    gl->DrawArrays(GL_TRIANGLES, 0, p->eosd->targets_count * 6);
+    gl->DrawArrays(GL_TRIANGLES, 0, p->eosd_va_count);
 
     gl->DisableClientState(GL_VERTEX_ARRAY);
     gl->DisableClientState(GL_TEXTURE_COORD_ARRAY);
@@ -1195,6 +1277,7 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw)
     *p = (struct gl_priv) {
         .many_fmts = 1,
         .use_osd = -1,
+        .use_cpu_eosd = 1,
         .use_yuv = -1,
         .colorspace = MP_CSP_DETAILS_DEFAULTS,
         .filter_strength = 0.5,
@@ -1220,6 +1303,7 @@ static int preinit_internal(struct vo *vo, const char *arg, int allow_sw)
         {"manyfmts",     OPT_ARG_BOOL, &p->many_fmts,    NULL},
         {"osd",          OPT_ARG_BOOL, &p->use_osd,      NULL},
         {"scaled-osd",   OPT_ARG_BOOL, &p->scaled_osd,   NULL},
+        {"cpu-eosd",     OPT_ARG_BOOL, &p->use_cpu_eosd, NULL},
         {"ycbcr",        OPT_ARG_BOOL, &p->use_ycbcr,    NULL},
         {"slice-height", OPT_ARG_INT,  &p->slice_height, int_non_neg},
         {"rectangle",    OPT_ARG_INT,  &p->use_rectangle,int_non_neg},

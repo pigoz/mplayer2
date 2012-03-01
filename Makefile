@@ -403,6 +403,7 @@ SRCS_COMMON = asxparser.c \
               libmpdemux/yuv4mpeg_ratio.c \
               libvo/osd.c \
               libvo/eosd_packer.c \
+              libvo/eosd_render.c \
               osdep/numcores.c \
               osdep/io.c \
               osdep/$(GETCH) \
