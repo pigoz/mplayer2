@@ -276,6 +276,7 @@ struct vo {
     struct input_ctx *input_ctx;
     int event_fd;  // check_events() should be called when this has input
     int registered_fd;  // set to event_fd when registered in input system
+    struct MPContext *mpctx;
 
     // requested position/resolution
     int dx;

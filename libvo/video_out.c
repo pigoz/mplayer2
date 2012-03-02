@@ -96,6 +96,7 @@ extern struct vo_driver video_out_fbdev;
 extern struct vo_driver video_out_fbdev2;
 extern struct vo_driver video_out_svga;
 extern struct vo_driver video_out_png;
+extern struct vo_driver video_out_image;
 extern struct vo_driver video_out_ggi;
 extern struct vo_driver video_out_aa;
 extern struct vo_driver video_out_caca;
@@ -228,6 +229,7 @@ const struct vo_driver *video_out_drivers[] =
         &video_out_yuv4mpeg,
 #endif
         &video_out_png,
+        &video_out_image,
 #ifdef CONFIG_JPEG
         &video_out_jpeg,
 #endif

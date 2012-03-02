@@ -2696,6 +2696,7 @@ int reinit_video_chain(struct MPContext *mpctx)
                     "the selected video_out (-vo) device.\n");
             goto err_out;
         }
+        mpctx->video_out->mpctx = mpctx;
         mpctx->initialized_flags |= INITIALIZED_VO;
     }
 
