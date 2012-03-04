@@ -1125,26 +1125,6 @@ static int init_gl(struct gl_priv *p)
     if (gl->SwapInterval && p->swap_interval >= 0)
         gl->SwapInterval(p->swap_interval);
 
-    if (p->use_lut_3d) {
-        mp_msg(MSGT_VO, MSGL_INFO, "[gl] upload 3dlut\n");
-
-        gl->GenTextures(1, &p->lut_3d_texture);
-        gl->ActiveTexture(GL_TEXTURE0 + TEXUNIT_3DLUT);
-        gl->BindTexture(GL_TEXTURE_3D, p->lut_3d_texture);
-        gl->PixelStorei(GL_UNPACK_ALIGNMENT, 4);
-        gl->PixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-        gl->TexImage3D(GL_TEXTURE_3D, 0, GL_RGB, 256, 256, 256, 0, GL_RGB,
-                       GL_UNSIGNED_BYTE, p->lut_3d_data);
-        gl->TexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        gl->TexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        gl->TexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP);
-        gl->TexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP);
-        gl->TexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP);
-        gl->ActiveTexture(GL_TEXTURE0);
-
-        mp_msg(MSGT_VO, MSGL_INFO, "[gl] end upload 3dlut\n");
-    }
-
     glCheckError(gl, "after init_gl");
 
     return 1;
@@ -1226,9 +1206,37 @@ static void reinit_rendering(struct gl_priv *p)
         fbotex_init(p, &p->indirect_fbo, p->texture_width, p->texture_height);
 }
 
+static void init_lut_3d(struct gl_priv *p)
+{
+    GL *gl = p->gl;
+
+    mp_msg(MSGT_VO, MSGL_INFO, "[gl] upload 3dlut\n");
+
+    gl->GenTextures(1, &p->lut_3d_texture);
+    gl->ActiveTexture(GL_TEXTURE0 + TEXUNIT_3DLUT);
+    gl->BindTexture(GL_TEXTURE_3D, p->lut_3d_texture);
+    gl->PixelStorei(GL_UNPACK_ALIGNMENT, 4);
+    gl->PixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+    gl->TexImage3D(GL_TEXTURE_3D, 0, GL_RGB, 256, 256, 256, 0, GL_RGB,
+                    GL_UNSIGNED_BYTE, p->lut_3d_data);
+    gl->TexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    gl->TexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    gl->TexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+    gl->TexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+    gl->TexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP);
+    gl->ActiveTexture(GL_TEXTURE0);
+
+    mp_msg(MSGT_VO, MSGL_INFO, "[gl] end upload 3dlut\n");
+
+    glCheckError(gl, "after 3d lut creation");
+}
+
 static void init_video(struct gl_priv *p)
 {
     GL *gl = p->gl;
+
+    if (p->use_lut_3d && !p->lut_3d_texture)
+        init_lut_3d(p);
 
     init_format(p->image_format, p);
 
