@@ -66,6 +66,10 @@
 // Pixel width of 1D lookup textures.
 #define LOOKUP_TEXTURE_SIZE 256
 
+// Texture units 0-2 are used by the video, with unit 0 for free use.
+// Units 3-4 are used for scaler LUTs.
+#define TEXUNIT_SCALERS 3
+
 // lscale/cscale arguments that map directly to shader filter routines.
 // Note that the convolution filters are not included in this list.
 static const char *fixed_scale_filters[] = {
@@ -124,11 +128,10 @@ struct texplane {
 };
 
 struct scaler {
-    int id;
+    int index;
     const char *name;
     struct filter_kernel *kernel;
     GLuint gl_lut;
-    int texunit;
     const char *lut_name;
 
     // kernel points here
@@ -511,7 +514,7 @@ static void update_uniforms(struct gl_priv *p, GLuint program)
         if (lut) {
             GLint loc = gl->GetUniformLocation(program, lut);
             if (loc >= 0)
-                gl->Uniform1i(loc, p->scalers[n].texunit);
+                gl->Uniform1i(loc, TEXUNIT_SCALERS + n);
         }
     }
 
@@ -947,7 +950,7 @@ static void shader_def_opt(char **shader, const char *name, bool b)
 
 static void shader_setup_scaler(char **shader, struct scaler *scaler, int pass)
 {
-    const char *target = scaler->id == 0 ? "SAMPLE_L" : "SAMPLE_C";
+    const char *target = scaler->index == 0 ? "SAMPLE_L" : "SAMPLE_C";
     if (!scaler->kernel) {
         *shader = talloc_asprintf_append(*shader, "#define %s sample_%s\n",
                                          target, scaler->name);
@@ -1129,12 +1132,12 @@ static void init_scaler(struct gl_priv *p, struct scaler *scaler)
     struct convolution_filters *entry = &convolution_filters[size];
 
     bool use_2d = size > 4;
-    bool is_luma = scaler->id == 0;
+    bool is_luma = scaler->index == 0;
     scaler->lut_name = use_2d
                        ? (is_luma ? "lut_l_2d" : "lut_c_2d")
                        : (is_luma ? "lut_l_1d" : "lut_c_1d");
 
-    gl->ActiveTexture(GL_TEXTURE0 + scaler->texunit);
+    gl->ActiveTexture(GL_TEXTURE0 + TEXUNIT_SCALERS + scaler->index);
     GLenum target = use_2d ? GL_TEXTURE_2D : GL_TEXTURE_1D;
 
     if (!scaler->gl_lut)
@@ -1790,8 +1793,8 @@ static int preinit(struct vo *vo, const char *arg)
         .use_scale_sep = 1,
         .use_fancy_downscaling = 1,
         .scalers = {
-            { .id = 0, .texunit = 5, .name = "lanczos2" },
-            { .id = 1, .texunit = 6, .name = "bilinear" },
+            { .index = 0, .name = "lanczos2" },
+            { .index = 1, .name = "bilinear" },
         },
     };
 
