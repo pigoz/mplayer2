@@ -4548,9 +4548,9 @@ goto_enable_cache:
         float stream_cache_min_percent = opts->stream_cache_min_percent;
         float stream_cache_seek_min_percent = opts->stream_cache_seek_min_percent;
         current_module = "enable_cache";
-        res = stream_enable_cache(mpctx->stream, stream_cache_size * 1024,
-                                  stream_cache_size * 1024 * (stream_cache_min_percent / 100.0),
-                                  stream_cache_size * 1024 * (stream_cache_seek_min_percent / 100.0));
+        res = stream_enable_cache(mpctx->stream, stream_cache_size * 1024ull,
+                                  stream_cache_size * 1024ull * (stream_cache_min_percent / 100.0),
+                                  stream_cache_size * 1024ull * (stream_cache_seek_min_percent / 100.0));
         if (res == 0)
             if ((mpctx->stop_play = libmpdemux_was_interrupted(mpctx, PT_NEXT_ENTRY)))
                 goto goto_next_file;
