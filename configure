@@ -337,6 +337,7 @@ Optional features:
   --enable-smb           enable Samba (SMB) input [autodetect]
   --enable-live          enable LIVE555 Streaming Media [autodetect]
   --enable-nemesi        enable Nemesi Streaming Media [autodetect]
+  --enable-lcms2         enable LCMS2 support [disable]
   --disable-vcd          disable VCD support [autodetect]
   --disable-bluray       disable Blu-ray support [autodetect]
   --disable-dvdnav       disable libdvdnav [autodetect]
@@ -634,6 +635,7 @@ _xanim=auto
 _real=auto
 _live=auto
 _nemesi=auto
+_lcms2=no
 _native_rtsp=yes
 _xinerama=auto
 _mga=auto
@@ -984,6 +986,8 @@ for ac_option do
   --disable-live)       _live=no        ;;
   --enable-nemesi)      _nemesi=yes     ;;
   --disable-nemesi)     _nemesi=no      ;;
+  --enable-lcms2)       _lcms2=yes      ;;
+  --disable-lcms2)      _lcms2=no       ;;
   --enable-xinerama)    _xinerama=yes   ;;
   --disable-xinerama)   _xinerama=no    ;;
   --enable-mga)         _mga=yes        ;;
@@ -5691,6 +5695,18 @@ else
 fi
 echores "$_qtx"
 
+echocheck "LCMS2 support"
+if test "$_lcms2" = yes; then
+  extra_ldflags="$extra_ldflags `pkg-config lcms2 --libs`"
+  extra_cflags="$extra_cflags `pkg-config lcms2 --cflags`"
+fi
+if test "$_lcms2" = yes; then
+    def_lcms2="#define CONFIG_LCMS2 1"
+else
+    def_lcms2="#undef CONFIG_LCMS2"
+fi
+echores "$_lcms2"
+
 echocheck "Nemesi Streaming Media libraries"
 if test "$_nemesi" = auto  && test "$networking" = yes ; then
     _nemesi=no
@@ -6485,6 +6501,7 @@ LIBDV = $_libdv
 LIBDVDCSS_INTERNAL = $_libdvdcss_internal
 LIBMAD = $_mad
 LIBNEMESI = $_nemesi
+LCMS2 = $_lcms2
 LIBNUT = $_libnut
 LIBPOSTPROC = $libpostproc
 LIBSMBCLIENT = $_smb
@@ -6840,6 +6857,8 @@ $def_networking
 $def_smb
 $def_socklen_t
 $def_vstream
+
+$def_lcms2
 
 
 /* libvo options */

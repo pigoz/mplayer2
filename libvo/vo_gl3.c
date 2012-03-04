@@ -34,10 +34,14 @@
 #include <math.h>
 #include <stdbool.h>
 #include <assert.h>
+#include "config.h"
 
 #include <libavutil/avutil.h>
 
-#include "config.h"
+#ifdef CONFIG_LCMS2
+#include <lcms2.h>
+#endif
+
 #include "talloc.h"
 #include "bstr.h"
 #include "mp_msg.h"
@@ -69,6 +73,7 @@
 // Texture units 0-2 are used by the video, with unit 0 for free use.
 // Units 3-4 are used for scaler LUTs.
 #define TEXUNIT_SCALERS 3
+#define TEXUNIT_3DLUT 5
 
 // lscale/cscale arguments that map directly to shader filter routines.
 // Note that the convolution filters are not included in this list.
@@ -170,11 +175,15 @@ struct gl_priv {
     struct vertex osd_va[MAX_OSD_PARTS * VERTICES_PER_QUAD];
     int osd_color;
 
+    GLuint lut_3d_texture;
+    void *lut_3d_data;
+
     int use_indirect;           // convert YUV to RGB texture first
     int use_gamma;
     int use_srgb;
     int use_scale_sep;
     int use_fancy_downscaling;
+    int use_lut_3d;
     struct mp_csp_details colorspace;
     bool is_yuv;
     float filter_strength;
@@ -509,6 +518,10 @@ static void update_uniforms(struct gl_priv *p, GLuint program)
     if (loc >= 0)
         gl->Uniform1i(loc, 2);
 
+    loc = gl->GetUniformLocation(program, "lut_3d");
+    if (loc >= 0)
+        gl->Uniform1i(loc, TEXUNIT_3DLUT);
+
     for (int n = 0; n < 2; n++) {
         const char *lut = p->scalers[n].lut_name;
         if (lut) {
@@ -838,6 +851,9 @@ static void uninit_gl(struct gl_priv *p)
     gl->DeleteBuffers(1, &p->eosd_buffer);
     eosd_packer_reinit(p->eosd, 0, 0);
     p->eosd_texture = 0;
+
+    gl->DeleteTextures(1, &p->lut_3d_texture);
+    p->lut_3d_texture = 0;
 }
 
 #define SECTION_HEADER "#!section "
@@ -1041,6 +1057,8 @@ static void compile_shaders(struct gl_priv *p)
                 get_section(tmp, src, "frag_video"));
     }
 
+    shader_def_opt(&header_final, "USE_3DLUT", p->use_lut_3d);
+
     p->final_program =
         create_program(gl, "final", header_final, vertex_shader,
             get_section(tmp, src, "frag_video"));
@@ -1106,6 +1124,26 @@ static int init_gl(struct gl_priv *p)
     gl->Clear(GL_COLOR_BUFFER_BIT);
     if (gl->SwapInterval && p->swap_interval >= 0)
         gl->SwapInterval(p->swap_interval);
+
+    if (p->use_lut_3d) {
+        mp_msg(MSGT_VO, MSGL_INFO, "[gl] upload 3dlut\n");
+
+        gl->GenTextures(1, &p->lut_3d_texture);
+        gl->ActiveTexture(GL_TEXTURE0 + TEXUNIT_3DLUT);
+        gl->BindTexture(GL_TEXTURE_3D, p->lut_3d_texture);
+        gl->PixelStorei(GL_UNPACK_ALIGNMENT, 4);
+        gl->PixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+        gl->TexImage3D(GL_TEXTURE_3D, 0, GL_RGB, 256, 256, 256, 0, GL_RGB,
+                       GL_UNSIGNED_BYTE, p->lut_3d_data);
+        gl->TexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        gl->TexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        gl->TexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+        gl->TexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+        gl->TexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP);
+        gl->ActiveTexture(GL_TEXTURE0);
+
+        mp_msg(MSGT_VO, MSGL_INFO, "[gl] end upload 3dlut\n");
+    }
 
     glCheckError(gl, "after init_gl");
 
@@ -1776,6 +1814,90 @@ static int fbo_format_valid(void *arg)
     return find_fbo_format(*(const char **)arg) >= 0;
 }
 
+#ifdef CONFIG_LCMS2
+
+static void lcms2_error_handler(cmsContext ctx, cmsUInt32Number code,
+                                const char *msg)
+{
+    mp_msg(MSGT_VO, MSGL_ERR, "[gl] lcms2: %s\n", msg);
+}
+
+static bool load_icc(struct gl_priv *p, const char *icc_file)
+{
+    cmsSetLogErrorHandler(lcms2_error_handler);
+
+    mp_msg(MSGT_VO, MSGL_INFO, "[gl] Opening ICC profile '%s'\n", icc_file);
+    cmsHPROFILE profile = cmsOpenProfileFromFile(icc_file, "r");
+    if (!profile)
+        return false;
+
+    cmsCIExyY d65;
+    cmsWhitePointFromTemp(&d65, 6504);
+    static const cmsCIExyYTRIPLE bt709prim = {
+        .Red   = {0.64, 0.33, 1.0},
+        .Green = {0.30, 0.60, 1.0},
+        .Blue  = {0.15, 0.06, 1.0},
+    };
+    cmsToneCurve *tonecurve = cmsBuildGamma(NULL, 2.2);
+    cmsHPROFILE vid_profile = cmsCreateRGBProfile(&d65, &bt709prim,
+                        (cmsToneCurve*[3]){tonecurve, tonecurve, tonecurve});
+    cmsFreeToneCurve(tonecurve);
+    cmsHTRANSFORM trafo = cmsCreateTransform(vid_profile, TYPE_RGB_8,
+                                             profile, TYPE_RGB_8,
+                                             INTENT_ABSOLUTE_COLORIMETRIC,
+                                             cmsFLAGS_HIGHRESPRECALC);
+    cmsCloseProfile(profile);
+    cmsCloseProfile(vid_profile);
+
+    if (!trafo)
+        return false;
+
+    mp_msg(MSGT_VO, MSGL_INFO, "[gl] DoTransform\n");
+
+    // transform a 256x256x256 cube, with 3 components per channel, and 8 bits
+    // per component
+    uint8_t *input = talloc_array(p, uint8_t, 256 * 256 * 256 * 3);
+    uint8_t *output = talloc_array(p, uint8_t, 256 * 256 * 256 * 3);
+    for (int z = 0; z < 256; z++) {
+        for (int y = 0; y < 256; y++) {
+            for (int x = 0; x < 256; x++) {
+                size_t base = (z * 256 * 256 + y * 256 + x) * 3;
+                input[base + 0] = x;
+                input[base + 1] = y;
+                input[base + 2] = z;
+
+                /*
+                output[base + 0] = x;
+                output[base + 1] = y;
+                output[base + 2] = z;
+                */
+            }
+        }
+    }
+
+    cmsDoTransform(trafo, input, output, 256 * 256 * 256);
+
+    mp_msg(MSGT_VO, MSGL_INFO, "[gl] end DoTransform\n");
+
+    cmsDeleteTransform(trafo);
+    talloc_free(input);
+
+    p->lut_3d_data = output;
+    p->use_lut_3d = true;
+
+    return true;
+}
+
+#else /* CONFIG_LCMS2 */
+
+static bool load_icc(struct gl_priv *p, const char *icc_file)
+{
+    mp_msg(MSGT_VO, MSGL_FATAL, "[gl] LCMS2 support not compiled.\n");
+    return false;
+}
+
+#endif /* CONFIG_LCMS2 */
+
 static int preinit(struct vo *vo, const char *arg)
 {
     struct gl_priv *p = talloc_zero(vo, struct gl_priv);
@@ -1802,6 +1924,7 @@ static int preinit(struct vo *vo, const char *arg)
     char *scalers[2] = {0};
     char *backend_arg = NULL;
     char *fbo_format = NULL;
+    char *icc_profile = NULL;
 
     const opt_t subopts[] = {
         {"gamma",        OPT_ARG_BOOL, &p->use_gamma,    NULL},
@@ -1823,6 +1946,7 @@ static int preinit(struct vo *vo, const char *arg)
         {"scale-sep",    OPT_ARG_BOOL, &p->use_scale_sep, NULL},
         {"fbo-format",   OPT_ARG_MSTRZ,&fbo_format,      fbo_format_valid},
         {"backend",      OPT_ARG_MSTRZ,&backend_arg,     backend_valid},
+        {"icc-profile",  OPT_ARG_MSTRZ,&icc_profile,     NULL},
         {NULL}
     };
 
@@ -1930,6 +2054,13 @@ static int preinit(struct vo *vo, const char *arg)
         if (scalers[n])
             p->scalers[n].name = handle_scaler_opt(scalers[n]);
         free(scalers[n]);
+    }
+
+    if (icc_profile) {
+        bool success = load_icc(p, icc_profile);
+        free(icc_profile);
+        if (!success)
+            goto err_out;
     }
 
     p->eosd = eosd_packer_create(vo);

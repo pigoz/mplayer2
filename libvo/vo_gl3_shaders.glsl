@@ -73,6 +73,7 @@ uniform sampler1D lut_c_1d;
 uniform sampler1D lut_l_1d;
 uniform sampler2D lut_c_2d;
 uniform sampler2D lut_l_2d;
+uniform sampler3D lut_3d;
 uniform mat4x3 colormatrix;
 uniform vec3 inv_gamma;
 uniform float conv_gamma;
@@ -288,6 +289,9 @@ void main() {
 #endif
 #ifdef USE_GAMMA_POW
     color = pow(color, inv_gamma);
+#endif
+#ifdef USE_3DLUT
+    color = texture(lut_3d, color).rgb;
 #endif
     out_color = vec4(color, 1);
 }
