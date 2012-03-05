@@ -86,7 +86,7 @@ extern int audio_substream_id;
 extern off_t ps_probe;
 
 extern int sws_flags;
-extern char* pp_help;
+extern const char pp_help[];
 
 #ifdef CONFIG_RADIO
 const m_option_t radioopts_conf[]={
@@ -486,7 +486,7 @@ const m_option_t common_opts[] = {
     OPT_TIME("ss", seek_to_sec, 0),
 
     // start paused
-    OPT_FLAG_ON("paused", start_paused, 0),
+    OPT_FLAG_ON("pause", start_paused, 0),
 
     // stop at given position
     {"endpos", &end_at, CONF_TYPE_TIME_SIZE, 0, 0, 0, NULL},
@@ -599,7 +599,9 @@ const m_option_t common_opts[] = {
 
     // postprocessing:
     {"pp", &divx_quality, CONF_TYPE_INT, 0, 0, 0, NULL},
+#ifdef CONFIG_LIBPOSTPROC
     {"pphelp", &pp_help, CONF_TYPE_PRINT, CONF_NOCFG, 0, 0, NULL},
+#endif
 
     // scaling:
     {"sws", &sws_flags, CONF_TYPE_INT, 0, 0, 2, NULL},
@@ -938,6 +940,7 @@ const m_option_t mplayer_opts[]={
     OPT_INTRANGE("screenshot-jpeg-quality", screenshot_jpeg_quality, 0, 0, 100),
     OPT_INTRANGE("screenshot-png-compression", screenshot_png_compression, 0, 0, 9),
     OPT_STRING("screenshot-filetype", screenshot_filetype, 0),
+    OPT_STRING("screenshot-template", screenshot_template, 0),
 
     OPT_FLAG_ON("list-properties", list_properties, CONF_GLOBAL),
     {"identify", &mp_msg_levels[MSGT_IDENTIFY], CONF_TYPE_FLAG, CONF_GLOBAL, 0, MSGL_V, NULL},

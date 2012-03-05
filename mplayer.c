@@ -22,6 +22,8 @@
 #include <math.h>
 #include <assert.h>
 
+#include <libavutil/intreadwrite.h>
+
 #include "config.h"
 #include "talloc.h"
 
@@ -64,8 +66,6 @@
 #include "mplayer.h"
 #include "m_property.h"
 
-#include "libavutil/avstring.h"
-
 #include "sub/subreader.h"
 #include "sub/find_subfiles.h"
 #include "sub/dec_sub.h"
@@ -76,7 +76,6 @@
 
 #include "sub/font_load.h"
 #include "sub/sub.h"
-#include "ffmpeg_files/intreadwrite.h"
 #include "sub/av_sub.h"
 #include "libmpcodecs/dec_teletext.h"
 #include "cpudetect.h"
@@ -1755,7 +1754,7 @@ static void update_osd_msg(struct MPContext *mpctx)
     // Clear the term osd line
     if (opts->term_osd && mpctx->terminal_osd_text[0]) {
         mpctx->terminal_osd_text[0] = '\0';
-        printf("%s\n", opts->term_osd_esc);
+        mp_msg(MSGT_CPLAYER, MSGL_STATUS, "%s\n", opts->term_osd_esc);
     }
 }
 
@@ -2813,7 +2812,9 @@ static double update_video_nocorrect_pts(struct MPContext *mpctx)
         frame_time = sh_video->next_frame_time;
         if (mpctx->restart_playback)
             frame_time = 0;
-        int in_size = video_read_frame(sh_video, &sh_video->next_frame_time,
+        int in_size = 0;
+        while (!in_size)
+            in_size = video_read_frame(sh_video, &sh_video->next_frame_time,
                                        &packet, force_fps);
         if (in_size < 0) {
 #ifdef CONFIG_DVDNAV
@@ -2912,7 +2913,15 @@ static double update_video(struct MPContext *mpctx)
         int in_size = 0;
         unsigned char *buf = NULL;
         pts = MP_NOPTS_VALUE;
-        struct demux_packet *pkt = ds_get_packet2(mpctx->d_video, false);
+        struct demux_packet *pkt;
+        while (1) {
+            pkt = ds_get_packet2(mpctx->d_video, false);
+            if (!pkt || pkt->len)
+                break;
+            /* Packets with size 0 are assumed to not correspond to frames,
+             * but to indicate the absence of a frame in formats like AVI
+             * that must have packets at fixed timecode intervals. */
+        }
         if (pkt) {
             in_size = pkt->len;
             buf = pkt->buffer;
@@ -3975,6 +3984,7 @@ int main(int argc, char *argv[])
 
     mp_msg_init();
     init_libav();
+    screenshot_init(mpctx);
 
 #ifdef CONFIG_X11
     mpctx->x11_state = vo_x11_init_state();
@@ -5003,7 +5013,7 @@ goto_enable_cache:
                    mpctx->paused ? VOCTRL_PAUSE : VOCTRL_RESUME, NULL);
 
     if (mpctx->opts.start_paused)
-        add_step_frame(mpctx);
+        pause_player(mpctx);
 
     while (!mpctx->stop_play)
         run_playloop(mpctx);
