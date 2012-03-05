@@ -1217,8 +1217,8 @@ static void init_lut_3d(struct gl_priv *p)
     gl->BindTexture(GL_TEXTURE_3D, p->lut_3d_texture);
     gl->PixelStorei(GL_UNPACK_ALIGNMENT, 4);
     gl->PixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-    gl->TexImage3D(GL_TEXTURE_3D, 0, GL_RGB, 256, 256, 256, 0, GL_RGB,
-                    GL_UNSIGNED_BYTE, p->lut_3d_data);
+    gl->TexImage3D(GL_TEXTURE_3D, 0, GL_RGB16, 256, 256, 256, 0, GL_RGB,
+                    GL_UNSIGNED_SHORT, p->lut_3d_data);
     gl->TexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     gl->TexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     gl->TexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -1851,7 +1851,7 @@ static bool load_icc(struct gl_priv *p, const char *icc_file)
                         (cmsToneCurve*[3]){tonecurve, tonecurve, tonecurve});
     cmsFreeToneCurve(tonecurve);
     cmsHTRANSFORM trafo = cmsCreateTransform(vid_profile, TYPE_RGB_8,
-                                             profile, TYPE_RGB_8,
+                                             profile, TYPE_RGB_16,
                                              INTENT_ABSOLUTE_COLORIMETRIC,
                                              cmsFLAGS_HIGHRESPRECALC);
     cmsCloseProfile(profile);
@@ -1864,8 +1864,8 @@ static bool load_icc(struct gl_priv *p, const char *icc_file)
 
     // transform a 256x256x256 cube, with 3 components per channel, and 8 bits
     // per component
-    uint8_t *input = talloc_array(p, uint8_t, 256 * 256 * 256 * 3);
-    uint8_t *output = talloc_array(p, uint8_t, 256 * 256 * 256 * 3);
+    uint8_t  *input  = talloc_array(p, uint8_t,  256 * 256 * 256 * 3);
+    uint16_t *output = talloc_array(p, uint16_t, 256 * 256 * 256 * 3);
     for (int z = 0; z < 256; z++) {
         for (int y = 0; y < 256; y++) {
             for (int x = 0; x < 256; x++) {
