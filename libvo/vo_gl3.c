@@ -497,16 +497,9 @@ static void update_uniforms(struct gl_priv *p, GLuint program)
 
     loc = gl->GetUniformLocation(program, "inv_gamma");
     if (loc >= 0) {
-        float factor = 1.0;
-        if (p->use_srgb && p->is_yuv)
-            factor = mp_csp_gamma(p->colorspace.format) / 2.2;
-        gl->Uniform3f(loc, factor / cparams.rgamma, factor / cparams.ggamma,
-                      factor / cparams.bgamma);
+        gl->Uniform3f(loc, 1.0 / cparams.rgamma, 1.0 / cparams.ggamma,
+                      1.0 / cparams.bgamma);
     }
-
-    loc = gl->GetUniformLocation(program, "conv_gamma");
-    if (loc >= 0)
-        gl->Uniform1f(loc, mp_csp_gamma(p->colorspace.format));
 
     loc = gl->GetUniformLocation(program, "texture1");
     if (loc >= 0)
@@ -1038,7 +1031,8 @@ static void compile_shaders(struct gl_priv *p)
         // We don't use filtering for the Y-plane (luma), because it's never
         // scaled in this scenario.
         shader_def(&header_conv, "SAMPLE_L", "sample_bilinear");
-        shader_def_opt(&header_conv, "USE_LINEAR_CONV", p->use_srgb);
+        shader_def_opt(&header_conv, "USE_LINEAR_CONV",
+                       p->use_srgb || p->use_lut_3d);
         shader_def_opt(&header_conv, "FIXED_SCALE", true);
         header_conv = talloc_asprintf(tmp, "%s%s", header, header_conv);
         header_final = talloc_asprintf(tmp, "%s%s", header, header_final);
@@ -1058,6 +1052,7 @@ static void compile_shaders(struct gl_priv *p)
     }
 
     shader_def_opt(&header_final, "USE_3DLUT", p->use_lut_3d);
+    shader_def_opt(&header_final, "USE_LINEAR_CONV_INV", p->use_lut_3d);
 
     p->final_program =
         create_program(gl, "final", header_final, vertex_shader,
@@ -1240,7 +1235,7 @@ static void init_video(struct gl_priv *p)
 
     init_format(p->image_format, p);
 
-    if (!p->is_yuv && p->use_srgb)
+    if (!p->is_yuv && (p->use_srgb || p->use_lut_3d))
         p->gl_internal_format = GL_SRGB;
 
     int eq_caps = MP_CSP_EQ_CAPS_GAMMA;
@@ -1503,7 +1498,7 @@ static void do_render(struct gl_priv *p)
     float final_texw = p->image_width * source->tex_w / (float)source->vp_w;
     float final_texh = p->image_height * source->tex_h / (float)source->vp_h;
 
-    if (p->use_srgb)
+    if (p->use_srgb && !p->use_lut_3d)
         gl->Enable(GL_FRAMEBUFFER_SRGB);
 
     if (p->stereo_mode) {
@@ -1544,8 +1539,7 @@ static void do_render(struct gl_priv *p)
         draw_triangles(p, vb, VERTICES_PER_QUAD);
     }
 
-    if (p->use_srgb)
-        gl->Disable(GL_FRAMEBUFFER_SRGB);
+    gl->Disable(GL_FRAMEBUFFER_SRGB);
 
     gl->UseProgram(0);
 
@@ -1892,6 +1886,7 @@ static bool load_icc(struct gl_priv *p, const char *icc_file)
 
     p->lut_3d_data = output;
     p->use_lut_3d = true;
+    p->use_indirect = true;
 
     return true;
 }
@@ -2046,10 +2041,8 @@ static int preinit(struct vo *vo, const char *arg)
         goto err_out;
     }
 
-    if (p->use_srgb) {
+    if (p->use_srgb)
         p->use_indirect = 1;
-        p->use_gamma = 1;
-    }
 
     int backend = backend_arg ? mpgl_find_backend(backend_arg) : GLTYPE_AUTO;
     free(backend_arg);

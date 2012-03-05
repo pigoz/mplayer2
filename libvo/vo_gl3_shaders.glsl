@@ -285,7 +285,12 @@ void main() {
     color = mat3(colormatrix) * color + colormatrix[3];
 #endif
 #ifdef USE_LINEAR_CONV
-    color = pow(color, vec3(conv_gamma));
+    color = pow(color, vec3(2.2));
+#endif
+#ifdef USE_LINEAR_CONV_INV
+    // Convert from linear RGB to gamma RGB before putting it through the 3D-LUT
+    // in the final stage.
+    color = pow(color, vec3(1.0/2.2));
 #endif
 #ifdef USE_GAMMA_POW
     color = pow(color, inv_gamma);
