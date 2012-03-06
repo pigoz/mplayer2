@@ -337,7 +337,7 @@ Optional features:
   --enable-smb           enable Samba (SMB) input [autodetect]
   --enable-live          enable LIVE555 Streaming Media [autodetect]
   --enable-nemesi        enable Nemesi Streaming Media [autodetect]
-  --enable-lcms2         enable LCMS2 support [disable]
+  --enable-lcms2         enable LCMS2 support [autodetect]
   --disable-vcd          disable VCD support [autodetect]
   --disable-bluray       disable Blu-ray support [autodetect]
   --disable-dvdnav       disable libdvdnav [autodetect]
@@ -635,7 +635,7 @@ _xanim=auto
 _real=auto
 _live=auto
 _nemesi=auto
-_lcms2=no
+_lcms2=auto
 _native_rtsp=yes
 _xinerama=auto
 _mga=auto
@@ -5696,9 +5696,11 @@ fi
 echores "$_qtx"
 
 echocheck "LCMS2 support"
-if test "$_lcms2" = yes; then
-  extra_ldflags="$extra_ldflags `pkg-config lcms2 --libs`"
-  extra_cflags="$extra_cflags `pkg-config lcms2 --cflags`"
+if test "$_lcms2" = auto ; then
+    _lcms2=no
+    if pkg_config_add lcms2 ; then
+        _lcms2=yes
+    fi
 fi
 if test "$_lcms2" = yes; then
     def_lcms2="#define CONFIG_LCMS2 1"
