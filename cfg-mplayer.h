@@ -699,6 +699,8 @@ const m_option_t common_opts[] = {
     OPT_STRING("ass-border-color", ass_border_color, 0),
     OPT_STRING("ass-styles", ass_styles_file, 0),
     OPT_INTRANGE("ass-hinting", ass_hinting, 0, 0, 7),
+    OPT_CHOICE("ass-override-mode", ass_override_mode, 0,
+               ({"light", 0}, {"force", 1}, {"none", 2})),
     OPT_START_CONDITIONAL(1, ""),
 #ifdef CONFIG_FONTCONFIG
     {"fontconfig", &font_fontconfig, CONF_TYPE_FLAG, 0, -1, 1, NULL},

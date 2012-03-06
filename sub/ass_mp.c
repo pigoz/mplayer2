@@ -311,9 +311,21 @@ void mp_ass_reload_options(ASS_Renderer *priv, struct MPOpts *opts)
      * ass_set_margins(priv, opts->ass_top_margin, opts->ass_bottom_margin,
      *                 0, 0);
      */
-    ass_set_use_margins(priv, opts->ass_use_margins);
-    ass_set_font_scale(priv, opts->ass_font_scale);
+    int use_margins = opts->ass_use_margins;
+    float font_scale = opts->ass_font_scale;
+    int subpos = 100 - sub_pos;
+    if (opts->ass_override_mode == 2) {
+        // force defaults
+        use_margins = 0;
+        font_scale = 1;
+        subpos = 0;
+    }
+    ass_set_use_margins(priv, use_margins);
+    ass_set_font_scale(priv, font_scale);
 #ifdef LIBASS_HAVE_LINE_POSITION
-    ass_set_line_position(priv, 100 - sub_pos);
+    ass_set_line_position(priv, subpos);
+#endif
+#ifdef LIBASS_HAVE_SELECTIVE_STYLE_OVERRIDES
+    ass_set_enable_selective_style_overrides(priv, opts->ass_override_mode == 1);
 #endif
 }

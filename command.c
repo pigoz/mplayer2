@@ -2047,6 +2047,21 @@ static int mp_property_ass_vsfilter_aspect_compat(m_option_t *prop, int action,
 
 #endif
 
+#ifdef CONFIG_ASS
+static int mp_property_ass_override_mode(m_option_t *prop, int action,
+                                         void *arg, MPContext *mpctx)
+{
+    int r = mp_property_generic_option(prop, action, arg, mpctx);
+    switch (action) {
+    case M_PROPERTY_SET:
+    case M_PROPERTY_STEP_UP:
+    case M_PROPERTY_STEP_DOWN:
+        mpctx->osd->ass_force_reload = true;
+    }
+    return r;
+}
+#endif
+
 /// Show only forced subtitles (RW)
 static int mp_property_sub_forced_only(m_option_t *prop, int action,
                                        void *arg, MPContext *mpctx)
@@ -2394,6 +2409,8 @@ static const m_option_t mp_properties[] = {
       M_OPT_RANGE, 0, 1, NULL },
     { "ass_vsfilter_aspect_compat", mp_property_ass_vsfilter_aspect_compat,
       CONF_TYPE_FLAG, M_OPT_RANGE, 0, 1, NULL },
+    { "ass_override_mode", mp_property_ass_override_mode, &m_option_type_choice,
+      0, 0, 0, "ass-override-mode" },
 #endif
 
 #ifdef CONFIG_TV
@@ -2509,6 +2526,7 @@ static struct property_osd_display {
 #endif
     { "ass_vsfilter_aspect_compat", 0, -1,
       _("Subtitle VSFilter aspect compat: %s")},
+    { "ass_override_mode", 0, -1, _("Subtitle style override: %s")},
 #ifdef CONFIG_TV
     { "tv_brightness", OSD_BRIGHTNESS, -1, _("Brightness") },
     { "tv_hue", OSD_HUE, -1, _("Hue") },
