@@ -2037,6 +2037,10 @@ static int preinit(struct vo *vo, const char *arg)
                "    if the proper extensions are not supported.\n"
                "  debug\n"
                "    Request debug OpenGL context. Does nothing.\n"
+               " Experimental:\n"
+               "  icc-profile=<file>\n"
+               "    Load an ICC profile and use it to transform linear RGB to\n"
+               "    screen output. Needs LittleCMS2 support compiled in.\n"
                "\n");
         goto err_out;
     }
