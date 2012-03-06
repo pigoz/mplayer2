@@ -1552,6 +1552,9 @@ static int mp_property_sub_pos(m_option_t *prop, int action, void *arg,
     case M_PROPERTY_STEP_UP:
     case M_PROPERTY_STEP_DOWN:
         vo_osd_changed(OSDTYPE_SUBTITLE);
+#ifdef CONFIG_ASS
+        mpctx->osd->ass_force_reload = true;
+#endif
     default:
         return m_property_int_range(prop, action, arg, &sub_pos);
     }

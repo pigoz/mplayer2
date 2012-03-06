@@ -37,6 +37,9 @@
 #include "stream/stream.h"
 #include "options.h"
 
+//for sub_pos
+#include "sub.h"
+
 #ifdef CONFIG_FONTCONFIG
 extern int font_fontconfig;
 #else
@@ -310,4 +313,7 @@ void mp_ass_reload_options(ASS_Renderer *priv, struct MPOpts *opts)
      */
     ass_set_use_margins(priv, opts->ass_use_margins);
     ass_set_font_scale(priv, opts->ass_font_scale);
+#ifdef LIBASS_HAVE_LINE_POSITION
+    ass_set_line_position(priv, 100 - sub_pos);
+#endif
 }
