@@ -40,6 +40,7 @@
 
 #ifdef CONFIG_LCMS2
 #include <lcms2.h>
+#include "stream/stream.h"
 #endif
 
 #include "talloc.h"
@@ -1824,14 +1825,53 @@ static void lcms2_error_handler(cmsContext ctx, cmsUInt32Number code,
     mp_msg(MSGT_VO, MSGL_ERR, "[gl] lcms2: %s\n", msg);
 }
 
-static bool load_icc(struct gl_priv *p, const char *icc_file)
+static struct bstr load_file(struct gl_priv *p, void *talloc_ctx,
+                             const char *filename)
 {
+    struct bstr res = {0};
+    stream_t *s = open_stream(filename, p->vo->opts, NULL);
+    if (s) {
+        res = stream_read_complete(s, talloc_ctx, 1000000000, 0);
+        free_stream(s);
+    }
+    return res;
+}
+
+#define LUT3D_DATA_SIZE (256 * 256 * 256 * 3 * 2)
+#define LUT3D_CACHE_HEADER "mplayer2 2dlut cache 1.0\n"
+
+static bool load_icc(struct gl_priv *p, const char *icc_file,
+                     const char *icc_cache)
+{
+    void *tmp = talloc_new(p);
+    uint16_t *output = talloc_array(tmp, uint16_t, 256 * 256 * 256 * 3);
+    assert(talloc_get_size(output) == LUT3D_DATA_SIZE);
+
     cmsSetLogErrorHandler(lcms2_error_handler);
 
     mp_msg(MSGT_VO, MSGL_INFO, "[gl] Opening ICC profile '%s'\n", icc_file);
-    cmsHPROFILE profile = cmsOpenProfileFromFile(icc_file, "r");
+    struct bstr iccdata = load_file(p, tmp, icc_file);
+    if (!iccdata.len)
+        goto error_exit;
+
+    // check cache
+    if (icc_cache) {
+        struct bstr cachedata = load_file(p, tmp, icc_cache);
+        if (bstr_eatstart(&cachedata, bstr(LUT3D_CACHE_HEADER))
+            && bstr_eatstart(&cachedata, iccdata)
+            && cachedata.len == talloc_get_size(output))
+        {
+            memcpy(output, cachedata.start, cachedata.len);
+            mp_msg(MSGT_VO, MSGL_INFO, "[gl] Using 3D LUT cache.\n");
+            goto done;
+        } else {
+            mp_msg(MSGT_VO, MSGL_WARN, "[gl] 3D LUT cache invalid!\n");
+        }
+    }
+
+    cmsHPROFILE profile = cmsOpenProfileFromMem(iccdata.start, iccdata.len);
     if (!profile)
-        return false;
+        goto error_exit;
 
     cmsCIExyY d65;
     cmsWhitePointFromTemp(&d65, 6504);
@@ -1852,14 +1892,13 @@ static bool load_icc(struct gl_priv *p, const char *icc_file)
     cmsCloseProfile(vid_profile);
 
     if (!trafo)
-        return false;
+        goto error_exit;
 
     mp_msg(MSGT_VO, MSGL_INFO, "[gl] DoTransform\n");
 
     // transform a 256x256x256 cube, with 3 components per channel, and 8 bits
     // per component
     uint8_t  *input  = talloc_array(p, uint8_t,  256 * 256 * 256 * 3);
-    uint16_t *output = talloc_array(p, uint16_t, 256 * 256 * 256 * 3);
     for (int z = 0; z < 256; z++) {
         for (int y = 0; y < 256; y++) {
             for (int x = 0; x < 256; x++) {
@@ -1884,11 +1923,29 @@ static bool load_icc(struct gl_priv *p, const char *icc_file)
     cmsDeleteTransform(trafo);
     talloc_free(input);
 
-    p->lut_3d_data = output;
+    if (icc_cache) {
+        FILE *out = fopen(icc_cache, "wb");
+        if (out) {
+            fprintf(out, LUT3D_CACHE_HEADER);
+            fwrite(iccdata.start, iccdata.len, 1, out);
+            fwrite(output, talloc_get_size(output), 1, out);
+            fclose(out);
+        }
+    }
+
+done:
+
+    p->lut_3d_data = talloc_steal(p, output);
     p->use_lut_3d = true;
     p->use_indirect = true;
 
+    talloc_free(tmp);
     return true;
+
+error_exit:
+    mp_msg(MSGT_VO, MSGL_FATAL, "[gl] Error loading ICC profile.\n");
+    talloc_free(tmp);
+    return false;
 }
 
 #else /* CONFIG_LCMS2 */
@@ -1928,6 +1985,7 @@ static int preinit(struct vo *vo, const char *arg)
     char *backend_arg = NULL;
     char *fbo_format = NULL;
     char *icc_profile = NULL;
+    char *icc_cache = NULL;
 
     const opt_t subopts[] = {
         {"gamma",        OPT_ARG_BOOL, &p->use_gamma,    NULL},
@@ -1950,6 +2008,7 @@ static int preinit(struct vo *vo, const char *arg)
         {"fbo-format",   OPT_ARG_MSTRZ,&fbo_format,      fbo_format_valid},
         {"backend",      OPT_ARG_MSTRZ,&backend_arg,     backend_valid},
         {"icc-profile",  OPT_ARG_MSTRZ,&icc_profile,     NULL},
+        {"icc-cache",    OPT_ARG_MSTRZ,&icc_cache,       NULL},
         {NULL}
     };
 
@@ -2041,6 +2100,11 @@ static int preinit(struct vo *vo, const char *arg)
                "  icc-profile=<file>\n"
                "    Load an ICC profile and use it to transform linear RGB to\n"
                "    screen output. Needs LittleCMS2 support compiled in.\n"
+               "  icc-cache=<file>\n"
+               "    Store and load the 3D LUT created from the ICC profile in\n"
+               "    this file. This can be used to speed up loading, since\n"
+               "    LittleCMS2 can take a while to create the 3D LUT.\n"
+               "    Note that this file will be about 100 MB big.\n"
                "\n");
         goto err_out;
     }
@@ -2062,11 +2126,12 @@ static int preinit(struct vo *vo, const char *arg)
     }
 
     if (icc_profile) {
-        bool success = load_icc(p, icc_profile);
-        free(icc_profile);
+        bool success = load_icc(p, icc_profile, icc_cache);
         if (!success)
             goto err_out;
     }
+    free(icc_profile);
+    free(icc_cache);
 
     p->eosd = eosd_packer_create(vo);
 
