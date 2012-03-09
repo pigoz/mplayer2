@@ -1001,8 +1001,11 @@ static void compile_shaders(struct gl_priv *p)
 
     char *header = talloc_strdup(tmp, shader_prelude);
 
+    char *header_eosd = talloc_strdup(tmp, header);
+    shader_def_opt(&header_eosd, "USE_3DLUT", p->use_lut_3d);
+
     p->eosd_program =
-        create_program(gl, "eosd", header, vertex_shader,
+        create_program(gl, "eosd", header_eosd, vertex_shader,
             get_section(tmp, src, "frag_eosd"));
 
     p->osd_program =
