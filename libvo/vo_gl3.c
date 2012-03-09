@@ -1899,7 +1899,7 @@ static bool load_icc(struct gl_priv *p, const char *icc_file,
     cmsHPROFILE vid_profile = cmsCreateRGBProfile(&d65, &bt709prim,
                         (cmsToneCurve*[3]){tonecurve, tonecurve, tonecurve});
     cmsFreeToneCurve(tonecurve);
-    cmsHTRANSFORM trafo = cmsCreateTransform(vid_profile, TYPE_RGB_8,
+    cmsHTRANSFORM trafo = cmsCreateTransform(vid_profile, TYPE_RGB_16,
                                              profile, TYPE_RGB_16,
                                              icc_intent,
                                              cmsFLAGS_HIGHRESPRECALC);
@@ -1909,28 +1909,26 @@ static bool load_icc(struct gl_priv *p, const char *icc_file,
     if (!trafo)
         goto error_exit;
 
-    mp_msg(MSGT_VO, MSGL_INFO, "[gl] DoTransform\n");
+    mp_msg(MSGT_VO, MSGL_V, "[gl] DoTransform\n");
 
     // transform a 256x256x256 cube, with 3 components per channel, and 8 bits
     // per component
-    uint8_t  *input  = talloc_array(p, uint8_t,  s_r * s_g * s_b * 3);
+    uint16_t *input = talloc_array(tmp, uint16_t, s_r * 3);
     for (int b = 0; b < s_b; b++) {
         for (int g = 0; g < s_g; g++) {
             for (int r = 0; r < s_r; r++) {
-                size_t base = (b * s_r * s_g + g * s_r + r) * 3;
-                input[base + 0] = r * (256 / s_r);
-                input[base + 1] = g * (256 / s_g);
-                input[base + 2] = b * (256 / s_b);
+                input[r * 3 + 0] = r * 65535 / (s_r - 1);
+                input[r * 3 + 1] = g * 65535 / (s_g - 1);
+                input[r * 3 + 2] = b * 65535 / (s_b - 1);
             }
+            size_t base = (b * s_r * s_g + g * s_r) * 3;
+            cmsDoTransform(trafo, input, output + base, s_r);
         }
     }
 
-    cmsDoTransform(trafo, input, output, s_r * s_g * s_b);
-
-    mp_msg(MSGT_VO, MSGL_INFO, "[gl] end DoTransform\n");
+    mp_msg(MSGT_VO, MSGL_V, "[gl] end DoTransform\n");
 
     cmsDeleteTransform(trafo);
-    talloc_free(input);
 
     if (icc_cache) {
         FILE *out = fopen(icc_cache, "wb");
