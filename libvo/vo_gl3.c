@@ -178,6 +178,7 @@ struct gl_priv {
     int osd_color;
 
     GLuint lut_3d_texture;
+    int lut_3d_w, lut_3d_h, lut_3d_d;
     void *lut_3d_data;
 
     int use_indirect;           // convert YUV to RGB texture first
@@ -1220,8 +1221,8 @@ static void init_lut_3d(struct gl_priv *p)
     gl->BindTexture(GL_TEXTURE_3D, p->lut_3d_texture);
     gl->PixelStorei(GL_UNPACK_ALIGNMENT, 4);
     gl->PixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-    gl->TexImage3D(GL_TEXTURE_3D, 0, GL_RGB16, 256, 256, 256, 0, GL_RGB,
-                    GL_UNSIGNED_SHORT, p->lut_3d_data);
+    gl->TexImage3D(GL_TEXTURE_3D, 0, GL_RGB16, p->lut_3d_w, p->lut_3d_h,
+                   p->lut_3d_d, 0, GL_RGB, GL_UNSIGNED_SHORT, p->lut_3d_data);
     gl->TexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     gl->TexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     gl->TexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -1844,15 +1845,14 @@ static struct bstr load_file(struct gl_priv *p, void *talloc_ctx,
     return res;
 }
 
-#define LUT3D_DATA_SIZE (256 * 256 * 256 * 3 * 2)
 #define LUT3D_CACHE_HEADER "mplayer2 2dlut cache 1.0\n"
 
 static bool load_icc(struct gl_priv *p, const char *icc_file,
-                     const char *icc_cache, int icc_intent)
+                     const char *icc_cache, int icc_intent,
+                     int s_r, int s_g, int s_b)
 {
     void *tmp = talloc_new(p);
-    uint16_t *output = talloc_array(tmp, uint16_t, 256 * 256 * 256 * 3);
-    assert(talloc_get_size(output) == LUT3D_DATA_SIZE);
+    uint16_t *output = talloc_array(tmp, uint16_t, s_r * s_g * s_b * 3);
 
     if (icc_intent == -1)
         icc_intent = INTENT_ABSOLUTE_COLORIMETRIC;
@@ -1862,7 +1862,8 @@ static bool load_icc(struct gl_priv *p, const char *icc_file,
     if (!iccdata.len)
         goto error_exit;
 
-    char *cache_info = talloc_asprintf(tmp, "intent=%d\n", icc_intent);
+    char *cache_info = talloc_asprintf(tmp, "intent=%d, size=%dx%dx%d\n",
+                                       icc_intent, s_r, s_g, s_b);
 
     // check cache
     if (icc_cache) {
@@ -1912,25 +1913,19 @@ static bool load_icc(struct gl_priv *p, const char *icc_file,
 
     // transform a 256x256x256 cube, with 3 components per channel, and 8 bits
     // per component
-    uint8_t  *input  = talloc_array(p, uint8_t,  256 * 256 * 256 * 3);
-    for (int z = 0; z < 256; z++) {
-        for (int y = 0; y < 256; y++) {
-            for (int x = 0; x < 256; x++) {
-                size_t base = (z * 256 * 256 + y * 256 + x) * 3;
-                input[base + 0] = x;
-                input[base + 1] = y;
-                input[base + 2] = z;
-
-                /*
-                output[base + 0] = x;
-                output[base + 1] = y;
-                output[base + 2] = z;
-                */
+    uint8_t  *input  = talloc_array(p, uint8_t,  s_r * s_g * s_b * 3);
+    for (int b = 0; b < s_b; b++) {
+        for (int g = 0; g < s_g; g++) {
+            for (int r = 0; r < s_r; r++) {
+                size_t base = (b * s_r * s_g + g * s_r + r) * 3;
+                input[base + 0] = r * (256 / s_r);
+                input[base + 1] = g * (256 / s_g);
+                input[base + 2] = b * (256 / s_b);
             }
         }
     }
 
-    cmsDoTransform(trafo, input, output, 256 * 256 * 256);
+    cmsDoTransform(trafo, input, output, s_r * s_g * s_b);
 
     mp_msg(MSGT_VO, MSGL_INFO, "[gl] end DoTransform\n");
 
@@ -1950,6 +1945,7 @@ static bool load_icc(struct gl_priv *p, const char *icc_file,
 done:
 
     p->lut_3d_data = talloc_steal(p, output);
+    p->lut_3d_w = s_r, p->lut_3d_h = s_g, p->lut_3d_d = s_b;
     p->use_lut_3d = true;
     p->use_indirect = true;
 
@@ -1971,6 +1967,25 @@ static bool load_icc(struct gl_priv *p, ...)
 }
 
 #endif /* CONFIG_LCMS2 */
+
+static bool parse_3dlut_size(const char *s, int *p1, int *p2, int *p3)
+{
+    if (sscanf(s, "%dx%dx%d", p1, p2, p3) != 3)
+        return false;
+    for (int n = 0; n < 3; n++) {
+        int s = ((int[]) { *p1, *p2, *p3 })[n];
+        if (s < 0 || s > 256 || ((s - 1) & s))
+            return false;
+    }
+    return true;
+}
+
+static int lut3d_size_valid(void *arg)
+{
+    char *s = *(char **)arg;
+    int p1, p2, p3;
+    return parse_3dlut_size(s, &p1, &p2, &p3);
+}
 
 static int preinit(struct vo *vo, const char *arg)
 {
@@ -2002,6 +2017,7 @@ static int preinit(struct vo *vo, const char *arg)
     char *icc_profile = NULL;
     char *icc_cache = NULL;
     int icc_intent = -1;
+    char *icc_size_str = NULL;
 
     const opt_t subopts[] = {
         {"gamma",        OPT_ARG_BOOL, &p->use_gamma,    NULL},
@@ -2028,6 +2044,7 @@ static int preinit(struct vo *vo, const char *arg)
         {"icc-profile",  OPT_ARG_MSTRZ,&icc_profile,     NULL},
         {"icc-cache",    OPT_ARG_MSTRZ,&icc_cache,       NULL},
         {"icc-intent",   OPT_ARG_INT,  &icc_intent,      NULL},
+        {"3dlut-size",   OPT_ARG_MSTRZ,&icc_size_str,    lut3d_size_valid},
         {NULL}
     };
 
@@ -2133,6 +2150,9 @@ static int preinit(struct vo *vo, const char *arg)
                "    1: relative colorimetric\n"
                "    2: saturation\n"
                "    3: absolute colorimetric (default)\n"
+               "  3dlut-size=<r>x<g>x<b>\n"
+               "    Size of the 3D LUT generated from the ICC profile in each\n"
+               "    dimension. Default is 256x256x256.\n"
                "\n");
         goto err_out;
     }
@@ -2153,8 +2173,14 @@ static int preinit(struct vo *vo, const char *arg)
         free(scalers[n]);
     }
 
+    int s_r = 256, s_g = 256, s_b = 256;
+    if (icc_size_str)
+        parse_3dlut_size(icc_size_str, &s_r, &s_g, &s_b);
+    free(icc_size_str);
+
     if (icc_profile) {
-        bool success = load_icc(p, icc_profile, icc_cache, icc_intent);
+        bool success = load_icc(p, icc_profile, icc_cache, icc_intent,
+                                s_r, s_g, s_b);
         if (!success)
             goto err_out;
     }
