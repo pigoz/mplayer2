@@ -136,6 +136,7 @@ struct texplane {
 struct scaler {
     int index;
     const char *name;
+    float params[2];
     struct filter_kernel *kernel;
     GLuint gl_lut;
     const char *lut_name;
@@ -215,6 +216,7 @@ struct gl_priv {
 
     // state for luma and chroma scalers
     struct scaler scalers[2];
+    float scaler_params[2];
 
     int mipmap_gen;
     int stereo_mode;
@@ -1139,6 +1141,11 @@ static void init_scaler(struct gl_priv *p, struct scaler *scaler)
     scaler->kernel_storage = *t_kernel;
     scaler->kernel = &scaler->kernel_storage;
 
+    for (int n = 0; n < 2; n++) {
+        if (!isnan(p->scaler_params[n]))
+            scaler->kernel->params[n] = p->scaler_params[n];
+    }
+
     update_scale_factor(p, scaler->kernel);
 
     int size = scaler->kernel->size;
@@ -1978,6 +1985,7 @@ static int preinit(struct vo *vo, const char *arg)
             { .index = 0, .name = "lanczos2" },
             { .index = 1, .name = "bilinear" },
         },
+        .scaler_params = {NAN, NAN},
     };
 
 
@@ -2000,6 +2008,8 @@ static int preinit(struct vo *vo, const char *arg)
         {"stereo",       OPT_ARG_INT,  &p->stereo_mode,  NULL},
         {"lscale",       OPT_ARG_MSTRZ,&scalers[0],      scaler_valid},
         {"cscale",       OPT_ARG_MSTRZ,&scalers[1],      scaler_valid},
+        {"lparam1",      OPT_ARG_FLOAT,&p->scaler_params[0], NULL},
+        {"lparam2",      OPT_ARG_FLOAT,&p->scaler_params[1], NULL},
         {"fancy-downscaling", OPT_ARG_BOOL, &p->use_fancy_downscaling, NULL},
         {"debug",        OPT_ARG_BOOL, &p->gl_debug,     NULL},
         {"force-gl2",    OPT_ARG_BOOL, &p->force_gl2,    NULL},
@@ -2029,6 +2039,10 @@ static int preinit(struct vo *vo, const char *arg)
                "  filter-strength=<value>\n"
                "    Set the effect strength for the sharpen4/sharpen5 filters.\n"
                "    Default: 0.5\n"
+               "  lparam1=<value> / lparam2=<value>\n"
+               "    Set parameters for configurable filters. Currently only the\n"
+               "    filters 'mitchell' (Mitchell-Netravali) and 'kaiser' support\n"
+               "    this. Affects chroma scaler as well.\n"
                "  osdcolor=<0xAARRGGBB>\n"
                "    Use the given color for the OSD.\n"
                "  stereo=<n>\n"

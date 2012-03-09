@@ -26,6 +26,9 @@ struct filter_kernel {
     double radius;
     double (*weight)(struct filter_kernel *kernel, double x);
 
+    // The filter params can be changed at runtime. Only used by some filters.
+    float params[2];
+    // The following values are set by mp_init_filter() at runtime.
     // Number of coefficients; equals the rounded up radius multiplied with 2.
     int size;
     double inv_scale;

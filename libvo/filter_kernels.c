@@ -163,8 +163,9 @@ static double bessel_i0(double epsilon, double x)
 
 static double kaiser(kernel *k, double x)
 {
-    // a, b, epsilon are configurable parameters
-    const double b = 6.33, a = b, epsilon = 1e-12;
+    double a = k->params[0];
+    double b = k->params[1];
+    double epsilon = 1e-12;
     double i0a = 1 / bessel_i0(epsilon, b);
     return bessel_i0(epsilon, a * sqrt(1 - x * x)) * i0a;
 }
@@ -181,7 +182,8 @@ static double catmull_rom(kernel *k, double x)
 // Mitchell-Netravali
 static double mitchell(kernel *k, double x)
 {
-    double b = 1.0/3.0, c = 1.0/3.0;
+    double b = k->params[0];
+    double c = k->params[1];
     double
         p0 = (6.0 - 2.0 * b) / 6.0,
         p2 = (-18.0 + 12.0 * b + 6.0 * c) / 6.0,
@@ -258,9 +260,9 @@ const struct filter_kernel mp_filter_kernels[] = {
     {"hermite",        1,   hermite},
     {"quadric",        1.5, quadric},
     {"bicubic",        2,   bicubic},
-    {"kaiser",         1,   kaiser},
+    {"kaiser",         1,   kaiser, .params = {6.33, 6.33} },
     {"catmull_rom",    2,   catmull_rom},
-    {"mitchell",       2,   mitchell},
+    {"mitchell",       2,   mitchell, .params = {1.0/3.0, 1.0/3.0} },
     {"spline16",       2,   spline16},
     {"spline36",       3,   spline36},
     {"gaussian",       2,   gaussian},
