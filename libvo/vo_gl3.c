@@ -1214,7 +1214,7 @@ static void init_lut_3d(struct gl_priv *p)
 {
     GL *gl = p->gl;
 
-    mp_msg(MSGT_VO, MSGL_INFO, "[gl] upload 3dlut\n");
+    mp_msg(MSGT_VO, MSGL_V, "[gl] upload 3dlut\n");
 
     gl->GenTextures(1, &p->lut_3d_texture);
     gl->ActiveTexture(GL_TEXTURE0 + TEXUNIT_3DLUT);
@@ -1230,7 +1230,7 @@ static void init_lut_3d(struct gl_priv *p)
     gl->TexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
     gl->ActiveTexture(GL_TEXTURE0);
 
-    mp_msg(MSGT_VO, MSGL_INFO, "[gl] end upload 3dlut\n");
+    mp_msg(MSGT_VO, MSGL_V, "[gl] end upload 3dlut\n");
 
     glCheckError(gl, "after 3d lut creation");
 }
@@ -2178,14 +2178,16 @@ static int preinit(struct vo *vo, const char *arg)
         parse_3dlut_size(icc_size_str, &s_r, &s_g, &s_b);
     free(icc_size_str);
 
+    bool success = true;
     if (icc_profile) {
-        bool success = load_icc(p, icc_profile, icc_cache, icc_intent,
-                                s_r, s_g, s_b);
-        if (!success)
-            goto err_out;
+        success = load_icc(p, icc_profile, icc_cache, icc_intent,
+                           s_r, s_g, s_b);
     }
     free(icc_profile);
     free(icc_cache);
+
+    if (!success)
+        goto err_out;
 
     p->eosd = eosd_packer_create(vo);
 
