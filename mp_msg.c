@@ -37,7 +37,7 @@
 #include "mp_msg.h"
 
 /* maximum message length of mp_msg */
-#define MSGSIZE_MAX 3072
+#define MSGSIZE_MAX 6144
 
 int mp_msg_levels[MSGT_MAX]; // verbose level of this module. initialized to -2
 int mp_msg_level_all = MSGL_STATUS;
