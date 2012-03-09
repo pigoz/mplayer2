@@ -1854,8 +1854,6 @@ static bool load_icc(struct gl_priv *p, const char *icc_file,
     uint16_t *output = talloc_array(tmp, uint16_t, 256 * 256 * 256 * 3);
     assert(talloc_get_size(output) == LUT3D_DATA_SIZE);
 
-    cmsSetLogErrorHandler(lcms2_error_handler);
-
     mp_msg(MSGT_VO, MSGL_INFO, "[gl] Opening ICC profile '%s'\n", icc_file);
     struct bstr iccdata = load_file(p, tmp, icc_file);
     if (!iccdata.len)
@@ -1875,6 +1873,8 @@ static bool load_icc(struct gl_priv *p, const char *icc_file,
             mp_msg(MSGT_VO, MSGL_WARN, "[gl] 3D LUT cache invalid!\n");
         }
     }
+
+    cmsSetLogErrorHandler(lcms2_error_handler);
 
     cmsHPROFILE profile = cmsOpenProfileFromMem(iccdata.start, iccdata.len);
     if (!profile)
@@ -1957,7 +1957,7 @@ error_exit:
 
 #else /* CONFIG_LCMS2 */
 
-static bool load_icc(struct gl_priv *p, const char *icc_file)
+static bool load_icc(struct gl_priv *p, ...)
 {
     mp_msg(MSGT_VO, MSGL_FATAL, "[gl] LCMS2 support not compiled.\n");
     return false;
