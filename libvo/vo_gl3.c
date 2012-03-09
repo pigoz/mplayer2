@@ -1848,26 +1848,33 @@ static struct bstr load_file(struct gl_priv *p, void *talloc_ctx,
 #define LUT3D_CACHE_HEADER "mplayer2 2dlut cache 1.0\n"
 
 static bool load_icc(struct gl_priv *p, const char *icc_file,
-                     const char *icc_cache)
+                     const char *icc_cache, int icc_intent)
 {
     void *tmp = talloc_new(p);
     uint16_t *output = talloc_array(tmp, uint16_t, 256 * 256 * 256 * 3);
     assert(talloc_get_size(output) == LUT3D_DATA_SIZE);
+
+    if (icc_intent == -1)
+        icc_intent = INTENT_ABSOLUTE_COLORIMETRIC;
 
     mp_msg(MSGT_VO, MSGL_INFO, "[gl] Opening ICC profile '%s'\n", icc_file);
     struct bstr iccdata = load_file(p, tmp, icc_file);
     if (!iccdata.len)
         goto error_exit;
 
+    char *cache_info = talloc_asprintf(tmp, "intent=%d\n", icc_intent);
+
     // check cache
     if (icc_cache) {
+        mp_msg(MSGT_VO, MSGL_INFO, "[gl] Opening 3D LUT cache in file '%s'.\n",
+               icc_cache);
         struct bstr cachedata = load_file(p, tmp, icc_cache);
         if (bstr_eatstart(&cachedata, bstr(LUT3D_CACHE_HEADER))
+            && bstr_eatstart(&cachedata, bstr(cache_info))
             && bstr_eatstart(&cachedata, iccdata)
             && cachedata.len == talloc_get_size(output))
         {
             memcpy(output, cachedata.start, cachedata.len);
-            mp_msg(MSGT_VO, MSGL_INFO, "[gl] Using 3D LUT cache.\n");
             goto done;
         } else {
             mp_msg(MSGT_VO, MSGL_WARN, "[gl] 3D LUT cache invalid!\n");
@@ -1893,7 +1900,7 @@ static bool load_icc(struct gl_priv *p, const char *icc_file,
     cmsFreeToneCurve(tonecurve);
     cmsHTRANSFORM trafo = cmsCreateTransform(vid_profile, TYPE_RGB_8,
                                              profile, TYPE_RGB_16,
-                                             INTENT_ABSOLUTE_COLORIMETRIC,
+                                             icc_intent,
                                              cmsFLAGS_HIGHRESPRECALC);
     cmsCloseProfile(profile);
     cmsCloseProfile(vid_profile);
@@ -1933,7 +1940,7 @@ static bool load_icc(struct gl_priv *p, const char *icc_file,
     if (icc_cache) {
         FILE *out = fopen(icc_cache, "wb");
         if (out) {
-            fprintf(out, LUT3D_CACHE_HEADER);
+            fprintf(out, "%s%s", LUT3D_CACHE_HEADER, cache_info);
             fwrite(iccdata.start, iccdata.len, 1, out);
             fwrite(output, talloc_get_size(output), 1, out);
             fclose(out);
@@ -1994,6 +2001,7 @@ static int preinit(struct vo *vo, const char *arg)
     char *fbo_format = NULL;
     char *icc_profile = NULL;
     char *icc_cache = NULL;
+    int icc_intent = -1;
 
     const opt_t subopts[] = {
         {"gamma",        OPT_ARG_BOOL, &p->use_gamma,    NULL},
@@ -2019,6 +2027,7 @@ static int preinit(struct vo *vo, const char *arg)
         {"backend",      OPT_ARG_MSTRZ,&backend_arg,     backend_valid},
         {"icc-profile",  OPT_ARG_MSTRZ,&icc_profile,     NULL},
         {"icc-cache",    OPT_ARG_MSTRZ,&icc_cache,       NULL},
+        {"icc-intent",   OPT_ARG_INT,  &icc_intent,      NULL},
         {NULL}
     };
 
@@ -2119,6 +2128,11 @@ static int preinit(struct vo *vo, const char *arg)
                "    this file. This can be used to speed up loading, since\n"
                "    LittleCMS2 can take a while to create the 3D LUT.\n"
                "    Note that this file will be about 100 MB big.\n"
+               "  icc-intent=<value>\n"
+               "    0: perceptual\n"
+               "    1: relative colorimetric\n"
+               "    2: saturation\n"
+               "    3: absolute colorimetric (default)\n"
                "\n");
         goto err_out;
     }
@@ -2140,7 +2154,7 @@ static int preinit(struct vo *vo, const char *arg)
     }
 
     if (icc_profile) {
-        bool success = load_icc(p, icc_profile, icc_cache);
+        bool success = load_icc(p, icc_profile, icc_cache, icc_intent);
         if (!success)
             goto err_out;
     }
