@@ -1911,8 +1911,7 @@ static bool load_icc(struct gl_priv *p, const char *icc_file,
 
     mp_msg(MSGT_VO, MSGL_V, "[gl] DoTransform\n");
 
-    // transform a 256x256x256 cube, with 3 components per channel, and 8 bits
-    // per component
+    // transform a (s_r)x(s_g)x(s_b) cube, with 3 components per channel
     uint16_t *input = talloc_array(tmp, uint16_t, s_r * 3);
     for (int b = 0; b < s_b; b++) {
         for (int g = 0; g < s_g; g++) {
@@ -1972,7 +1971,7 @@ static bool parse_3dlut_size(const char *s, int *p1, int *p2, int *p3)
         return false;
     for (int n = 0; n < 3; n++) {
         int s = ((int[]) { *p1, *p2, *p3 })[n];
-        if (s < 0 || s > 256 || ((s - 1) & s))
+        if (s < 2 || s > 256 || ((s - 1) & s))
             return false;
     }
     return true;
@@ -2142,7 +2141,7 @@ static int preinit(struct vo *vo, const char *arg)
                "    Store and load the 3D LUT created from the ICC profile in\n"
                "    this file. This can be used to speed up loading, since\n"
                "    LittleCMS2 can take a while to create the 3D LUT.\n"
-               "    Note that this file will be about 100 MB big.\n"
+               "    Note that this file will be at most about 100 MB big.\n"
                "  icc-intent=<value>\n"
                "    0: perceptual\n"
                "    1: relative colorimetric\n"
@@ -2150,7 +2149,8 @@ static int preinit(struct vo *vo, const char *arg)
                "    3: absolute colorimetric (default)\n"
                "  3dlut-size=<r>x<g>x<b>\n"
                "    Size of the 3D LUT generated from the ICC profile in each\n"
-               "    dimension. Default is 256x256x256.\n"
+               "    dimension. Default is 128x256x64.\n"
+               "    Sizes must be a power of two, and 256 at most.\n"
                "\n");
         goto err_out;
     }
@@ -2171,7 +2171,7 @@ static int preinit(struct vo *vo, const char *arg)
         free(scalers[n]);
     }
 
-    int s_r = 256, s_g = 256, s_b = 256;
+    int s_r = 128, s_g = 256, s_b = 64;
     if (icc_size_str)
         parse_3dlut_size(icc_size_str, &s_r, &s_g, &s_b);
     free(icc_size_str);
