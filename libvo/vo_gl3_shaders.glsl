@@ -26,6 +26,7 @@
 
 #!section vertex_all
 uniform mat3 transform;
+uniform sampler3D lut_3d;
 
 in vec2 vertex_position;
 in vec4 vertex_color;
@@ -40,6 +41,9 @@ void main() {
 #endif
     gl_Position = vec4(position, 1);
     color = vertex_color;
+#ifdef USE_3DLUT
+    color = vec4(texture(lut_3d, color.rgb).rgb, color.a);
+#endif
     texcoord = vertex_texcoord;
 }
 
