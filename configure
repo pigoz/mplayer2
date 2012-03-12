@@ -436,6 +436,7 @@ Video output:
   --disable-yuv4mpeg       disable yuv4mpeg video output [enable]
   --disable-corevideo      disable CoreVideo video output [autodetect]
   --disable-cocoa          disable Cocoa OpenGL backend [autodetect]
+  --disable-iosurface      disable IOSurface backed OpenGL FBO [autodetect]
 
 Audio output:
   --disable-alsa         disable ALSA audio output [autodetect]
@@ -695,6 +696,7 @@ _qtx=auto
 _coreaudio=auto
 _corevideo=auto
 _cocoa=auto
+_iosurface=auto
 quicktime=auto
 _macosx_finder=no
 _macosx_bundle=auto
@@ -1127,6 +1129,8 @@ for ac_option do
   --disable-corevideo) _corevideo=no ;;
   --enable-cocoa) _cocoa=yes ;;
   --disable-cocoa) _cocoa=no ;;
+  --enable-iosurface) _iosurface=yes ;;
+  --disable-iosurface) _iosurface=no ;;
   --enable-macosx-finder) _macosx_finder=yes ;;
   --disable-macosx-finder) _macosx_finder=no ;;
   --enable-macosx-bundle) _macosx_bundle=yes ;;
@@ -4213,6 +4217,22 @@ else
 fi
 echores "$_corevideo"
 
+echocheck "IOSurface support"
+if test "$_iosurface" = yes; then
+  cat > $TMPC <<EOF
+#include <IOSurface/IOSurface.h>
+int main(void) { return 0; }
+EOF
+  _iosurface=no
+  cc_check -framework Cocoa -framework IOSurface && _iosurface=yes
+fi
+if test "$_iosurface" = yes ; then
+  def_iosurface="#define CONFIG_IOSURFACE 1"
+else
+  def_iosurface="#undef CONFIG_IOSURFACE"
+fi
+echores "$_iosurface"
+
 fi #if darwin
 
 
@@ -6416,6 +6436,7 @@ CDDA = $_cdda
 CDDB = $_cddb
 COREAUDIO = $_coreaudio
 COREVIDEO = $_corevideo
+IOSURFACE = $_iosurface
 DART = $_dart
 DGA = $_dga
 DIRECT3D = $_direct3d
@@ -6835,6 +6856,7 @@ $def_ggiwmh
 $def_gif
 $def_gif_4
 $def_gif_tvt_hack
+$def_iosurface
 $def_gl
 $def_gl_cocoa
 $def_gl_win32
