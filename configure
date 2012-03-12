@@ -4198,6 +4198,24 @@ if test "$_cocoa" = yes ; then
 fi
 echores "$_cocoa"
 
+echocheck "IOSurface support"
+if test "$_iosurface" = auto; then
+  cat > $TMPC <<EOF
+#include <IOSurface/IOSurface.h>
+int main(void) { return 0; }
+EOF
+  _iosurface=no
+  cc_check -framework IOSurface && _iosurface=yes
+fi
+if test "$_iosurface" = yes ; then
+  libs_mplayer="$libs_mplayer -framework IOSurface"
+  def_corevideo='#define CONFIG_COREVIDEO 1'
+  def_iosurface="#define CONFIG_IOSURFACE 1"
+else
+  def_iosurface="#undef CONFIG_IOSURFACE"
+fi
+echores "$_iosurface"
+
 echocheck "CoreVideo"
 if test "$_cocoa" = yes && test "$_corevideo" = auto ; then
   cat > $TMPC <<EOF
@@ -4216,22 +4234,6 @@ else
   def_corevideo='#undef CONFIG_COREVIDEO'
 fi
 echores "$_corevideo"
-
-echocheck "IOSurface support"
-if test "$_iosurface" = yes; then
-  cat > $TMPC <<EOF
-#include <IOSurface/IOSurface.h>
-int main(void) { return 0; }
-EOF
-  _iosurface=no
-  cc_check -framework Cocoa -framework IOSurface && _iosurface=yes
-fi
-if test "$_iosurface" = yes ; then
-  def_iosurface="#define CONFIG_IOSURFACE 1"
-else
-  def_iosurface="#undef CONFIG_IOSURFACE"
-fi
-echores "$_iosurface"
 
 fi #if darwin
 
