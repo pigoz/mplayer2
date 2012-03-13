@@ -75,6 +75,7 @@
 // Units 3-4 are used for scaler LUTs.
 #define TEXUNIT_SCALERS 3
 #define TEXUNIT_3DLUT 5
+#define TEXUNIT_DITHER 6
 
 // lscale/cscale arguments that map directly to shader filter routines.
 // Note that the convolution filters are not included in this list.
@@ -181,12 +182,16 @@ struct gl_priv {
     int lut_3d_w, lut_3d_h, lut_3d_d;
     void *lut_3d_data;
 
+    GLuint dither_texture;
+    float dither_quantization;
+
     int use_indirect;           // convert YUV to RGB texture first
     int use_gamma;
     int use_srgb;
     int use_scale_sep;
     int use_fancy_downscaling;
     int use_lut_3d;
+    int dither_depth;
     struct mp_csp_details colorspace;
     bool is_yuv;
     float filter_strength;
@@ -528,6 +533,14 @@ static void update_uniforms(struct gl_priv *p, GLuint program)
         }
     }
 
+    loc = gl->GetUniformLocation(program, "dither");
+    if (loc >= 0)
+        gl->Uniform1i(loc, TEXUNIT_DITHER);
+
+    loc = gl->GetUniformLocation(program, "dither_quantization");
+    if (loc >= 0)
+        gl->Uniform1f(loc, p->dither_quantization);
+
     loc = gl->GetUniformLocation(program, "filter_strength");
     if (loc >= 0)
         gl->Uniform1f(loc, p->filter_strength);
@@ -803,6 +816,9 @@ static void uninit_rendering(struct gl_priv *p)
         p->scalers->lut_name = NULL;
         p->scalers->kernel = NULL;
     }
+
+    gl->DeleteTextures(1, &p->dither_texture);
+    p->dither_texture = 0;
 }
 
 // Free video resources etc.
@@ -1060,6 +1076,7 @@ static void compile_shaders(struct gl_priv *p)
 
     shader_def_opt(&header_final, "USE_3DLUT", p->use_lut_3d);
     shader_def_opt(&header_final, "USE_LINEAR_CONV_INV", p->use_lut_3d);
+    shader_def_opt(&header_final, "USE_DITHER", p->dither_texture != 0);
 
     p->final_program =
         create_program(gl, "final", header_final, vertex_shader,
@@ -1102,6 +1119,8 @@ static int init_gl(struct gl_priv *p)
     mp_msg(MSGT_VO, MSGL_V, "[gl] GL_RENDERER='%s', GL_VENDOR='%s', "
                             "GL_VERSION='%s', GL_SHADING_LANGUAGE_VERSION='%s'"
                             "\n", renderer, vendor, version, glsl);
+    mp_msg(MSGT_VO, MSGL_V, "[gl] Display depth: R=%d, G=%d, B=%d\n",
+           p->glctx->depth_r, p->glctx->depth_g, p->glctx->depth_b);
 
     gl->Disable(GL_BLEND);
     gl->Disable(GL_DEPTH_TEST);
@@ -1195,6 +1214,58 @@ static void init_scaler(struct gl_priv *p, struct scaler *scaler)
     glCheckError(gl, "after initializing scaler");
 }
 
+// 8x8 dither matrix, taken from libav's swscale (dither_8x8_256)
+// (which is actually dither_8x8_128 multiplied with 2, plus a typo)
+static const unsigned char dither[64] = {
+     72,136,120,184, 68,132,116,180,
+    200,  8,248, 56,196,  4,244, 52,
+    104,168, 88,152,100,164, 84,148,
+    232, 40,216, 24,228, 36,212, 20,
+     64,128,112,176, 76,140,124,188,
+    192,  0,240, 48,204, 12,252, 60,
+     96,160, 80,144,108,172, 92,156,
+    224, 32,208, 16,236, 44,220, 28,
+};
+
+static void setup_dither(struct gl_priv *p)
+{
+    GL *gl = p->gl;
+
+    // Assume 8 bits per component if unknown.
+    int dst_depth = p->glctx->depth_g ? p->glctx->depth_g : 8;
+    if (p->dither_depth > 0)
+        dst_depth = p->dither_depth;
+
+    // not sure how to get per-component bit depth for RGB formats
+    int src_depth = p->is_yuv ? p->plane_bits : -1;
+    if (p->use_lut_3d)
+        src_depth = 16;
+
+    if (dst_depth >= src_depth || p->dither_depth < 0 || src_depth < 0)
+        return;
+
+    mp_msg(MSGT_VO, MSGL_V, "[gl] Dither %d->%d.\n", src_depth, dst_depth);
+
+    // This defines how many bits are considered significant for output on
+    // screen. The superfluous bits will be used for rounded according to the
+    // dither matrix. The precision of the source implicitly decides how many
+    // dither patterns can be visible.
+    p->dither_quantization = (1 << dst_depth) - 1;
+
+    gl->ActiveTexture(GL_TEXTURE0 + TEXUNIT_DITHER);
+    gl->GenTextures(1, &p->dither_texture);
+    gl->BindTexture(GL_TEXTURE_2D, p->dither_texture);
+    gl->PixelStorei(GL_UNPACK_ALIGNMENT, 4);
+    gl->PixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+    gl->TexImage2D(GL_TEXTURE_2D, 0, GL_RED, 8, 8, 0, GL_RED,
+                   GL_UNSIGNED_BYTE, dither);
+    gl->TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    gl->TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    gl->TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    gl->TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    gl->ActiveTexture(GL_TEXTURE0);
+}
+
 static void reinit_rendering(struct gl_priv *p)
 {
     GL *gl = p->gl;
@@ -1205,8 +1276,11 @@ static void reinit_rendering(struct gl_priv *p)
 
     uninit_rendering(p);
 
+    setup_dither(p);
+
     init_scaler(p, &p->scalers[0]);
     init_scaler(p, &p->scalers[1]);
+
     compile_shaders(p);
 
     if (p->indirect_program && !p->indirect_fbo.fbo)
@@ -2045,6 +2119,7 @@ static int preinit(struct vo *vo, const char *arg)
         {"icc-cache",    OPT_ARG_MSTRZ,&icc_cache,       NULL},
         {"icc-intent",   OPT_ARG_INT,  &icc_intent,      NULL},
         {"3dlut-size",   OPT_ARG_MSTRZ,&icc_size_str,    lut3d_size_valid},
+        {"dither-depth", OPT_ARG_INT,  &p->dither_depth, NULL},
         {NULL}
     };
 
@@ -2086,6 +2161,17 @@ static int preinit(struct vo *vo, const char *arg)
                "  pbo\n"
                "    Enable use of PBOs. This is faster, but can sometimes lead to\n"
                "    sparodic and temporary image corruption.\n"
+               "  dither-depth=<n>\n"
+               "    Positive non-zero values select the target bit depth.\n"
+               "    -1: Disable any dithering done by mplayer.\n"
+               "     0: Automatic selection. If output bit depth can't be detected,\n"
+               "        8 bits per component are assumed.\n"
+               "     8: Dither to 8 bit output.\n"
+               "    Default: 0.\n"
+               "    Note that dithering will always be disabled if the bit depth\n"
+               "    of the video is lower or qual to the detected dither-depth.\n"
+               "    If color management is enabled, input depth is assumed to be\n"
+               "    16 bits, because the 3D LUT output is 16 bit wide.\n"
                "Less useful options:\n"
                "  swapinterval=<n>\n"
                "    Interval in displayed frames between to buffer swaps.\n"

@@ -78,9 +78,11 @@ uniform sampler1D lut_l_1d;
 uniform sampler2D lut_c_2d;
 uniform sampler2D lut_l_2d;
 uniform sampler3D lut_3d;
+uniform sampler2D dither;
 uniform mat4x3 colormatrix;
 uniform vec3 inv_gamma;
 uniform float conv_gamma;
+uniform float dither_quantization;
 uniform float filter_strength;
 
 in vec2 texcoord;
@@ -303,6 +305,10 @@ void main() {
 #endif
 #ifdef USE_3DLUT
     color = texture(lut_3d, color).rgb;
+#endif
+#ifdef USE_DITHER
+    float dither = texture(dither, gl_FragCoord.xy / textureSize(dither, 0)).r;
+    color = floor(color * dither_quantization + dither ) / dither_quantization;
 #endif
     out_color = vec4(color, 1);
 }
