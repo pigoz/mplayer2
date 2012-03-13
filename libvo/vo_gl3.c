@@ -1214,18 +1214,17 @@ static void init_scaler(struct gl_priv *p, struct scaler *scaler)
     glCheckError(gl, "after initializing scaler");
 }
 
-// 8x8 dither matrix, taken from libav's swscale (dither_8x8_256)
-// (which is actually dither_8x8_128 multiplied with 2, plus a typo)
-static const unsigned char dither[64] = {
-     72,136,120,184, 68,132,116,180,
-    200,  8,248, 56,196,  4,244, 52,
-    104,168, 88,152,100,164, 84,148,
-    232, 40,216, 24,228, 36,212, 20,
-     64,128,112,176, 76,140,124,188,
-    192,  0,240, 48,204, 12,252, 60,
-     96,160, 80,144,108,172, 92,156,
-    224, 32,208, 16,236, 44,220, 28,
-};
+static void make_dither_matrix(unsigned char *m, int size)
+{
+    m[0] = 0;
+    for (int sz = 1; sz < size; sz *= 2) {
+        int offset[] = {sz*size, sz, sz * (size+1), 0};
+        for (int i = 0; i < 4; i++)
+            for (int y = 0; y < sz * size; y += size)
+                for (int x = 0; x < sz; x++)
+                    m[x+y+offset[i]] = m[x+y] * 4 + (3-i) * 256/size/size;
+    }
+}
 
 static void setup_dither(struct gl_priv *p)
 {
@@ -1251,13 +1250,16 @@ static void setup_dither(struct gl_priv *p)
     // dither matrix. The precision of the source implicitly decides how many
     // dither patterns can be visible.
     p->dither_quantization = (1 << dst_depth) - 1;
+    int size = 8;
+    unsigned char dither[256];
+    make_dither_matrix(dither, size);
 
     gl->ActiveTexture(GL_TEXTURE0 + TEXUNIT_DITHER);
     gl->GenTextures(1, &p->dither_texture);
     gl->BindTexture(GL_TEXTURE_2D, p->dither_texture);
-    gl->PixelStorei(GL_UNPACK_ALIGNMENT, 4);
+    gl->PixelStorei(GL_UNPACK_ALIGNMENT, 1);
     gl->PixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-    gl->TexImage2D(GL_TEXTURE_2D, 0, GL_RED, 8, 8, 0, GL_RED,
+    gl->TexImage2D(GL_TEXTURE_2D, 0, GL_RED, size, size, 0, GL_RED,
                    GL_UNSIGNED_BYTE, dither);
     gl->TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     gl->TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
