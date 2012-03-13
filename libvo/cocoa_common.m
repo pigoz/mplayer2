@@ -57,9 +57,12 @@
 @interface GLMPlayerOpenGLView : NSView
 @end
 
+bool drawing = NO;
+
 struct vo_cocoa_state {
     NSAutoreleasePool *pool;
     GLMPlayerWindow *window;
+    GLMPlayerOpenGLView *glView;
     NSOpenGLContext *glContext;
     NSOpenGLPixelFormat *pixelFormat;
 
@@ -243,7 +246,7 @@ int vo_cocoa_create_window(struct vo *vo, uint32_t d_width,
                                              styleMask:s->windowed_mask
                                              backing:NSBackingStoreBuffered defer:NO];
 
-        GLMPlayerOpenGLView *glView = [[GLMPlayerOpenGLView alloc] initWithFrame:NSMakeRect(0, 0, 100, 100)];
+        s->glView = [[GLMPlayerOpenGLView alloc] initWithFrame:NSMakeRect(0, 0, 100, 100)];
 
         NSOpenGLPixelFormatAttribute attrs[] = {
             NSOpenGLPFADoubleBuffer, // double buffered
@@ -256,10 +259,10 @@ int vo_cocoa_create_window(struct vo *vo, uint32_t d_width,
 
         create_menu();
 
-        [s->window setContentView:glView];
-        [glView release];
+        [s->window setContentView:s->glView];
+        [s->glView release];
         [s->window setAcceptsMouseMovedEvents:YES];
-        [s->glContext setView:glView];
+        [s->glContext setView:s->glView];
         [s->glContext makeCurrentContext];
 
         [NSApp setDelegate:s->window];
@@ -307,7 +310,8 @@ int vo_cocoa_create_window(struct vo *vo, uint32_t d_width,
 
 void vo_cocoa_swap_buffers()
 {
-    [s->glContext flushBuffer];
+    [s->glView setNeedsDisplay:YES];
+    drawing = YES;
 }
 
 void vo_cocoa_display_cursor(int requested_state)
@@ -649,7 +653,7 @@ void create_menu()
 @implementation MPlayerPlayLoop
 - (void) call
 {
-  s_play_loop(s_context);
+   s_play_loop(s_context);
 }
 @end
 
@@ -658,5 +662,10 @@ void create_menu()
 {
     [[NSColor clearColor] set];
     NSRectFill([self bounds]);
+    if (drawing) {
+        l_vo->driver->control(l_vo, VOCTRL_REDRAW_FRAME, nil);
+        [s->glContext flushBuffer];
+        drawing = NO;
+    }
 }
 @end

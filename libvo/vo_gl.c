@@ -1119,8 +1119,8 @@ static uint32_t draw_image(struct vo *vo, mp_image_t *mpi)
         gl->BindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
     }
 skip_upload:
-    if (vo_doublebuffering)
-        do_render(vo);
+    //if (vo_doublebuffering)
+    //    do_render(vo);
     return VO_TRUE;
 }
 
