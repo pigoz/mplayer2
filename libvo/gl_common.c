@@ -2260,6 +2260,10 @@ static int create_window_x11_gl3(struct MPGLContext *ctx, int gl_flags,
         return SET_WINDOW_FAILED;
     }
 
+    glXGetFBConfigAttrib(vo->x11->display, fbc, GLX_RED_SIZE, &ctx->depth_r);
+    glXGetFBConfigAttrib(vo->x11->display, fbc, GLX_GREEN_SIZE, &ctx->depth_g);
+    glXGetFBConfigAttrib(vo->x11->display, fbc, GLX_BLUE_SIZE, &ctx->depth_b);
+
     XVisualInfo *vinfo = glXGetVisualFromFBConfig(vo->x11->display, fbc);
     mp_msg(MSGT_VO, MSGL_V, "[gl] GLX chose visual with ID 0x%x\n",
             (int)vinfo->visualid);

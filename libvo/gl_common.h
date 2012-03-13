@@ -386,6 +386,8 @@ typedef struct MPGLContext {
     GL *gl;
     enum MPGLType type;
     struct vo *vo;
+    // Bit size of each component in the created framebuffer. 0 if unknown.
+    int depth_r, depth_g, depth_b;
     union {
         int w32;
 #ifdef CONFIG_GL_X11
