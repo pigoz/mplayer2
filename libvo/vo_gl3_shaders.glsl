@@ -283,7 +283,9 @@ void main() {
     vec3 color = SAMPLE_L(texture1, texcoord).rgb;
 #endif
 #ifdef USE_YGRAY
-    color.gb = vec2(0.5);
+    // NOTE: actually slightly wrong for 16 bit input video, and completely
+    //       wrong for 9/10 bit input
+    color.gb = vec2(128.0/255.0);
 #endif
 #ifdef USE_COLORMATRIX
     color = mat3(colormatrix) * color + colormatrix[3];
