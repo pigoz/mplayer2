@@ -23,9 +23,11 @@
 #else
 #include <cdio/cdda.h>
 #include <cdio/paranoia.h>
+#include <cdio/cdio.h>
 #endif
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 #include "talloc.h"
 
@@ -134,9 +136,54 @@ static void cdparanoia_callback(long int inpos, paranoia_cb_mode_t function) {
 #endif
 }
 
+#ifdef CONFIG_LIBCDIO
+static const char *cdtext_name[] = {
+    [CDTEXT_ARRANGER] = "Arranger",
+    [CDTEXT_COMPOSER] = "Composer",
+    [CDTEXT_MESSAGE]  =  "Message",
+    [CDTEXT_ISRC] =  "ISRC",
+    [CDTEXT_PERFORMER] = "Performer",
+    [CDTEXT_SONGWRITER] =  "Songwriter",
+    [CDTEXT_TITLE] =  "Title",
+    [CDTEXT_UPC_EAN] = "UPC_EAN",
+};
+#endif
+
+static bool print_cdtext(stream_t *s, int track)
+{
+#ifdef CONFIG_LIBCDIO
+    cdda_priv* p = (cdda_priv*)s->priv;
+    cdtext_t *text = cdio_get_cdtext(p->cd->p_cdio, track);
+    if (text) {
+        mp_msg(MSGT_SEEK, MSGL_INFO, "CD-Text (%s):\n", track ? "track" : "CD");
+        for (int i = 0; i < sizeof(cdtext_name) / sizeof(cdtext_name[0]); i++) {
+            const char *name = cdtext_name[i];
+            const char *value = cdtext_get_const(i, text);
+            if (name && value)
+                mp_msg(MSGT_SEEK, MSGL_INFO, "  %s: '%s'\n", name, value);
+        }
+        return true;
+    }
+#endif
+    return false;
+}
+
+static void print_track_info(stream_t *s, int track)
+{
+    cdda_priv* p = (cdda_priv*)s->priv;
+    cd_track_t *cd_track = cd_info_get_track(p->cd_info, track);
+    if( cd_track!=NULL ) {
+        mp_msg(MSGT_SEEK, MSGL_INFO, "\n%s\n", cd_track->name);
+        mp_msg(MSGT_IDENTIFY, MSGL_INFO, "ID_CDDA_TRACK=%d\n", cd_track->track_nb);
+    }
+    if (print_cdtext(s, track)) {
+        // hack for term OSD overwriting the last line of CDTEXT
+        mp_msg(MSGT_SEEK, MSGL_INFO, "\n");
+    }
+}
+
 static int fill_buffer(stream_t* s, char* buffer, int max_len) {
   cdda_priv* p = (cdda_priv*)s->priv;
-  cd_track_t *cd_track;
   int16_t * buf;
   int i;
 
@@ -159,12 +206,7 @@ static int fill_buffer(stream_t* s, char* buffer, int max_len) {
 
   for(i=0;i<p->cd->tracks;i++){
 	  if(p->cd->disc_toc[i].dwStartSector==p->sector-1) {
-		  cd_track = cd_info_get_track(p->cd_info, i+1);
-//printf("Track %d, sector=%d\n", i, p->sector-1);
-		  if( cd_track!=NULL ) {
-			mp_msg(MSGT_SEEK, MSGL_INFO, "\n%s\n", cd_track->name);
-			mp_msg(MSGT_IDENTIFY, MSGL_INFO, "ID_CDDA_TRACK=%d\n", cd_track->track_nb);
-		  }
+		  print_track_info(s, i + 1);
 		  break;
 	  }
   }
@@ -175,7 +217,6 @@ static int fill_buffer(stream_t* s, char* buffer, int max_len) {
 
 static int seek(stream_t* s,off_t newpos) {
   cdda_priv* p = (cdda_priv*)s->priv;
-  cd_track_t *cd_track;
   int sec;
   int current_track=0, seeked_track=0;
   int seek_to_track = 0;
@@ -203,13 +244,7 @@ static int seek(stream_t* s,off_t newpos) {
   }
 //printf("current: %d, seeked: %d\n", current_track, seeked_track);
 	if (current_track != seeked_track && !seek_to_track) {
-//printf("Track %d, sector=%d\n", seeked_track, sec);
-		  cd_track = cd_info_get_track(p->cd_info, seeked_track+1);
-		  if( cd_track!=NULL ) {
-			  mp_msg(MSGT_SEEK, MSGL_INFO, "\n%s\n", cd_track->name);
-			  mp_msg(MSGT_IDENTIFY, MSGL_INFO, "ID_CDDA_TRACK=%d\n", cd_track->track_nb);
-		  }
-
+            print_track_info(s, seeked_track + 1);
 	}
 #if 0
   if(sec < p->start_sector)
@@ -461,6 +496,8 @@ static int open_cdda(stream_t *st,int m, void* opts, int* file_format) {
   *file_format = DEMUXER_TYPE_RAWAUDIO;
 
   m_struct_free(&stream_opts,opts);
+
+  print_cdtext(st, 0);
 
   return STREAM_OK;
 }
