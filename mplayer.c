@@ -1646,6 +1646,27 @@ void set_osd_subtitle(struct MPContext *mpctx, subtitle *subs)
     }
 }
 
+// unlike osd_set_text, this handles both video and terminal OSD cases
+static void set_osd_text(struct MPContext *mpctx, const char *text)
+{
+    struct MPOpts *opts = &mpctx->opts;
+    struct osd_state *osd = mpctx->osd;
+
+    if (mpctx->sh_video && opts->term_osd != 1) {
+        if (strcmp(osd->osd_text, text)) {
+            osd_set_text(osd, text);
+            vo_osd_changed(OSDTYPE_OSD);
+        }
+    } else if (opts->term_osd) {
+        if (strcmp(mpctx->terminal_osd_text, text)) {
+            talloc_free(mpctx->terminal_osd_text);
+            mpctx->terminal_osd_text = talloc_strdup(mpctx, text);
+            mp_msg(MSGT_CPLAYER, MSGL_STATUS, "%s%s\n", opts->term_osd_esc,
+                    mpctx->terminal_osd_text);
+        }
+    }
+}
+
 /**
  * \brief Update the OSD message line.
  *
@@ -1659,7 +1680,6 @@ static void update_osd_msg(struct MPContext *mpctx)
 {
     struct MPOpts *opts = &mpctx->opts;
     mp_osd_msg_t *msg;
-    struct osd_state *osd = mpctx->osd;
     char osd_text_timer[128];
 
     if (mpctx->add_osd_seek_info) {
@@ -1672,24 +1692,12 @@ static void update_osd_msg(struct MPContext *mpctx)
 
     // Look if we have a msg
     if ((msg = get_osd_msg(mpctx))) {
-        if (mpctx->sh_video && opts->term_osd != 1) {
-            if (strcmp(osd->osd_text, msg->msg)) {
-                osd_set_text(osd, msg->msg);
-                vo_osd_changed(OSDTYPE_OSD);
-            }
-        } else if (opts->term_osd) {
-            if (strcmp(mpctx->terminal_osd_text, msg->msg)) {
-                talloc_free(mpctx->terminal_osd_text);
-                mpctx->terminal_osd_text = talloc_strdup(mpctx, msg->msg);
-                mp_msg(MSGT_CPLAYER, MSGL_STATUS, "%s%s\n", opts->term_osd_esc,
-                       mpctx->terminal_osd_text);
-            }
-        }
+        set_osd_text(mpctx, msg->msg);
         return;
     }
 
-    if (mpctx->sh_video && opts->term_osd != 1) {
         // fallback on the timer
+        osd_text_timer[0] = 0;
         if (opts->osd_level >= 2) {
             int len = get_time_length(mpctx);
             int percentage = -1;
@@ -1731,32 +1739,25 @@ static void update_osd_msg(struct MPContext *mpctx)
                 fractions_text[0] = 0;
             }
 
+            if (mpctx->sh_video && opts->term_osd != 1)
+                snprintf(osd_text_timer, sizeof(osd_text_timer), "%c ",
+                         mpctx->osd_function);
+
+            int pos = strlen(osd_text_timer);
             if (opts->osd_level == 3)
-                snprintf(osd_text_timer, sizeof(osd_text_timer),
-                         "%c %02d:%02d:%02d%s / %02d:%02d:%02d%s",
-                         mpctx->osd_function, pts / 3600, (pts / 60) % 60, pts % 60,
+                snprintf(osd_text_timer + pos, sizeof(osd_text_timer) - pos,
+                         "%02d:%02d:%02d%s / %02d:%02d:%02d%s",
+                         pts / 3600, (pts / 60) % 60, pts % 60,
                          fractions_text, len / 3600, (len / 60) % 60, len % 60,
                          percentage_text);
             else
-                snprintf(osd_text_timer, sizeof(osd_text_timer),
-                         "%c %02d:%02d:%02d%s%s",
-                         mpctx->osd_function, pts / 3600, (pts / 60) % 60,
+                snprintf(osd_text_timer + pos, sizeof(osd_text_timer) - pos,
+                         "%02d:%02d:%02d%s%s",
+                         pts / 3600, (pts / 60) % 60,
                          pts % 60, fractions_text, percentage_text);
-        } else
-            osd_text_timer[0] = 0;
-
-        if (strcmp(osd->osd_text, osd_text_timer)) {
-            osd_set_text(osd, osd_text_timer);
-            vo_osd_changed(OSDTYPE_OSD);
         }
-        return;
-    }
 
-    // Clear the term osd line
-    if (opts->term_osd && mpctx->terminal_osd_text[0]) {
-        mpctx->terminal_osd_text[0] = '\0';
-        mp_msg(MSGT_CPLAYER, MSGL_STATUS, "%s\n", opts->term_osd_esc);
-    }
+        set_osd_text(mpctx, osd_text_timer);
 }
 
 
