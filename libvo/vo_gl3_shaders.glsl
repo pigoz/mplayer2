@@ -83,6 +83,7 @@ uniform mat4x3 colormatrix;
 uniform vec3 inv_gamma;
 uniform float conv_gamma;
 uniform float dither_quantization;
+uniform float dither_multiply;
 uniform float filter_strength;
 
 in vec2 texcoord;
@@ -308,8 +309,7 @@ void main() {
 #endif
 #ifdef USE_DITHER
     float dither = texture(dither, gl_FragCoord.xy / textureSize(dither, 0)).r;
-    color = floor(color * dither_quantization + dither ) / dither_quantization;
+    color = floor(color * dither_multiply + dither ) / dither_quantization;
 #endif
     out_color = vec4(color, 1);
 }
-

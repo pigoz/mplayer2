@@ -184,6 +184,7 @@ struct gl_priv {
 
     GLuint dither_texture;
     float dither_quantization;
+    float dither_multiply;
 
     int use_indirect;           // convert YUV to RGB texture first
     int use_gamma;
@@ -540,6 +541,10 @@ static void update_uniforms(struct gl_priv *p, GLuint program)
     loc = gl->GetUniformLocation(program, "dither_quantization");
     if (loc >= 0)
         gl->Uniform1f(loc, p->dither_quantization);
+
+    loc = gl->GetUniformLocation(program, "dither_multiply");
+    if (loc >= 0)
+        gl->Uniform1f(loc, p->dither_multiply);
 
     loc = gl->GetUniformLocation(program, "filter_strength");
     if (loc >= 0)
@@ -1251,6 +1256,7 @@ static void setup_dither(struct gl_priv *p)
     // dither patterns can be visible.
     p->dither_quantization = (1 << dst_depth) - 1;
     int size = 8;
+    p->dither_multiply = p->dither_quantization + 1. / (size*size);
     unsigned char dither[256];
     make_dither_matrix(dither, size);
 
