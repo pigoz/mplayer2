@@ -487,7 +487,8 @@ static void update_uniforms(struct gl_priv *p, GLuint program)
 
     struct mp_csp_params cparams = {
         .colorspace = p->colorspace,
-        .input_shift = -p->plane_bits & 7,
+        .input_bits = p->plane_bits,
+        .texture_bits = (p->plane_bits + 7) & ~7,
     };
     mp_csp_copy_equalizer_values(&cparams, &p->video_eq);
 
