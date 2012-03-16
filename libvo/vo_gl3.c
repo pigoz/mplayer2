@@ -1128,6 +1128,7 @@ static int init_gl(struct gl_priv *p)
     mp_msg(MSGT_VO, MSGL_V, "[gl] Display depth: R=%d, G=%d, B=%d\n",
            p->glctx->depth_r, p->glctx->depth_g, p->glctx->depth_b);
 
+    gl->Disable(GL_DITHER);
     gl->Disable(GL_BLEND);
     gl->Disable(GL_DEPTH_TEST);
     gl->DepthMask(GL_FALSE);
