@@ -355,25 +355,6 @@ static void tex_size(struct gl_priv *p, int w, int h, int *texw, int *texh)
     }
 }
 
-static void matrix_ortho2d(float m[3][3], float x0, float x1,
-                           float y0, float y1)
-{
-    memset(m, 0, 9 * sizeof(float));
-    m[0][0] = 2.0f / (x1 - x0);
-    m[1][1] = 2.0f / (y1 - y0);
-    m[2][0] = -(x1 + x0) / (x1 - x0);
-    m[2][1] = -(y1 + y0) / (y1 - y0);
-    m[2][2] = 1.0f;
-}
-
-static bool can_use_filter_kernel(const struct filter_kernel *kernel)
-{
-    if (!kernel)
-        return false;
-    struct filter_kernel k = *kernel;
-    return mp_init_filter(&k, filter_sizes, 1);
-}
-
 static void draw_triangles(struct gl_priv *p, struct vertex *vb, int vert_count)
 {
     GL *gl = p->gl;
@@ -479,6 +460,17 @@ static void fbotex_uninit(struct gl_priv *p, struct fbotex *fbo)
     fbo->vp_w = fbo->vp_h = 0;
 }
 
+static void matrix_ortho2d(float m[3][3], float x0, float x1,
+                           float y0, float y1)
+{
+    memset(m, 0, 9 * sizeof(float));
+    m[0][0] = 2.0f / (x1 - x0);
+    m[1][1] = 2.0f / (y1 - y0);
+    m[2][0] = -(x1 + x0) / (x1 - x0);
+    m[2][1] = -(y1 + y0) / (y1 - y0);
+    m[2][2] = 1.0f;
+}
+
 static void update_uniforms(struct gl_priv *p, GLuint program)
 {
     GL *gl = p->gl;
@@ -569,319 +561,6 @@ static void update_all_uniforms(struct gl_priv *p)
     update_uniforms(p, p->final_program);
 }
 
-static void update_window_sized_objects(struct gl_priv *p)
-{
-    if (p->scale_sep_program) {
-        if (p->dst_rect.height > p->scale_sep_fbo.tex_h) {
-            fbotex_uninit(p, &p->scale_sep_fbo);
-            // Round up to an arbitrary alignment to make window resizing or
-            // panscan controls smoother (less texture reallocations).
-            int height = FFALIGN(p->dst_rect.height, 256);
-            fbotex_init(p, &p->scale_sep_fbo, p->image_width, height);
-        }
-        p->scale_sep_fbo.vp_w = p->image_width;
-        p->scale_sep_fbo.vp_h = p->dst_rect.height;
-    }
-}
-
-static void reinit_rendering(struct gl_priv *p);
-static void init_scaler(struct gl_priv *p, struct scaler *scaler);
-
-static double get_scale_factor(struct gl_priv *p)
-{
-    double sx = p->dst_rect.width / (double)p->src_rect.width;
-    double sy = p->dst_rect.height / (double)p->src_rect.height;
-    // xxx: actually we should use different scalers in X/Y directions if the
-    // scale factors are different due to anamorphic content
-    return FFMIN(sx, sy);
-}
-
-static bool update_scale_factor(struct gl_priv *p, struct filter_kernel *kernel)
-{
-    double scale = get_scale_factor(p);
-    if (!p->use_fancy_downscaling && scale < 1.0)
-        scale = 1.0;
-    return mp_init_filter(kernel, filter_sizes, FFMAX(1.0, 1.0/scale));
-}
-
-static void resize(struct gl_priv *p)
-{
-    GL *gl = p->gl;
-    struct vo *vo = p->vo;
-
-    mp_msg(MSGT_VO, MSGL_V, "[gl] Resize: %dx%d\n", vo->dwidth, vo->dheight);
-    p->vp_x = 0, p->vp_y = 0;
-    if (WinID >= 0) {
-        int w = vo->dwidth, h = vo->dheight;
-        int old_y = vo->dheight;
-        geometry(&p->vp_x, &p->vp_y, &w, &h, vo->dwidth, vo->dheight);
-        p->vp_y = old_y - h - p->vp_y;
-    }
-    p->vp_w = vo->dwidth, p->vp_h = vo->dheight;
-    gl->Viewport(p->vp_x, p->vp_y, p->vp_w, p->vp_h);
-
-    struct vo_rect borders;
-    calc_src_dst_rects(vo, p->image_width, p->image_height, &p->src_rect,
-                       &p->dst_rect, &borders, NULL);
-    p->border_x = borders.left;
-    p->border_y = borders.top;
-
-    bool need_scaler_reinit = false;    // filter size change needed
-    bool need_scaler_update = false;    // filter LUT change needed
-    bool too_small = false;
-    for (int n = 0; n < 2; n++) {
-        if (p->scalers[n].kernel) {
-            struct filter_kernel tkernel = *p->scalers[n].kernel;
-            struct filter_kernel old = tkernel;
-            bool ok = update_scale_factor(p, &tkernel);
-            too_small |= !ok;
-            need_scaler_reinit |= (tkernel.size != old.size);
-            need_scaler_update |= (tkernel.inv_scale != old.inv_scale);
-        }
-    }
-    if (need_scaler_reinit) {
-        reinit_rendering(p);
-    } else if (need_scaler_update) {
-        init_scaler(p, &p->scalers[0]);
-        init_scaler(p, &p->scalers[1]);
-    }
-    if (too_small)
-        mp_msg(MSGT_VO, MSGL_WARN, "[gl] Can't downscale that much, window "
-               "output may look suboptimal.\n");
-
-    update_window_sized_objects(p);
-    update_all_uniforms(p);
-
-#ifdef CONFIG_FREETYPE
-    // adjust font size to display size
-    force_load_font = 1;
-#endif
-    vo_osd_changed(OSDTYPE_OSD);
-
-    gl->Clear(GL_COLOR_BUFFER_BIT);
-    vo->want_redraw = true;
-}
-
-/**
- * \brief remove all OSD textures and display-lists, thus clearing it.
- */
-static void clear_osd(struct gl_priv *p)
-{
-    GL *gl = p->gl;
-
-    if (!p->osdtex_count)
-        return;
-    gl->DeleteTextures(p->osdtex_count, p->osdtex);
-    p->osdtex_count = 0;
-}
-
-/**
- * \brief construct display list from ass image list
- * \param img image list to create OSD from.
- */
-static void gen_eosd(struct gl_priv *p, mp_eosd_images_t *imgs)
-{
-    GL *gl = p->gl;
-
-    bool need_repos, need_upload, need_allocate;
-    eosd_packer_generate(p->eosd, imgs, &need_repos, &need_upload,
-                         &need_allocate);
-
-    if (!need_repos)
-        return;
-
-    if (!p->eosd_texture) {
-        gl->GenTextures(1, &p->eosd_texture);
-        gl->GenBuffers(1, &p->eosd_buffer);
-    }
-
-    gl->BindTexture(GL_TEXTURE_2D, p->eosd_texture);
-
-    if (need_allocate) {
-        tex_size(p, p->eosd->surface.w, p->eosd->surface.h,
-                 &p->eosd_texture_width, &p->eosd_texture_height);
-        gl->TexImage2D(GL_TEXTURE_2D, 0, GL_RED,
-                       p->eosd_texture_width, p->eosd_texture_height, 0,
-                       GL_RED, GL_UNSIGNED_BYTE, NULL);
-        default_tex_params(gl, GL_TEXTURE_2D, GL_NEAREST);
-        gl->BindBuffer(GL_PIXEL_UNPACK_BUFFER, p->eosd_buffer);
-        gl->BufferData(GL_PIXEL_UNPACK_BUFFER,
-                       p->eosd->surface.w * p->eosd->surface.h,
-                       NULL,
-                       GL_DYNAMIC_COPY);
-        gl->BindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
-    }
-
-    // 2 triangles primitives per quad = 6 vertices per quad
-    // not using GL_QUADS, as it is deprecated in OpenGL 3.x and later
-    p->eosd_va = talloc_realloc_size(p->eosd, p->eosd_va,
-                                     p->eosd->targets_count
-                                     * sizeof(struct vertex)
-                                     * VERTICES_PER_QUAD);
-
-    if (need_upload && p->use_pbo) {
-        gl->BindBuffer(GL_PIXEL_UNPACK_BUFFER, p->eosd_buffer);
-        char *data = gl->MapBuffer(GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY);
-        if (!data) {
-            mp_msg(MSGT_VO, MSGL_FATAL, "[gl] Error: can't upload subtitles! "
-                                        "Subtitles will look corrupted.\n");
-        } else {
-            for (int n = 0; n < p->eosd->targets_count; n++) {
-                struct eosd_target *target = &p->eosd->targets[n];
-                ASS_Image *i = target->ass_img;
-
-                void *pdata = data + target->source.y0 * p->eosd->surface.w
-                              + target->source.x0;
-
-                memcpy_pic(pdata, i->bitmap, i->w, i->h,
-                           p->eosd->surface.w, i->stride);
-            }
-            if (!gl->UnmapBuffer(GL_PIXEL_UNPACK_BUFFER))
-                mp_msg(MSGT_VO, MSGL_FATAL, "[gl] EOSD PBO upload failed. "
-                       "Remove the 'pbo' suboption.\n");
-            struct eosd_rect rc;
-            eosd_packer_calculate_source_bb(p->eosd, &rc);
-            glUploadTex(gl, GL_TEXTURE_2D, GL_RED, GL_UNSIGNED_BYTE, NULL,
-                        p->eosd->surface.w, rc.x0, rc.y0,
-                        rc.x1 - rc.x0, rc.y1 - rc.y0, 0);
-        }
-        gl->BindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
-    } else if (need_upload) {
-        // non-PBO upload
-        for (int n = 0; n < p->eosd->targets_count; n++) {
-            struct eosd_target *target = &p->eosd->targets[n];
-            ASS_Image *i = target->ass_img;
-
-            glUploadTex(gl, GL_TEXTURE_2D, GL_RED, GL_UNSIGNED_BYTE, i->bitmap,
-                        i->stride, target->source.x0, target->source.y0,
-                        i->w, i->h, 0);
-        }
-    }
-
-    gl->BindTexture(GL_TEXTURE_2D, 0);
-
-    glCheckError(gl, "EOSD upload");
-
-    for (int n = 0; n < p->eosd->targets_count; n++) {
-        struct eosd_target *target = &p->eosd->targets[n];
-        ASS_Image *i = target->ass_img;
-        uint8_t color[4] = { i->color >> 24, (i->color >> 16) & 0xff,
-                            (i->color >> 8) & 0xff, 255 - (i->color & 0xff) };
-
-        write_quad(&p->eosd_va[n * VERTICES_PER_QUAD],
-                   target->dest.x0, target->dest.y0,
-                   target->dest.x1, target->dest.y1,
-                   target->source.x0, target->source.y0,
-                   target->source.x1, target->source.y1,
-                   p->eosd_texture_width, p->eosd_texture_height,
-                   color, false);
-    }
-}
-
-static void draw_eosd(struct gl_priv *p, mp_eosd_images_t *imgs)
-{
-    GL *gl = p->gl;
-
-    gen_eosd(p, imgs);
-
-    if (p->eosd->targets_count == 0)
-        return;
-
-    gl->Enable(GL_BLEND);
-    gl->BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    gl->BindTexture(GL_TEXTURE_2D, p->eosd_texture);
-    gl->UseProgram(p->eosd_program);
-    draw_triangles(p, p->eosd_va, p->eosd->targets_count * VERTICES_PER_QUAD);
-    gl->UseProgram(0);
-    gl->BindTexture(GL_TEXTURE_2D, 0);
-    gl->Disable(GL_BLEND);
-}
-
-static void delete_program(GL *gl, GLuint *prog)
-{
-    gl->DeleteProgram(*prog);
-    *prog = 0;
-}
-
-static void delete_shaders(struct gl_priv *p)
-{
-    GL *gl = p->gl;
-
-    delete_program(gl, &p->osd_program);
-    delete_program(gl, &p->eosd_program);
-    delete_program(gl, &p->indirect_program);
-    delete_program(gl, &p->scale_sep_program);
-    delete_program(gl, &p->final_program);
-}
-
-static void uninit_rendering(struct gl_priv *p)
-{
-    GL *gl = p->gl;
-
-    delete_shaders(p);
-
-    for (int n = 0; n < 2; n++) {
-        gl->DeleteTextures(1, &p->scalers->gl_lut);
-        p->scalers->gl_lut = 0;
-        p->scalers->lut_name = NULL;
-        p->scalers->kernel = NULL;
-    }
-
-    gl->DeleteTextures(1, &p->dither_texture);
-    p->dither_texture = 0;
-}
-
-// Free video resources etc.
-static void uninit_video(struct gl_priv *p)
-{
-    GL *gl = p->gl;
-
-    uninit_rendering(p);
-
-    for (int n = 0; n < 3; n++) {
-        struct texplane *plane = &p->planes[n];
-
-        gl->DeleteTextures(1, &plane->gl_texture);
-        plane->gl_texture = 0;
-        gl->DeleteBuffers(1, &plane->gl_buffer);
-        plane->gl_buffer = 0;
-        plane->buffer_ptr = NULL;
-        plane->buffer_size = 0;
-    }
-
-    fbotex_uninit(p, &p->indirect_fbo);
-    fbotex_uninit(p, &p->scale_sep_fbo);
-}
-
-/**
- * \brief uninitialize OpenGL context, freeing textures, buffers etc.
- */
-static void uninit_gl(struct gl_priv *p)
-{
-    GL *gl = p->gl;
-
-    // NOTE: GL functions might not be loaded yet
-    if (!(p->glctx && p->gl->DeleteTextures))
-        return;
-
-    uninit_video(p);
-
-    gl->DeleteVertexArrays(1, &p->vao);
-    p->vao = 0;
-    gl->DeleteBuffers(1, &p->vertex_buffer);
-    p->vertex_buffer = 0;
-
-    clear_osd(p);
-    gl->DeleteTextures(1, &p->eosd_texture);
-    p->eosd_texture = 0;
-    gl->DeleteBuffers(1, &p->eosd_buffer);
-    p->eosd_buffer = 0;
-    eosd_packer_reinit(p->eosd, 0, 0);
-
-    gl->DeleteTextures(1, &p->lut_3d_texture);
-    p->lut_3d_texture = 0;
-}
-
 #define SECTION_HEADER "#!section "
 
 static char *get_section(void *talloc_ctx, struct bstr source,
@@ -941,13 +620,6 @@ static void prog_create_shader(GL *gl, GLuint program, GLenum type,
     gl->DeleteShader(shader);
 }
 
-static void bind_attrib_locs(GL *gl, GLuint program)
-{
-    gl->BindAttribLocation(program, VERTEX_ATTRIB_POSITION, "vertex_position");
-    gl->BindAttribLocation(program, VERTEX_ATTRIB_COLOR, "vertex_color");
-    gl->BindAttribLocation(program, VERTEX_ATTRIB_TEXCOORD, "vertex_texcoord");
-}
-
 static void link_shader(GL *gl, GLuint program)
 {
     gl->LinkProgram(program);
@@ -964,6 +636,13 @@ static void link_shader(GL *gl, GLuint program)
                status, log);
         talloc_free(log);
     }
+}
+
+static void bind_attrib_locs(GL *gl, GLuint program)
+{
+    gl->BindAttribLocation(program, VERTEX_ATTRIB_POSITION, "vertex_position");
+    gl->BindAttribLocation(program, VERTEX_ATTRIB_COLOR, "vertex_color");
+    gl->BindAttribLocation(program, VERTEX_ATTRIB_TEXCOORD, "vertex_texcoord");
 }
 
 static GLuint create_program(GL *gl, const char *name, const char *header,
@@ -1023,6 +702,8 @@ static bool input_is_subsampled(struct gl_priv *p)
             return true;
     return false;
 }
+
+static void delete_shaders(struct gl_priv *p);
 
 static void compile_shaders(struct gl_priv *p)
 {
@@ -1128,69 +809,38 @@ static void compile_shaders(struct gl_priv *p)
     talloc_free(tmp);
 }
 
-
-static void setup_vertex_array(GL *gl)
+static void delete_program(GL *gl, GLuint *prog)
 {
-    size_t stride = sizeof(struct vertex);
-
-    gl->EnableVertexAttribArray(VERTEX_ATTRIB_POSITION);
-    gl->VertexAttribPointer(VERTEX_ATTRIB_POSITION, 2, GL_FLOAT, GL_FALSE,
-                            stride, (void*)offsetof(struct vertex, position));
-
-    gl->EnableVertexAttribArray(VERTEX_ATTRIB_COLOR);
-    gl->VertexAttribPointer(VERTEX_ATTRIB_COLOR, 4, GL_UNSIGNED_BYTE, GL_TRUE,
-                            stride, (void*)offsetof(struct vertex, color));
-
-    gl->EnableVertexAttribArray(VERTEX_ATTRIB_TEXCOORD);
-    gl->VertexAttribPointer(VERTEX_ATTRIB_TEXCOORD, 2, GL_FLOAT, GL_FALSE,
-                            stride, (void*)offsetof(struct vertex, texcoord));
+    gl->DeleteProgram(*prog);
+    *prog = 0;
 }
 
-// First-time initialization of the GL state.
-static int init_gl(struct gl_priv *p)
+static void delete_shaders(struct gl_priv *p)
 {
     GL *gl = p->gl;
 
-    glCheckError(p->gl, "before init_gl");
+    delete_program(gl, &p->osd_program);
+    delete_program(gl, &p->eosd_program);
+    delete_program(gl, &p->indirect_program);
+    delete_program(gl, &p->scale_sep_program);
+    delete_program(gl, &p->final_program);
+}
 
-    const char *vendor     = gl->GetString(GL_VENDOR);
-    const char *version    = gl->GetString(GL_VERSION);
-    const char *renderer   = gl->GetString(GL_RENDERER);
-    const char *glsl       = gl->GetString(GL_SHADING_LANGUAGE_VERSION);
-    mp_msg(MSGT_VO, MSGL_V, "[gl] GL_RENDERER='%s', GL_VENDOR='%s', "
-                            "GL_VERSION='%s', GL_SHADING_LANGUAGE_VERSION='%s'"
-                            "\n", renderer, vendor, version, glsl);
-    mp_msg(MSGT_VO, MSGL_V, "[gl] Display depth: R=%d, G=%d, B=%d\n",
-           p->glctx->depth_r, p->glctx->depth_g, p->glctx->depth_b);
+static double get_scale_factor(struct gl_priv *p)
+{
+    double sx = p->dst_rect.width / (double)p->src_rect.width;
+    double sy = p->dst_rect.height / (double)p->src_rect.height;
+    // xxx: actually we should use different scalers in X/Y directions if the
+    // scale factors are different due to anamorphic content
+    return FFMIN(sx, sy);
+}
 
-    gl->Disable(GL_DITHER);
-    gl->Disable(GL_BLEND);
-    gl->Disable(GL_DEPTH_TEST);
-    gl->DepthMask(GL_FALSE);
-    gl->Disable(GL_CULL_FACE);
-    gl->DrawBuffer(GL_BACK);
-
-    gl->GenBuffers(1, &p->vertex_buffer);
-    gl->GenVertexArrays(1, &p->vao);
-
-    gl->BindBuffer(GL_ARRAY_BUFFER, p->vertex_buffer);
-    gl->BindVertexArray(p->vao);
-    setup_vertex_array(gl);
-    gl->BindBuffer(GL_ARRAY_BUFFER, 0);
-    gl->BindVertexArray(0);
-
-    GLint max_texture_size;
-    gl->GetIntegerv(GL_MAX_TEXTURE_SIZE, &max_texture_size);
-    eosd_packer_reinit(p->eosd, max_texture_size, max_texture_size);
-
-    gl->ClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-    gl->Clear(GL_COLOR_BUFFER_BIT);
-    if (gl->SwapInterval && p->swap_interval >= 0)
-        gl->SwapInterval(p->swap_interval);
-
-    glCheckError(gl, "after init_gl");
-
-    return 1;
+static bool update_scale_factor(struct gl_priv *p, struct filter_kernel *kernel)
+{
+    double scale = get_scale_factor(p);
+    if (!p->use_fancy_downscaling && scale < 1.0)
+        scale = 1.0;
+    return mp_init_filter(kernel, filter_sizes, FFMAX(1.0, 1.0/scale));
 }
 
 static void init_scaler(struct gl_priv *p, struct scaler *scaler)
@@ -1310,6 +960,8 @@ static void init_dither(struct gl_priv *p)
     gl->ActiveTexture(GL_TEXTURE0);
 }
 
+static void uninit_rendering(struct gl_priv *p);
+
 static void reinit_rendering(struct gl_priv *p)
 {
     GL *gl = p->gl;
@@ -1329,6 +981,23 @@ static void reinit_rendering(struct gl_priv *p)
 
     if (p->indirect_program && !p->indirect_fbo.fbo)
         fbotex_init(p, &p->indirect_fbo, p->texture_width, p->texture_height);
+}
+
+static void uninit_rendering(struct gl_priv *p)
+{
+    GL *gl = p->gl;
+
+    delete_shaders(p);
+
+    for (int n = 0; n < 2; n++) {
+        gl->DeleteTextures(1, &p->scalers->gl_lut);
+        p->scalers->gl_lut = 0;
+        p->scalers->lut_name = NULL;
+        p->scalers->kernel = NULL;
+    }
+
+    gl->DeleteTextures(1, &p->dither_texture);
+    p->dither_texture = 0;
 }
 
 static void init_lut_3d(struct gl_priv *p)
@@ -1417,160 +1086,26 @@ static void init_video(struct gl_priv *p)
     reinit_rendering(p);
 }
 
-
-static bool config_window(struct gl_priv *p, uint32_t d_width,
-                          uint32_t d_height, uint32_t flags)
+// Free resources specific to video size or pixel format.
+static void uninit_video(struct gl_priv *p)
 {
-    if (p->stereo_mode == GL_3D_QUADBUFFER)
-        flags |= VOFLAG_STEREO;
-
-    int mpgl_version = p->force_gl2 ? MPGL_VER(2, 1) : MPGL_VER(3, 2);
-    int mpgl_flags = 0;
-    if (p->gl_debug)
-        mpgl_flags |= MPGLFLAG_DEBUG;
-
-    if (create_mpglcontext(p->glctx, mpgl_flags, mpgl_version, d_width,
-                           d_height, flags) == SET_WINDOW_FAILED)
-        return false;
-
-    if (!p->vertex_buffer)
-        init_gl(p);
-
-    return true;
-}
-
-static int config(struct vo *vo, uint32_t width, uint32_t height,
-                  uint32_t d_width, uint32_t d_height, uint32_t flags,
-                  uint32_t format)
-{
-    struct gl_priv *p = vo->priv;
-
-    if (!config_window(p, d_width, d_height, flags))
-        return -1;
-
-    p->image_d_width = d_width;
-    p->image_d_height = d_height;
-    p->vo_flipped = !!(flags & VOFLAG_FLIPPING);
-
-    if (p->image_format != format || p->image_width != width
-        || p->image_height != height)
-    {
-        uninit_video(p);
-        p->image_height = height;
-        p->image_width = width;
-        p->image_format = format;
-        init_video(p);
-    }
-
-    resize(p);
-
-    return 0;
-}
-
-static void check_events(struct vo *vo)
-{
-    struct gl_priv *p = vo->priv;
-
-    int e = p->glctx->check_events(vo);
-    if (e & VO_EVENT_REINIT) {
-        uninit_gl(p);
-        init_gl(p);
-        init_video(p);
-        resize(p);
-    }
-    if (e & VO_EVENT_RESIZE)
-        resize(p);
-    if (e & VO_EVENT_EXPOSE)
-        vo->want_redraw = true;
-}
-
-/**
- * Creates the textures and the display list needed for displaying
- * an OSD part.
- * Callback function for osd_draw_text_ext().
- */
-static void create_osd_texture(void *ctx, int x0, int y0, int w, int h,
-                               unsigned char *src, unsigned char *srca,
-                               int stride)
-{
-    struct gl_priv *p = ctx;
     GL *gl = p->gl;
 
-    // initialize to 8 to avoid special-casing on alignment
-    int sx = 8, sy = 8;
+    uninit_rendering(p);
 
-    if (w <= 0 || h <= 0 || stride < w) {
-        mp_msg(MSGT_VO, MSGL_V, "Invalid dimensions OSD for part!\n");
-        return;
-    }
-    tex_size(p, w, h, &sx, &sy);
+    for (int n = 0; n < 3; n++) {
+        struct texplane *plane = &p->planes[n];
 
-    if (p->osdtex_count >= MAX_OSD_PARTS) {
-        mp_msg(MSGT_VO, MSGL_ERR, "Too many OSD parts, contact the developers!\n");
-        return;
-    }
-
-    gl->GenTextures(1, &p->osdtex[p->osdtex_count]);
-    gl->BindTexture(GL_TEXTURE_2D, p->osdtex[p->osdtex_count]);
-    gl->TexImage2D(GL_TEXTURE_2D, 0, GL_RG, sx, sy, 0, GL_RG, GL_UNSIGNED_BYTE,
-                   NULL);
-    default_tex_params(gl, GL_TEXTURE_2D, GL_NEAREST);
-    {
-        int i;
-        unsigned char *tmp = malloc(stride * h * 2);
-        // convert alpha from weird MPlayer scale.
-        for (i = 0; i < h * stride; i++) {
-            tmp[i*2+0] = src[i];
-            tmp[i*2+1] = -srca[i];
-        }
-        glUploadTex(gl, GL_TEXTURE_2D, GL_RG, GL_UNSIGNED_BYTE, tmp, stride * 2,
-                    0, 0, w, h, 0);
-        free(tmp);
+        gl->DeleteTextures(1, &plane->gl_texture);
+        plane->gl_texture = 0;
+        gl->DeleteBuffers(1, &plane->gl_buffer);
+        plane->gl_buffer = 0;
+        plane->buffer_ptr = NULL;
+        plane->buffer_size = 0;
     }
 
-    gl->BindTexture(GL_TEXTURE_2D, 0);
-
-    uint8_t color[4] = {(p->osd_color >> 16) & 0xff, (p->osd_color >> 8) & 0xff,
-                        p->osd_color & 0xff, 0xff - (p->osd_color >> 24)};
-
-    write_quad(&p->osd_va[p->osdtex_count * VERTICES_PER_QUAD],
-               x0, y0, x0 + w, y0 + h, 0, 0, w, h,
-               sx, sy, color, false);
-
-    p->osdtex_count++;
-}
-
-static void draw_osd(struct vo *vo, struct osd_state *osd)
-{
-    struct gl_priv *p = vo->priv;
-    GL *gl = p->gl;
-
-    if (vo_osd_changed(0)) {
-        clear_osd(p);
-        osd_draw_text_ext(osd, vo->dwidth, vo->dheight, p->border_x,
-                          p->border_y, p->border_x,
-                          p->border_y, p->image_width,
-                          p->image_height, create_osd_texture, p);
-    }
-
-    if (p->osdtex_count > 0) {
-        gl->Enable(GL_BLEND);
-        // OSD bitmaps use premultiplied alpha.
-        gl->BlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-
-        gl->UseProgram(p->osd_program);
-
-        for (int n = 0; n < p->osdtex_count; n++) {
-            gl->BindTexture(GL_TEXTURE_2D, p->osdtex[n]);
-            draw_triangles(p, &p->osd_va[n * VERTICES_PER_QUAD],
-                           VERTICES_PER_QUAD);
-        }
-
-        gl->UseProgram(0);
-
-        gl->Disable(GL_BLEND);
-        gl->BindTexture(GL_TEXTURE_2D, 0);
-    }
+    fbotex_uninit(p, &p->indirect_fbo);
+    fbotex_uninit(p, &p->scale_sep_fbo);
 }
 
 static void render_to_fbo(struct gl_priv *p, struct fbotex *fbo, int w, int h,
@@ -1679,6 +1214,79 @@ static void do_render(struct gl_priv *p)
     gl->UseProgram(0);
 
     glCheckError(gl, "after video rendering");
+}
+
+static void update_window_sized_objects(struct gl_priv *p)
+{
+    if (p->scale_sep_program) {
+        if (p->dst_rect.height > p->scale_sep_fbo.tex_h) {
+            fbotex_uninit(p, &p->scale_sep_fbo);
+            // Round up to an arbitrary alignment to make window resizing or
+            // panscan controls smoother (less texture reallocations).
+            int height = FFALIGN(p->dst_rect.height, 256);
+            fbotex_init(p, &p->scale_sep_fbo, p->image_width, height);
+        }
+        p->scale_sep_fbo.vp_w = p->image_width;
+        p->scale_sep_fbo.vp_h = p->dst_rect.height;
+    }
+}
+
+static void resize(struct gl_priv *p)
+{
+    GL *gl = p->gl;
+    struct vo *vo = p->vo;
+
+    mp_msg(MSGT_VO, MSGL_V, "[gl] Resize: %dx%d\n", vo->dwidth, vo->dheight);
+    p->vp_x = 0, p->vp_y = 0;
+    if (WinID >= 0) {
+        int w = vo->dwidth, h = vo->dheight;
+        int old_y = vo->dheight;
+        geometry(&p->vp_x, &p->vp_y, &w, &h, vo->dwidth, vo->dheight);
+        p->vp_y = old_y - h - p->vp_y;
+    }
+    p->vp_w = vo->dwidth, p->vp_h = vo->dheight;
+    gl->Viewport(p->vp_x, p->vp_y, p->vp_w, p->vp_h);
+
+    struct vo_rect borders;
+    calc_src_dst_rects(vo, p->image_width, p->image_height, &p->src_rect,
+                       &p->dst_rect, &borders, NULL);
+    p->border_x = borders.left;
+    p->border_y = borders.top;
+
+    bool need_scaler_reinit = false;    // filter size change needed
+    bool need_scaler_update = false;    // filter LUT change needed
+    bool too_small = false;
+    for (int n = 0; n < 2; n++) {
+        if (p->scalers[n].kernel) {
+            struct filter_kernel tkernel = *p->scalers[n].kernel;
+            struct filter_kernel old = tkernel;
+            bool ok = update_scale_factor(p, &tkernel);
+            too_small |= !ok;
+            need_scaler_reinit |= (tkernel.size != old.size);
+            need_scaler_update |= (tkernel.inv_scale != old.inv_scale);
+        }
+    }
+    if (need_scaler_reinit) {
+        reinit_rendering(p);
+    } else if (need_scaler_update) {
+        init_scaler(p, &p->scalers[0]);
+        init_scaler(p, &p->scalers[1]);
+    }
+    if (too_small)
+        mp_msg(MSGT_VO, MSGL_WARN, "[gl] Can't downscale that much, window "
+               "output may look suboptimal.\n");
+
+    update_window_sized_objects(p);
+    update_all_uniforms(p);
+
+#ifdef CONFIG_FREETYPE
+    // adjust font size to display size
+    force_load_font = 1;
+#endif
+    vo_osd_changed(OSDTYPE_OSD);
+
+    gl->Clear(GL_COLOR_BUFFER_BIT);
+    vo->want_redraw = true;
 }
 
 static void flip_page(struct vo *vo)
@@ -1864,6 +1472,357 @@ static mp_image_t *get_window_screenshot(struct gl_priv *p)
     return image;
 }
 
+static void clear_osd(struct gl_priv *p)
+{
+    GL *gl = p->gl;
+
+    if (!p->osdtex_count)
+        return;
+    gl->DeleteTextures(p->osdtex_count, p->osdtex);
+    p->osdtex_count = 0;
+}
+
+static void create_osd_texture(void *ctx, int x0, int y0, int w, int h,
+                               unsigned char *src, unsigned char *srca,
+                               int stride)
+{
+    struct gl_priv *p = ctx;
+    GL *gl = p->gl;
+
+    // initialize to 8 to avoid special-casing on alignment
+    int sx = 8, sy = 8;
+
+    if (w <= 0 || h <= 0 || stride < w) {
+        mp_msg(MSGT_VO, MSGL_V, "Invalid dimensions OSD for part!\n");
+        return;
+    }
+    tex_size(p, w, h, &sx, &sy);
+
+    if (p->osdtex_count >= MAX_OSD_PARTS) {
+        mp_msg(MSGT_VO, MSGL_ERR, "Too many OSD parts, contact the developers!\n");
+        return;
+    }
+
+    gl->GenTextures(1, &p->osdtex[p->osdtex_count]);
+    gl->BindTexture(GL_TEXTURE_2D, p->osdtex[p->osdtex_count]);
+    gl->TexImage2D(GL_TEXTURE_2D, 0, GL_RG, sx, sy, 0, GL_RG, GL_UNSIGNED_BYTE,
+                   NULL);
+    default_tex_params(gl, GL_TEXTURE_2D, GL_NEAREST);
+    {
+        int i;
+        unsigned char *tmp = malloc(stride * h * 2);
+        // convert alpha from weird MPlayer scale.
+        for (i = 0; i < h * stride; i++) {
+            tmp[i*2+0] = src[i];
+            tmp[i*2+1] = -srca[i];
+        }
+        glUploadTex(gl, GL_TEXTURE_2D, GL_RG, GL_UNSIGNED_BYTE, tmp, stride * 2,
+                    0, 0, w, h, 0);
+        free(tmp);
+    }
+
+    gl->BindTexture(GL_TEXTURE_2D, 0);
+
+    uint8_t color[4] = {(p->osd_color >> 16) & 0xff, (p->osd_color >> 8) & 0xff,
+                        p->osd_color & 0xff, 0xff - (p->osd_color >> 24)};
+
+    write_quad(&p->osd_va[p->osdtex_count * VERTICES_PER_QUAD],
+               x0, y0, x0 + w, y0 + h, 0, 0, w, h,
+               sx, sy, color, false);
+
+    p->osdtex_count++;
+}
+
+static void draw_osd(struct vo *vo, struct osd_state *osd)
+{
+    struct gl_priv *p = vo->priv;
+    GL *gl = p->gl;
+
+    if (vo_osd_changed(0)) {
+        clear_osd(p);
+        osd_draw_text_ext(osd, vo->dwidth, vo->dheight, p->border_x,
+                          p->border_y, p->border_x,
+                          p->border_y, p->image_width,
+                          p->image_height, create_osd_texture, p);
+    }
+
+    if (p->osdtex_count > 0) {
+        gl->Enable(GL_BLEND);
+        // OSD bitmaps use premultiplied alpha.
+        gl->BlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+
+        gl->UseProgram(p->osd_program);
+
+        for (int n = 0; n < p->osdtex_count; n++) {
+            gl->BindTexture(GL_TEXTURE_2D, p->osdtex[n]);
+            draw_triangles(p, &p->osd_va[n * VERTICES_PER_QUAD],
+                           VERTICES_PER_QUAD);
+        }
+
+        gl->UseProgram(0);
+
+        gl->Disable(GL_BLEND);
+        gl->BindTexture(GL_TEXTURE_2D, 0);
+    }
+}
+
+static void gen_eosd(struct gl_priv *p, mp_eosd_images_t *imgs)
+{
+    GL *gl = p->gl;
+
+    bool need_repos, need_upload, need_allocate;
+    eosd_packer_generate(p->eosd, imgs, &need_repos, &need_upload,
+                         &need_allocate);
+
+    if (!need_repos)
+        return;
+
+    if (!p->eosd_texture) {
+        gl->GenTextures(1, &p->eosd_texture);
+        gl->GenBuffers(1, &p->eosd_buffer);
+    }
+
+    gl->BindTexture(GL_TEXTURE_2D, p->eosd_texture);
+
+    if (need_allocate) {
+        tex_size(p, p->eosd->surface.w, p->eosd->surface.h,
+                 &p->eosd_texture_width, &p->eosd_texture_height);
+        gl->TexImage2D(GL_TEXTURE_2D, 0, GL_RED,
+                       p->eosd_texture_width, p->eosd_texture_height, 0,
+                       GL_RED, GL_UNSIGNED_BYTE, NULL);
+        default_tex_params(gl, GL_TEXTURE_2D, GL_NEAREST);
+        gl->BindBuffer(GL_PIXEL_UNPACK_BUFFER, p->eosd_buffer);
+        gl->BufferData(GL_PIXEL_UNPACK_BUFFER,
+                       p->eosd->surface.w * p->eosd->surface.h,
+                       NULL,
+                       GL_DYNAMIC_COPY);
+        gl->BindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+    }
+
+    // 2 triangles primitives per quad = 6 vertices per quad
+    // not using GL_QUADS, as it is deprecated in OpenGL 3.x and later
+    p->eosd_va = talloc_realloc_size(p->eosd, p->eosd_va,
+                                     p->eosd->targets_count
+                                     * sizeof(struct vertex)
+                                     * VERTICES_PER_QUAD);
+
+    if (need_upload && p->use_pbo) {
+        gl->BindBuffer(GL_PIXEL_UNPACK_BUFFER, p->eosd_buffer);
+        char *data = gl->MapBuffer(GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY);
+        if (!data) {
+            mp_msg(MSGT_VO, MSGL_FATAL, "[gl] Error: can't upload subtitles! "
+                                        "Subtitles will look corrupted.\n");
+        } else {
+            for (int n = 0; n < p->eosd->targets_count; n++) {
+                struct eosd_target *target = &p->eosd->targets[n];
+                ASS_Image *i = target->ass_img;
+
+                void *pdata = data + target->source.y0 * p->eosd->surface.w
+                              + target->source.x0;
+
+                memcpy_pic(pdata, i->bitmap, i->w, i->h,
+                           p->eosd->surface.w, i->stride);
+            }
+            if (!gl->UnmapBuffer(GL_PIXEL_UNPACK_BUFFER))
+                mp_msg(MSGT_VO, MSGL_FATAL, "[gl] EOSD PBO upload failed. "
+                       "Remove the 'pbo' suboption.\n");
+            struct eosd_rect rc;
+            eosd_packer_calculate_source_bb(p->eosd, &rc);
+            glUploadTex(gl, GL_TEXTURE_2D, GL_RED, GL_UNSIGNED_BYTE, NULL,
+                        p->eosd->surface.w, rc.x0, rc.y0,
+                        rc.x1 - rc.x0, rc.y1 - rc.y0, 0);
+        }
+        gl->BindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+    } else if (need_upload) {
+        // non-PBO upload
+        for (int n = 0; n < p->eosd->targets_count; n++) {
+            struct eosd_target *target = &p->eosd->targets[n];
+            ASS_Image *i = target->ass_img;
+
+            glUploadTex(gl, GL_TEXTURE_2D, GL_RED, GL_UNSIGNED_BYTE, i->bitmap,
+                        i->stride, target->source.x0, target->source.y0,
+                        i->w, i->h, 0);
+        }
+    }
+
+    gl->BindTexture(GL_TEXTURE_2D, 0);
+
+    glCheckError(gl, "EOSD upload");
+
+    for (int n = 0; n < p->eosd->targets_count; n++) {
+        struct eosd_target *target = &p->eosd->targets[n];
+        ASS_Image *i = target->ass_img;
+        uint8_t color[4] = { i->color >> 24, (i->color >> 16) & 0xff,
+                            (i->color >> 8) & 0xff, 255 - (i->color & 0xff) };
+
+        write_quad(&p->eosd_va[n * VERTICES_PER_QUAD],
+                   target->dest.x0, target->dest.y0,
+                   target->dest.x1, target->dest.y1,
+                   target->source.x0, target->source.y0,
+                   target->source.x1, target->source.y1,
+                   p->eosd_texture_width, p->eosd_texture_height,
+                   color, false);
+    }
+}
+
+static void draw_eosd(struct gl_priv *p, mp_eosd_images_t *imgs)
+{
+    GL *gl = p->gl;
+
+    gen_eosd(p, imgs);
+
+    if (p->eosd->targets_count == 0)
+        return;
+
+    gl->Enable(GL_BLEND);
+    gl->BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    gl->BindTexture(GL_TEXTURE_2D, p->eosd_texture);
+    gl->UseProgram(p->eosd_program);
+    draw_triangles(p, p->eosd_va, p->eosd->targets_count * VERTICES_PER_QUAD);
+    gl->UseProgram(0);
+    gl->BindTexture(GL_TEXTURE_2D, 0);
+    gl->Disable(GL_BLEND);
+}
+
+static void setup_vertex_array(GL *gl)
+{
+    size_t stride = sizeof(struct vertex);
+
+    gl->EnableVertexAttribArray(VERTEX_ATTRIB_POSITION);
+    gl->VertexAttribPointer(VERTEX_ATTRIB_POSITION, 2, GL_FLOAT, GL_FALSE,
+                            stride, (void*)offsetof(struct vertex, position));
+
+    gl->EnableVertexAttribArray(VERTEX_ATTRIB_COLOR);
+    gl->VertexAttribPointer(VERTEX_ATTRIB_COLOR, 4, GL_UNSIGNED_BYTE, GL_TRUE,
+                            stride, (void*)offsetof(struct vertex, color));
+
+    gl->EnableVertexAttribArray(VERTEX_ATTRIB_TEXCOORD);
+    gl->VertexAttribPointer(VERTEX_ATTRIB_TEXCOORD, 2, GL_FLOAT, GL_FALSE,
+                            stride, (void*)offsetof(struct vertex, texcoord));
+}
+
+// First-time initialization of the GL state.
+static int init_gl(struct gl_priv *p)
+{
+    GL *gl = p->gl;
+
+    glCheckError(p->gl, "before init_gl");
+
+    const char *vendor     = gl->GetString(GL_VENDOR);
+    const char *version    = gl->GetString(GL_VERSION);
+    const char *renderer   = gl->GetString(GL_RENDERER);
+    const char *glsl       = gl->GetString(GL_SHADING_LANGUAGE_VERSION);
+    mp_msg(MSGT_VO, MSGL_V, "[gl] GL_RENDERER='%s', GL_VENDOR='%s', "
+                            "GL_VERSION='%s', GL_SHADING_LANGUAGE_VERSION='%s'"
+                            "\n", renderer, vendor, version, glsl);
+    mp_msg(MSGT_VO, MSGL_V, "[gl] Display depth: R=%d, G=%d, B=%d\n",
+           p->glctx->depth_r, p->glctx->depth_g, p->glctx->depth_b);
+
+    gl->Disable(GL_DITHER);
+    gl->Disable(GL_BLEND);
+    gl->Disable(GL_DEPTH_TEST);
+    gl->DepthMask(GL_FALSE);
+    gl->Disable(GL_CULL_FACE);
+    gl->DrawBuffer(GL_BACK);
+
+    gl->GenBuffers(1, &p->vertex_buffer);
+    gl->GenVertexArrays(1, &p->vao);
+
+    gl->BindBuffer(GL_ARRAY_BUFFER, p->vertex_buffer);
+    gl->BindVertexArray(p->vao);
+    setup_vertex_array(gl);
+    gl->BindBuffer(GL_ARRAY_BUFFER, 0);
+    gl->BindVertexArray(0);
+
+    GLint max_texture_size;
+    gl->GetIntegerv(GL_MAX_TEXTURE_SIZE, &max_texture_size);
+    eosd_packer_reinit(p->eosd, max_texture_size, max_texture_size);
+
+    gl->ClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+    gl->Clear(GL_COLOR_BUFFER_BIT);
+    if (gl->SwapInterval && p->swap_interval >= 0)
+        gl->SwapInterval(p->swap_interval);
+
+    glCheckError(gl, "after init_gl");
+
+    return 1;
+}
+
+static void uninit_gl(struct gl_priv *p)
+{
+    GL *gl = p->gl;
+
+    // NOTE: GL functions might not be loaded yet
+    if (!(p->glctx && p->gl->DeleteTextures))
+        return;
+
+    uninit_video(p);
+
+    gl->DeleteVertexArrays(1, &p->vao);
+    p->vao = 0;
+    gl->DeleteBuffers(1, &p->vertex_buffer);
+    p->vertex_buffer = 0;
+
+    clear_osd(p);
+    gl->DeleteTextures(1, &p->eosd_texture);
+    p->eosd_texture = 0;
+    gl->DeleteBuffers(1, &p->eosd_buffer);
+    p->eosd_buffer = 0;
+    eosd_packer_reinit(p->eosd, 0, 0);
+
+    gl->DeleteTextures(1, &p->lut_3d_texture);
+    p->lut_3d_texture = 0;
+}
+
+static bool config_window(struct gl_priv *p, uint32_t d_width,
+                          uint32_t d_height, uint32_t flags)
+{
+    if (p->stereo_mode == GL_3D_QUADBUFFER)
+        flags |= VOFLAG_STEREO;
+
+    int mpgl_version = p->force_gl2 ? MPGL_VER(2, 1) : MPGL_VER(3, 2);
+    int mpgl_flags = 0;
+    if (p->gl_debug)
+        mpgl_flags |= MPGLFLAG_DEBUG;
+
+    if (create_mpglcontext(p->glctx, mpgl_flags, mpgl_version, d_width,
+                           d_height, flags) == SET_WINDOW_FAILED)
+        return false;
+
+    if (!p->vertex_buffer)
+        init_gl(p);
+
+    return true;
+}
+
+static int config(struct vo *vo, uint32_t width, uint32_t height,
+                  uint32_t d_width, uint32_t d_height, uint32_t flags,
+                  uint32_t format)
+{
+    struct gl_priv *p = vo->priv;
+
+    if (!config_window(p, d_width, d_height, flags))
+        return -1;
+
+    p->image_d_width = d_width;
+    p->image_d_height = d_height;
+    p->vo_flipped = !!(flags & VOFLAG_FLIPPING);
+
+    if (p->image_format != format || p->image_width != width
+        || p->image_height != height)
+    {
+        uninit_video(p);
+        p->image_height = height;
+        p->image_width = width;
+        p->image_format = format;
+        init_video(p);
+    }
+
+    resize(p);
+
+    return 0;
+}
+
 static int query_format(uint32_t format)
 {
     int caps = VFCAP_CSP_SUPPORTED | VFCAP_CSP_SUPPORTED_BY_HW | VFCAP_FLIP |
@@ -1874,6 +1833,119 @@ static int query_format(uint32_t format)
     return caps;
 }
 
+static void check_events(struct vo *vo)
+{
+    struct gl_priv *p = vo->priv;
+
+    int e = p->glctx->check_events(vo);
+    if (e & VO_EVENT_REINIT) {
+        uninit_gl(p);
+        init_gl(p);
+        init_video(p);
+        resize(p);
+    }
+    if (e & VO_EVENT_RESIZE)
+        resize(p);
+    if (e & VO_EVENT_EXPOSE)
+        vo->want_redraw = true;
+}
+
+static int control(struct vo *vo, uint32_t request, void *data)
+{
+    struct gl_priv *p = vo->priv;
+
+    switch (request) {
+    case VOCTRL_QUERY_FORMAT:
+        return query_format(*(uint32_t *)data);
+    case VOCTRL_GET_IMAGE:
+        return get_image(vo, data);
+    case VOCTRL_DRAW_IMAGE:
+        return draw_image(p, data);
+    case VOCTRL_DRAW_EOSD:
+        if (!data)
+            return VO_FALSE;
+        draw_eosd(p, data);
+        return VO_TRUE;
+    case VOCTRL_GET_EOSD_RES: {
+        mp_eosd_res_t *r = data;
+        r->w = vo->dwidth;
+        r->h = vo->dheight;
+        r->mt = r->mb = r->ml = r->mr = 0;
+        if (aspect_scaling()) {
+            r->ml = r->mr = p->border_x;
+            r->mt = r->mb = p->border_y;
+        }
+        return VO_TRUE;
+    }
+    case VOCTRL_ONTOP:
+        if (!p->glctx->ontop)
+            break;
+        p->glctx->ontop(vo);
+        return VO_TRUE;
+    case VOCTRL_FULLSCREEN:
+        p->glctx->fullscreen(vo);
+        resize(p);
+        return VO_TRUE;
+    case VOCTRL_BORDER:
+        if (!p->glctx->border)
+            break;
+        p->glctx->border(vo);
+        resize(p);
+        return VO_TRUE;
+    case VOCTRL_GET_PANSCAN:
+        return VO_TRUE;
+    case VOCTRL_SET_PANSCAN:
+        resize(p);
+        return VO_TRUE;
+    case VOCTRL_GET_EQUALIZER: {
+        struct voctrl_get_equalizer_args *args = data;
+        return mp_csp_equalizer_get(&p->video_eq, args->name, args->valueptr)
+                >= 0 ? VO_TRUE : VO_NOTIMPL;
+    }
+    case VOCTRL_SET_EQUALIZER: {
+        struct voctrl_set_equalizer_args *args = data;
+        if (mp_csp_equalizer_set(&p->video_eq, args->name, args->value) < 0)
+            return VO_NOTIMPL;
+        if (!p->use_gamma && p->video_eq.values[MP_CSP_EQ_GAMMA] != 0) {
+            mp_msg(MSGT_VO, MSGL_V, "[gl] Auto-enabling gamma.\n");
+            p->use_gamma = true;
+            compile_shaders(p);
+        }
+        update_all_uniforms(p);
+        vo->want_redraw = true;
+        return VO_TRUE;
+    }
+    case VOCTRL_SET_YUV_COLORSPACE: {
+        if (p->is_yuv) {
+            p->colorspace = *(struct mp_csp_details *)data;
+            update_all_uniforms(p);
+            vo->want_redraw = true;
+        }
+        return VO_TRUE;
+    }
+    case VOCTRL_GET_YUV_COLORSPACE:
+        *(struct mp_csp_details *)data = p->colorspace;
+        return VO_TRUE;
+    case VOCTRL_UPDATE_SCREENINFO:
+        if (!p->glctx->update_xinerama_info)
+            break;
+        p->glctx->update_xinerama_info(vo);
+        return VO_TRUE;
+    case VOCTRL_SCREENSHOT: {
+        struct voctrl_screenshot_args *args = data;
+        if (args->full_window)
+            args->out_image = get_window_screenshot(p);
+        else
+            args->out_image = get_screenshot(p);
+        return true;
+    }
+    case VOCTRL_REDRAW_FRAME:
+        do_render(p);
+        return true;
+    }
+    return VO_NOTIMPL;
+}
+
 static void uninit(struct vo *vo)
 {
     struct gl_priv *p = vo->priv;
@@ -1882,73 +1954,6 @@ static void uninit(struct vo *vo)
     uninit_mpglcontext(p->glctx);
     p->glctx = NULL;
     p->gl = NULL;
-}
-
-#if 0
-static void print_scalers(void)
-{
-    mp_msg(MSGT_VO, MSGL_INFO, "Available scalers:\n");
-    for (const char **e = fixed_scale_filters; *e; e++) {
-        mp_msg(MSGT_VO, MSGL_INFO, "    %s\n", *e);
-    }
-    for (const struct filter_kernel *e = mp_filter_kernels; e->name; e++) {
-        if (can_use_filter_kernel(e))
-            mp_msg(MSGT_VO, MSGL_INFO, "    %s\n", e->name);
-    }
-}
-#endif
-
-static const char* handle_scaler_opt(const char *name)
-{
-    const struct filter_kernel *kernel = mp_find_filter_kernel(name);
-    if (can_use_filter_kernel(kernel))
-        return kernel->name;
-
-    for (const char **filter = fixed_scale_filters; *filter; filter++) {
-        if (strcmp(*filter, name) == 0)
-            return *filter;
-    }
-
-    return NULL;
-}
-
-static int scaler_valid(void *arg)
-{
-    return handle_scaler_opt(*(const char **)arg) != NULL;
-}
-
-static int backend_valid(void *arg)
-{
-    return mpgl_find_backend(*(const char **)arg) >= 0;
-}
-
-struct fbo_format {
-    const char *name;
-    GLint format;
-};
-
-const struct fbo_format fbo_formats[] = {
-    {"rgb",    GL_RGB},
-    {"rgba",   GL_RGBA},
-    {"rgb8",   GL_RGB8},
-    {"rgb16",  GL_RGB16},
-    {"rgb16f", GL_RGB16F},
-    {"rgb32f", GL_RGB32F},
-    {0}
-};
-
-static GLint find_fbo_format(const char *name)
-{
-    for (const struct fbo_format *fmt = fbo_formats; fmt->name; fmt++) {
-        if (strcmp(fmt->name, name) == 0)
-            return fmt->format;
-    }
-    return -1;
-}
-
-static int fbo_format_valid(void *arg)
-{
-    return find_fbo_format(*(const char **)arg) >= 0;
 }
 
 #ifdef CONFIG_LCMS2
@@ -2109,6 +2114,81 @@ static int lut3d_size_valid(void *arg)
     int p1, p2, p3;
     return parse_3dlut_size(s, &p1, &p2, &p3);
 }
+
+static int backend_valid(void *arg)
+{
+    return mpgl_find_backend(*(const char **)arg) >= 0;
+}
+
+struct fbo_format {
+    const char *name;
+    GLint format;
+};
+
+const struct fbo_format fbo_formats[] = {
+    {"rgb",    GL_RGB},
+    {"rgba",   GL_RGBA},
+    {"rgb8",   GL_RGB8},
+    {"rgb16",  GL_RGB16},
+    {"rgb16f", GL_RGB16F},
+    {"rgb32f", GL_RGB32F},
+    {0}
+};
+
+static GLint find_fbo_format(const char *name)
+{
+    for (const struct fbo_format *fmt = fbo_formats; fmt->name; fmt++) {
+        if (strcmp(fmt->name, name) == 0)
+            return fmt->format;
+    }
+    return -1;
+}
+
+static int fbo_format_valid(void *arg)
+{
+    return find_fbo_format(*(const char **)arg) >= 0;
+}
+
+static bool can_use_filter_kernel(const struct filter_kernel *kernel)
+{
+    if (!kernel)
+        return false;
+    struct filter_kernel k = *kernel;
+    return mp_init_filter(&k, filter_sizes, 1);
+}
+
+static const char* handle_scaler_opt(const char *name)
+{
+    const struct filter_kernel *kernel = mp_find_filter_kernel(name);
+    if (can_use_filter_kernel(kernel))
+        return kernel->name;
+
+    for (const char **filter = fixed_scale_filters; *filter; filter++) {
+        if (strcmp(*filter, name) == 0)
+            return *filter;
+    }
+
+    return NULL;
+}
+
+static int scaler_valid(void *arg)
+{
+    return handle_scaler_opt(*(const char **)arg) != NULL;
+}
+
+#if 0
+static void print_scalers(void)
+{
+    mp_msg(MSGT_VO, MSGL_INFO, "Available scalers:\n");
+    for (const char **e = fixed_scale_filters; *e; e++) {
+        mp_msg(MSGT_VO, MSGL_INFO, "    %s\n", *e);
+    }
+    for (const struct filter_kernel *e = mp_filter_kernels; e->name; e++) {
+        if (can_use_filter_kernel(e))
+            mp_msg(MSGT_VO, MSGL_INFO, "    %s\n", e->name);
+    }
+}
+#endif
 
 static int preinit(struct vo *vo, const char *arg)
 {
@@ -2350,102 +2430,6 @@ static int preinit(struct vo *vo, const char *arg)
 err_out:
     uninit(vo);
     return -1;
-}
-
-static int control(struct vo *vo, uint32_t request, void *data)
-{
-    struct gl_priv *p = vo->priv;
-
-    switch (request) {
-    case VOCTRL_QUERY_FORMAT:
-        return query_format(*(uint32_t *)data);
-    case VOCTRL_GET_IMAGE:
-        return get_image(vo, data);
-    case VOCTRL_DRAW_IMAGE:
-        return draw_image(p, data);
-    case VOCTRL_DRAW_EOSD:
-        if (!data)
-            return VO_FALSE;
-        draw_eosd(p, data);
-        return VO_TRUE;
-    case VOCTRL_GET_EOSD_RES: {
-        mp_eosd_res_t *r = data;
-        r->w = vo->dwidth;
-        r->h = vo->dheight;
-        r->mt = r->mb = r->ml = r->mr = 0;
-        if (aspect_scaling()) {
-            r->ml = r->mr = p->border_x;
-            r->mt = r->mb = p->border_y;
-        }
-        return VO_TRUE;
-    }
-    case VOCTRL_ONTOP:
-        if (!p->glctx->ontop)
-            break;
-        p->glctx->ontop(vo);
-        return VO_TRUE;
-    case VOCTRL_FULLSCREEN:
-        p->glctx->fullscreen(vo);
-        resize(p);
-        return VO_TRUE;
-    case VOCTRL_BORDER:
-        if (!p->glctx->border)
-            break;
-        p->glctx->border(vo);
-        resize(p);
-        return VO_TRUE;
-    case VOCTRL_GET_PANSCAN:
-        return VO_TRUE;
-    case VOCTRL_SET_PANSCAN:
-        resize(p);
-        return VO_TRUE;
-    case VOCTRL_GET_EQUALIZER: {
-        struct voctrl_get_equalizer_args *args = data;
-        return mp_csp_equalizer_get(&p->video_eq, args->name, args->valueptr)
-                >= 0 ? VO_TRUE : VO_NOTIMPL;
-    }
-    case VOCTRL_SET_EQUALIZER: {
-        struct voctrl_set_equalizer_args *args = data;
-        if (mp_csp_equalizer_set(&p->video_eq, args->name, args->value) < 0)
-            return VO_NOTIMPL;
-        if (!p->use_gamma && p->video_eq.values[MP_CSP_EQ_GAMMA] != 0) {
-            mp_msg(MSGT_VO, MSGL_V, "[gl] Auto-enabling gamma.\n");
-            p->use_gamma = true;
-            compile_shaders(p);
-        }
-        update_all_uniforms(p);
-        vo->want_redraw = true;
-        return VO_TRUE;
-    }
-    case VOCTRL_SET_YUV_COLORSPACE: {
-        if (p->is_yuv) {
-            p->colorspace = *(struct mp_csp_details *)data;
-            update_all_uniforms(p);
-            vo->want_redraw = true;
-        }
-        return VO_TRUE;
-    }
-    case VOCTRL_GET_YUV_COLORSPACE:
-        *(struct mp_csp_details *)data = p->colorspace;
-        return VO_TRUE;
-    case VOCTRL_UPDATE_SCREENINFO:
-        if (!p->glctx->update_xinerama_info)
-            break;
-        p->glctx->update_xinerama_info(vo);
-        return VO_TRUE;
-    case VOCTRL_SCREENSHOT: {
-        struct voctrl_screenshot_args *args = data;
-        if (args->full_window)
-            args->out_image = get_window_screenshot(p);
-        else
-            args->out_image = get_screenshot(p);
-        return true;
-    }
-    case VOCTRL_REDRAW_FRAME:
-        do_render(p);
-        return true;
-    }
-    return VO_NOTIMPL;
 }
 
 const struct vo_driver video_out_gl3 = {
