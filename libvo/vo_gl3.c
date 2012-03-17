@@ -87,22 +87,26 @@ static const char *fixed_scale_filters[] = {
     NULL
 };
 
-struct convolution_filters {
-    char *shader_fn, *shader_fn_sep;
+struct lut_tex_format {
+    int pixels;
     GLint internal_format;
     GLenum format;
 };
 
-// indexed with filter_kernel->size
-struct convolution_filters convolution_filters[] = {
-    [2] = {"sample_convolution2", "sample_convolution_sep2",    GL_RG16F,   GL_RG},
-    [4] = {"sample_convolution4", "sample_convolution_sep4",    GL_RGBA16F, GL_RGBA},
-    [6] = {"sample_convolution6", "sample_convolution_sep6",    GL_RGB16F,  GL_RGB},
-    [8] = {"sample_convolution8", "sample_convolution_sep8",    GL_RGBA16F, GL_RGBA},
-    [12] = {"sample_convolution12", "sample_convolution_sep12", GL_RGBA16F, GL_RGBA},
-    [16] = {"sample_convolution16", "sample_convolution_sep16", GL_RGBA16F, GL_RGBA},
+// Indexed with filter_kernel->size.
+// This must match the weightsN functions in the shader.
+// Each entry uses (size+3)/4 pixels per LUT entry, and size/pixels components
+// per pixel.
+struct lut_tex_format lut_tex_formats[] = {
+    [2] =  {1, GL_RG16F,   GL_RG},
+    [4] =  {1, GL_RGBA16F, GL_RGBA},
+    [6] =  {2, GL_RGB16F,  GL_RGB},
+    [8] =  {2, GL_RGBA16F, GL_RGBA},
+    [12] = {3, GL_RGBA16F, GL_RGBA},
+    [16] = {4, GL_RGBA16F, GL_RGBA},
 };
 
+// must be sorted, and terminated with 0
 static const int filter_sizes[] = {2, 4, 6, 8, 12, 16, 0};
 
 struct vertex {
@@ -990,21 +994,18 @@ static void shader_setup_scaler(char **shader, struct scaler *scaler, int pass)
         *shader = talloc_asprintf_append(*shader, "#define %s sample_%s\n",
                                          target, scaler->name);
     } else {
-        const struct convolution_filters *entry =
-            &convolution_filters[scaler->kernel->size];
+        int size = scaler->kernel->size;
         if (pass != -1) {
-            // strictly needed for the first pass
-            if (pass == 0)
-                shader_def_opt(shader, "FIXED_SCALE", true);
-            // the direction/pass assignment is rather arbitrary
+            // The direction/pass assignment is rather arbitrary, but fixed in
+            // other parts of the code (like FBO setup).
             const char *direction = pass == 0 ? "0, 1" : "1, 0";
-            *shader = talloc_asprintf_append(*shader,
-                "#define %s(p0, p1) %s(vec2(%s), %s, p0, p1)\n", target,
-                entry->shader_fn_sep, direction, scaler->lut_name);
+            *shader = talloc_asprintf_append(*shader, "#define %s(p0, p1) "
+                "sample_convolution_sep%d(vec2(%s), %s, p0, p1)\n",
+                target, size, direction, scaler->lut_name);
         } else {
-            *shader = talloc_asprintf_append(*shader,
-                "#define %s(p0, p1) %s(%s, p0, p1)\n", target, entry->shader_fn,
-                scaler->lut_name);
+            *shader = talloc_asprintf_append(*shader, "#define %s(p0, p1) "
+                "sample_convolution%d(%s, p0, p1)\n",
+                target, size, scaler->lut_name);
         }
     }
 }
@@ -1048,6 +1049,7 @@ static void compile_shaders(struct gl_priv *p)
     if (p->use_scale_sep && p->scalers[0].kernel) {
         use_indirect = true;
         header_sep = talloc_strdup(tmp, "");
+        shader_def_opt(&header_sep, "FIXED_SCALE", true);
         shader_setup_scaler(&header_sep, &p->scalers[0], 0);
         shader_setup_scaler(&header_final, &p->scalers[0], 1);
     } else {
@@ -1179,10 +1181,9 @@ static void init_scaler(struct gl_priv *p, struct scaler *scaler)
     update_scale_factor(p, scaler->kernel);
 
     int size = scaler->kernel->size;
-    assert(size < FF_ARRAY_ELEMS(convolution_filters));
-    struct convolution_filters *entry = &convolution_filters[size];
-
-    bool use_2d = size > 4;
+    assert(size < FF_ARRAY_ELEMS(lut_tex_formats));
+    struct lut_tex_format *fmt = &lut_tex_formats[size];
+    bool use_2d = fmt->pixels > 1;
     bool is_luma = scaler->index == 0;
     scaler->lut_name = use_2d
                        ? (is_luma ? "lut_l_2d" : "lut_c_2d")
@@ -1201,12 +1202,12 @@ static void init_scaler(struct gl_priv *p, struct scaler *scaler)
     float *weights = talloc_array(NULL, float, LOOKUP_TEXTURE_SIZE * size);
     mp_compute_lut(scaler->kernel, LOOKUP_TEXTURE_SIZE, weights);
     if (use_2d) {
-        gl->TexImage2D(GL_TEXTURE_2D, 0, entry->internal_format, (size + 3) / 4,
-                       LOOKUP_TEXTURE_SIZE, 0, entry->format, GL_FLOAT,
+        gl->TexImage2D(GL_TEXTURE_2D, 0, fmt->internal_format, fmt->pixels,
+                       LOOKUP_TEXTURE_SIZE, 0, fmt->format, GL_FLOAT,
                        weights);
     } else {
-        gl->TexImage1D(GL_TEXTURE_1D, 0, entry->internal_format,
-                       LOOKUP_TEXTURE_SIZE, 0, entry->format, GL_FLOAT,
+        gl->TexImage1D(GL_TEXTURE_1D, 0, fmt->internal_format,
+                       LOOKUP_TEXTURE_SIZE, 0, fmt->format, GL_FLOAT,
                        weights);
     }
     talloc_free(weights);
@@ -1233,7 +1234,7 @@ static void make_dither_matrix(unsigned char *m, int size)
     }
 }
 
-static void setup_dither(struct gl_priv *p)
+static void init_dither(struct gl_priv *p)
 {
     GL *gl = p->gl;
 
@@ -1286,7 +1287,7 @@ static void reinit_rendering(struct gl_priv *p)
 
     uninit_rendering(p);
 
-    setup_dither(p);
+    init_dither(p);
 
     init_scaler(p, &p->scalers[0]);
     init_scaler(p, &p->scalers[1]);
@@ -2232,7 +2233,7 @@ static int preinit(struct vo *vo, const char *arg)
                "    if the proper extensions are not supported.\n"
                "  debug\n"
                "    Request debug OpenGL context. Does nothing.\n"
-               " Experimental:\n"
+               "Color management:\n"
                "  icc-profile=<file>\n"
                "    Load an ICC profile and use it to transform linear RGB to\n"
                "    screen output. Needs LittleCMS2 support compiled in.\n"

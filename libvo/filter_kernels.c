@@ -47,7 +47,7 @@ const struct filter_kernel *mp_find_filter_kernel(const char *name)
     return NULL;
 }
 
-// sizes = 0-terminated and sorted list of available filter sizes
+// sizes = sorted list of available filter sizes, terminated with size 0
 // inv_scale = source_size / dest_size
 bool mp_init_filter(struct filter_kernel *filter, const int *sizes,
                     double inv_scale)
