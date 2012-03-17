@@ -33,22 +33,27 @@
 #include "video_out.h"
 #include "csputils.h"
 
-#ifdef CONFIG_GL_WIN32
-#include <windows.h>
-#include "w32_common.h"
-#endif
 #ifdef CONFIG_GL_X11
 #include <X11/Xlib.h>
 #include <GL/glx.h>
 #include "x11_common.h"
-// This old-vo wrapper macro would conflict with the struct member
-#undef update_xinerama_info
 #endif
-#include <GL/gl.h>
+
+#ifdef CONFIG_GL_COCOA
+#include "cocoa_common.h"
+#endif
 
 #ifdef CONFIG_GL_WIN32
-#include <GL/glext.h>
+#include <windows.h>
+#include "w32_common.h"
 #endif
+
+#ifdef CONFIG_GL_SDL
+#include "sdl_common.h"
+#endif
+
+#include <GL/gl.h>
+#include <GL/glext.h>
 
 #include "libvo/gl_header_fixes.h"
 

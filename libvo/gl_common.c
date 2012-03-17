@@ -1765,7 +1765,6 @@ void glDrawTex(GL *gl, GLfloat x, GLfloat y, GLfloat w, GLfloat h,
 }
 
 #ifdef CONFIG_GL_COCOA
-#include "cocoa_common.h"
 static int create_window_cocoa(struct MPGLContext *ctx, uint32_t d_width,
                                uint32_t d_height, uint32_t flags)
 {
@@ -1821,9 +1820,6 @@ static void cocoa_fullscreen(struct vo *vo)
 #endif
 
 #ifdef CONFIG_GL_WIN32
-#include "w32_common.h"
-
-
 static int create_window_w32(struct MPGLContext *ctx, uint32_t d_width,
                              uint32_t d_height, uint32_t flags)
 {
@@ -2015,9 +2011,8 @@ static void new_vo_w32_fullscreen(struct vo *vo) { vo_w32_fullscreen(); }
 static int new_vo_w32_check_events(struct vo *vo) { return vo_w32_check_events(); }
 static void new_w32_update_xinerama_info(struct vo *vo) { w32_update_xinerama_info(); }
 #endif
-#ifdef CONFIG_GL_X11
-#include "x11_common.h"
 
+#ifdef CONFIG_GL_X11
 static int create_window_x11(struct MPGLContext *ctx, uint32_t d_width,
                              uint32_t d_height, uint32_t flags)
 {
@@ -2351,8 +2346,6 @@ static void swapGlBuffers_x11(MPGLContext *ctx)
 #endif
 
 #ifdef CONFIG_GL_SDL
-#include "sdl_common.h"
-
 static int create_window_sdl(struct MPGLContext *ctx, uint32_t d_width,
                              uint32_t d_height, uint32_t flags)
 {
