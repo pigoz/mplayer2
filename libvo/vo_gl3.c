@@ -867,13 +867,16 @@ static void uninit_gl(struct gl_priv *p)
     uninit_video(p);
 
     gl->DeleteVertexArrays(1, &p->vao);
+    p->vao = 0;
     gl->DeleteBuffers(1, &p->vertex_buffer);
+    p->vertex_buffer = 0;
 
     clear_osd(p);
     gl->DeleteTextures(1, &p->eosd_texture);
-    gl->DeleteBuffers(1, &p->eosd_buffer);
-    eosd_packer_reinit(p->eosd, 0, 0);
     p->eosd_texture = 0;
+    gl->DeleteBuffers(1, &p->eosd_buffer);
+    p->eosd_buffer = 0;
+    eosd_packer_reinit(p->eosd, 0, 0);
 
     gl->DeleteTextures(1, &p->lut_3d_texture);
     p->lut_3d_texture = 0;
@@ -1415,8 +1418,8 @@ static void init_video(struct gl_priv *p)
 }
 
 
-static int create_window(struct gl_priv *p, uint32_t d_width, uint32_t d_height,
-                         uint32_t flags)
+static bool config_window(struct gl_priv *p, uint32_t d_width,
+                          uint32_t d_height, uint32_t flags)
 {
     if (p->stereo_mode == GL_3D_QUADBUFFER)
         flags |= VOFLAG_STEREO;
@@ -1426,8 +1429,14 @@ static int create_window(struct gl_priv *p, uint32_t d_width, uint32_t d_height,
     if (p->gl_debug)
         mpgl_flags |= MPGLFLAG_DEBUG;
 
-    return create_mpglcontext(p->glctx, mpgl_flags, mpgl_version, d_width,
-                              d_height, flags);
+    if (create_mpglcontext(p->glctx, mpgl_flags, mpgl_version, d_width,
+                           d_height, flags) == SET_WINDOW_FAILED)
+        return false;
+
+    if (!p->vertex_buffer)
+        init_gl(p);
+
+    return true;
 }
 
 static int config(struct vo *vo, uint32_t width, uint32_t height,
@@ -1436,11 +1445,8 @@ static int config(struct vo *vo, uint32_t width, uint32_t height,
 {
     struct gl_priv *p = vo->priv;
 
-    if (create_window(p, d_width, d_height, flags) == SET_WINDOW_FAILED)
+    if (!config_window(p, d_width, d_height, flags))
         return -1;
-
-    if (!vo->config_count)
-        init_gl(p);
 
     p->image_d_width = d_width;
     p->image_d_height = d_height;
@@ -2327,9 +2333,7 @@ static int preinit(struct vo *vo, const char *arg)
     p->gl = p->glctx->gl;
 
     if (true) {
-        if (create_window(p, 320, 200, VOFLAG_HIDDEN) == SET_WINDOW_FAILED)
-            goto err_out;
-        if (!init_gl(p))
+        if (!config_window(p, 320, 200, VOFLAG_HIDDEN))
             goto err_out;
         // We created a window to test whether the GL context could be
         // created and so on. Destroy that window to make sure all state
