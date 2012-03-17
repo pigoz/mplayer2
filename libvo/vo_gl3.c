@@ -122,8 +122,6 @@ struct vertex {
 #define VERTICES_PER_QUAD 6
 
 struct texplane {
-    // (this can be false even for plane 1+2 if the format is planar RGB)
-    bool is_chroma;
     // chroma shifts
     // e.g. get the plane's width in pixels with (priv->src_width >> shift_x)
     int shift_x, shift_y;
@@ -323,10 +321,10 @@ static bool init_format(int fmt, struct gl_priv *init)
     for (int n = 0; n < init->plane_count; n++) {
         struct texplane *plane = &init->planes[n];
 
-        plane->is_chroma = n > 0;
         plane->shift_x = n > 0 ? dummy_img.chroma_x_shift : 0;
         plane->shift_y = n > 0 ? dummy_img.chroma_y_shift : 0;
-        plane->clear_val = n > 0 ? get_chroma_clear_val(init->plane_bits) : 0;
+        plane->clear_val = n > 0 && init->is_yuv
+                           ? get_chroma_clear_val(init->plane_bits) : 0;
     }
 
     return true;
@@ -1058,6 +1056,8 @@ static void compile_shaders(struct gl_priv *p)
 
     shader_setup_scaler(&header_conv, &p->scalers[1], -1);
 
+    // The second condition is because "indirect" shouldn't be active if not
+    // needed.
     if (use_indirect && p->is_yuv) {
         // We don't use filtering for the Y-plane (luma), because it's never
         // scaled in this scenario.
@@ -1066,13 +1066,13 @@ static void compile_shaders(struct gl_priv *p)
                        p->use_srgb || p->use_lut_3d);
         shader_def_opt(&header_conv, "FIXED_SCALE", true);
         header_conv = talloc_asprintf(tmp, "%s%s", header, header_conv);
-        header_final = talloc_asprintf(tmp, "%s%s", header, header_final);
         p->indirect_program =
             create_program(gl, "indirect", header_conv, vertex_shader,
                 get_section(tmp, src, "frag_video"));
+    } else if (header_sep) {
+        header_sep = talloc_asprintf(tmp, "%s%s", header_sep, header_conv);
     } else {
-        header_final = talloc_asprintf(tmp, "%s%s%s", header, header_conv,
-                                       header_final);
+        header_final = talloc_asprintf(tmp, "%s%s", header_final, header_conv);
     }
 
     if (header_sep) {
@@ -1086,6 +1086,7 @@ static void compile_shaders(struct gl_priv *p)
     shader_def_opt(&header_final, "USE_LINEAR_CONV_INV", p->use_lut_3d);
     shader_def_opt(&header_final, "USE_DITHER", p->dither_texture != 0);
 
+    header_final = talloc_asprintf(tmp, "%s%s", header, header_final);
     p->final_program =
         create_program(gl, "final", header_final, vertex_shader,
             get_section(tmp, src, "frag_video"));
