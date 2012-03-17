@@ -1296,9 +1296,15 @@ static void flip_page(struct vo *vo)
 
     if (p->use_glFinish)
         gl->Finish();
+
     p->glctx->swapGlBuffers(p->glctx);
-    if (aspect_scaling())
+
+    if (p->dst_rect.left > p->vp_x || p->dst_rect.top > p->vp_y
+        || p->dst_rect.right < p->vp_x + p->vp_w
+        || p->dst_rect.bottom < p->vp_y + p->vp_h)
+    {
         gl->Clear(GL_COLOR_BUFFER_BIT);
+    }
 }
 
 static int draw_slice(struct vo *vo, uint8_t *src[], int stride[], int w, int h,
