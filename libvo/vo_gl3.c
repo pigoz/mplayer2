@@ -1020,18 +1020,20 @@ static void compile_shaders(struct gl_priv *p)
     char *vertex_shader = get_section(tmp, src, "vertex_all");
     char *shader_prelude = get_section(tmp, src, "prelude");
 
+    char *s_video = get_section(tmp, src, "frag_video");
+    char *s_eosd = get_section(tmp, src, "frag_eosd");
+    char *s_osd = get_section(tmp, src, "frag_osd");
+
     char *header = talloc_strdup(tmp, shader_prelude);
 
     char *header_eosd = talloc_strdup(tmp, header);
     shader_def_opt(&header_eosd, "USE_3DLUT", p->use_lut_3d);
 
     p->eosd_program =
-        create_program(gl, "eosd", header_eosd, vertex_shader,
-            get_section(tmp, src, "frag_eosd"));
+        create_program(gl, "eosd", header_eosd, vertex_shader, s_eosd);
 
     p->osd_program =
-        create_program(gl, "osd", header, vertex_shader,
-            get_section(tmp, src, "frag_osd"));
+        create_program(gl, "osd", header, vertex_shader, s_osd);
 
     char *header_conv = talloc_strdup(tmp, "");
     char *header_final = talloc_strdup(tmp, "");
@@ -1067,8 +1069,7 @@ static void compile_shaders(struct gl_priv *p)
         shader_def_opt(&header_conv, "FIXED_SCALE", true);
         header_conv = talloc_asprintf(tmp, "%s%s", header, header_conv);
         p->indirect_program =
-            create_program(gl, "indirect", header_conv, vertex_shader,
-                get_section(tmp, src, "frag_video"));
+            create_program(gl, "indirect", header_conv, vertex_shader, s_video);
     } else if (header_sep) {
         header_sep = talloc_asprintf(tmp, "%s%s", header_sep, header_conv);
     } else {
@@ -1078,8 +1079,7 @@ static void compile_shaders(struct gl_priv *p)
     if (header_sep) {
         header_sep = talloc_asprintf(tmp, "%s%s", header, header_sep);
         p->scale_sep_program =
-            create_program(gl, "scale_sep", header_sep, vertex_shader,
-                get_section(tmp, src, "frag_video"));
+            create_program(gl, "scale_sep", header_sep, vertex_shader, s_video);
     }
 
     shader_def_opt(&header_final, "USE_3DLUT", p->use_lut_3d);
@@ -1088,8 +1088,7 @@ static void compile_shaders(struct gl_priv *p)
 
     header_final = talloc_asprintf(tmp, "%s%s", header, header_final);
     p->final_program =
-        create_program(gl, "final", header_final, vertex_shader,
-            get_section(tmp, src, "frag_video"));
+        create_program(gl, "final", header_final, vertex_shader, s_video);
 
     glCheckError(gl, "shader compilation");
 
