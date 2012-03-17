@@ -197,6 +197,7 @@ struct gl_priv {
     int dither_depth;
     struct mp_csp_details colorspace;
     bool is_yuv;
+    bool is_linear_rgb;
     float filter_strength;
     int use_npot;
     uint32_t image_width;
@@ -312,6 +313,7 @@ static bool init_format(int fmt, struct gl_priv *init)
 
     init->plane_bytes = (init->plane_bits + 7) / 8;
     init->is_yuv = dummy_img.flags & MP_IMGFLAG_YUV;
+    init->is_linear_rgb = false;
 
     // NOTE: we throw away the additional alpha plane, if one exists.
     init->plane_count = dummy_img.num_planes > 2 ? 3 : 1;
@@ -965,6 +967,8 @@ static GLuint create_program(GL *gl, const char *name, const char *header,
                              const char *vertex, const char *frag)
 {
     mp_msg(MSGT_VO, MSGL_V, "[gl] compiling shader program '%s'\n", name);
+    mp_msg(MSGT_VO, MSGL_V, "[gl] header:\n");
+    mp_log_source(MSGT_VO, MSGL_V, header);
     GLuint prog = gl->CreateProgram();
     prog_create_shader(gl, prog, GL_VERTEX_SHADER, header, vertex);
     prog_create_shader(gl, prog, GL_FRAGMENT_SHADER, header, frag);
@@ -1008,6 +1012,15 @@ static void shader_setup_scaler(char **shader, struct scaler *scaler, int pass)
     }
 }
 
+// return false if RGB or 4:4:4 YUV
+static bool input_is_subsampled(struct gl_priv *p)
+{
+    for (int i = 0; i < p->plane_count; i++)
+        if (p->planes[i].shift_x || p->planes[i].shift_y)
+            return true;
+    return false;
+}
+
 static void compile_shaders(struct gl_priv *p)
 {
     GL *gl = p->gl;
@@ -1015,11 +1028,10 @@ static void compile_shaders(struct gl_priv *p)
     delete_shaders(p);
 
     void *tmp = talloc_new(NULL);
-    struct bstr src = { (char*)vo_gl3_shaders, sizeof(vo_gl3_shaders) };
 
+    struct bstr src = { (char*)vo_gl3_shaders, sizeof(vo_gl3_shaders) };
     char *vertex_shader = get_section(tmp, src, "vertex_all");
     char *shader_prelude = get_section(tmp, src, "prelude");
-
     char *s_video = get_section(tmp, src, "frag_video");
     char *s_eosd = get_section(tmp, src, "frag_eosd");
     char *s_osd = get_section(tmp, src, "frag_osd");
@@ -1042,12 +1054,15 @@ static void compile_shaders(struct gl_priv *p)
     shader_def_opt(&header_conv, "USE_PLANAR", p->plane_count > 1);
     shader_def_opt(&header_conv, "USE_YGRAY", p->is_yuv && p->plane_count == 1);
     shader_def_opt(&header_conv, "USE_COLORMATRIX", p->is_yuv);
-    shader_def_opt(&header_final, "USE_GAMMA_POW", p->use_gamma);
+    shader_def_opt(&header_conv, "USE_LINEAR_CONV",
+                   !p->is_linear_rgb && (p->use_srgb || p->use_lut_3d));
 
-    bool use_indirect = p->use_indirect;
+    shader_def_opt(&header_final, "USE_LINEAR_CONV_INV", p->use_lut_3d);
+    shader_def_opt(&header_final, "USE_GAMMA_POW", p->use_gamma);
+    shader_def_opt(&header_final, "USE_3DLUT", p->use_lut_3d);
+    shader_def_opt(&header_final, "USE_DITHER", p->dither_texture != 0);
 
     if (p->use_scale_sep && p->scalers[0].kernel) {
-        use_indirect = true;
         header_sep = talloc_strdup(tmp, "");
         shader_def_opt(&header_sep, "FIXED_SCALE", true);
         shader_setup_scaler(&header_sep, &p->scalers[0], 0);
@@ -1056,16 +1071,35 @@ static void compile_shaders(struct gl_priv *p)
         shader_setup_scaler(&header_final, &p->scalers[0], -1);
     }
 
-    shader_setup_scaler(&header_conv, &p->scalers[1], -1);
+    bool use_indirect = p->use_indirect;
 
-    // The second condition is because "indirect" shouldn't be active if not
-    // needed.
-    if (use_indirect && p->is_yuv) {
+    // It doesn't make sense to scale the chroma with cscale in the 1. scale
+    // step and with lscale in the 2. step. Also, even with 4:4:4 YUV or planar
+    // RGB, the indirection might be faster: the shader can't use one scaler for
+    // sampling from 3 textures, but has to fetch the coefficients for each
+    // texture separately, even though they're the same (this is not an inherent
+    // restriction, but would require to restructure the shader).
+    if (header_sep && p->plane_count > 1)
+        use_indirect = true;
+
+    if (input_is_subsampled(p)) {
+        shader_setup_scaler(&header_conv, &p->scalers[1], -1);
+    } else {
+        // Force using the luma scaler on chroma. If the "indirect" stage is
+        // used, the actual scaling will happen in the next stage.
+        shader_def(&header_conv, "SAMPLE_C",
+                   use_indirect ? "sample_bilinear" : "SAMPLE_L");
+    }
+
+    // We want to do scaling in linear light. Scaling is closely connected to
+    // texture sampling due to how the shader is structured (or if GL bilinear
+    // scaling is used). The purpose of the "indirect" pass is to convert the
+    // input video to linear RGB.
+    // Another purpose is reducing input to a single texture for scaling.
+    if (use_indirect) {
         // We don't use filtering for the Y-plane (luma), because it's never
         // scaled in this scenario.
         shader_def(&header_conv, "SAMPLE_L", "sample_bilinear");
-        shader_def_opt(&header_conv, "USE_LINEAR_CONV",
-                       p->use_srgb || p->use_lut_3d);
         shader_def_opt(&header_conv, "FIXED_SCALE", true);
         header_conv = talloc_asprintf(tmp, "%s%s", header, header_conv);
         p->indirect_program =
@@ -1081,10 +1115,6 @@ static void compile_shaders(struct gl_priv *p)
         p->scale_sep_program =
             create_program(gl, "scale_sep", header_sep, vertex_shader, s_video);
     }
-
-    shader_def_opt(&header_final, "USE_3DLUT", p->use_lut_3d);
-    shader_def_opt(&header_final, "USE_LINEAR_CONV_INV", p->use_lut_3d);
-    shader_def_opt(&header_final, "USE_DITHER", p->dither_texture != 0);
 
     header_final = talloc_asprintf(tmp, "%s%s", header, header_final);
     p->final_program =
@@ -1332,8 +1362,10 @@ static void init_video(struct gl_priv *p)
 
     init_format(p->image_format, p);
 
-    if (!p->is_yuv && (p->use_srgb || p->use_lut_3d))
+    if (!p->is_yuv && (p->use_srgb || p->use_lut_3d)) {
+        p->is_linear_rgb = true;
         p->gl_internal_format = GL_SRGB;
+    }
 
     int eq_caps = MP_CSP_EQ_CAPS_GAMMA;
     if (p->is_yuv)
