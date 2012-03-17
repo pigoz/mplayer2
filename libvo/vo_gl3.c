@@ -1876,11 +1876,8 @@ static int control(struct vo *vo, uint32_t request, void *data)
         mp_eosd_res_t *r = data;
         r->w = vo->dwidth;
         r->h = vo->dheight;
-        r->mt = r->mb = r->ml = r->mr = 0;
-        if (aspect_scaling()) {
-            r->ml = r->mr = p->border_x;
-            r->mt = r->mb = p->border_y;
-        }
+        r->ml = r->mr = p->border_x;
+        r->mt = r->mb = p->border_y;
         return VO_TRUE;
     }
     case VOCTRL_ONTOP:
