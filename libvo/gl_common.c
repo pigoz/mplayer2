@@ -37,6 +37,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
+#include <stdbool.h>
 #include <math.h>
 #include "talloc.h"
 #include "gl_common.h"
@@ -264,6 +265,7 @@ typedef struct {
     const char *extstr;
     const char *funcnames[7];
     void *fallback;
+    bool is_gl3;
 } extfunc_desc_t;
 
 #define DEF_FUNC_DESC(name) \
@@ -274,7 +276,7 @@ typedef struct {
 // These are mostly handled the same, but needed because at least the MESA
 // headers don't define any function prototypes for these.
 #define DEF_GL3_DESC(name) \
-    {offsetof(GL, name), NULL, {"gl" # name}, NULL}
+    {offsetof(GL, name), NULL, {"gl" # name}, NULL, .is_gl3 = true}
 
 static const extfunc_desc_t extfuncs[] = {
     // these aren't extension functions but we query them anyway to allow
@@ -484,7 +486,7 @@ static void getFunctions(GL *gl, void *(*getProcAddress)(const GLubyte *),
         }
         if (!ptr)
             ptr = dsc->fallback;
-        if (!ptr && !dsc->extstr)
+        if (!ptr && !dsc->extstr && (!dsc->is_gl3 || is_gl3))
             mp_msg(MSGT_VO, MSGL_WARN, "[gl] OpenGL function not found: %s\n",
                    dsc->funcnames[0]);
         void **funcptr = (void**)(((char*)gl) + dsc->offset);
