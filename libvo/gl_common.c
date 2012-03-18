@@ -458,6 +458,9 @@ static void getFunctions(GL *gl, void *(*getProcAddress)(const GLubyte *),
         gl->GetStringi = getProcAddress("glGetStringi");
         gl->GetIntegerv = getProcAddress("glGetIntegerv");
 
+        if (!(gl->GetStringi && gl->GetIntegerv))
+            return;
+
         GLint exts;
         gl->GetIntegerv(GL_NUM_EXTENSIONS, &exts);
         for (int n = 0; n < exts; n++) {
