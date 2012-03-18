@@ -228,7 +228,6 @@ struct gl_priv {
     struct scaler scalers[2];
     float scaler_params[2];
 
-    int mipmap_gen;
     int stereo_mode;
 
     struct mp_csp_equalizer video_eq;
@@ -1076,9 +1075,6 @@ static void init_video(struct gl_priv *p)
         gl->TexImage2D(GL_TEXTURE_2D, 0, p->gl_internal_format, w, h, 0,
                        p->gl_format, p->gl_type, tmp);
         default_tex_params(gl, GL_TEXTURE_2D, GL_LINEAR);
-        if (p->mipmap_gen)
-            gl->TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
-                              GL_LINEAR_MIPMAP_NEAREST);
     }
     gl->ActiveTexture(GL_TEXTURE0);
 
@@ -1420,13 +1416,6 @@ static uint32_t draw_image(struct gl_priv *p, mp_image_t *mpi)
     gl->ActiveTexture(GL_TEXTURE0);
     gl->BindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 skip_upload:
-    if (p->mipmap_gen) {
-        for (n = 0; n < p->plane_count; n++) {
-            gl->ActiveTexture(GL_TEXTURE0 + n);
-            gl->GenerateMipmap(GL_TEXTURE_2D);
-        }
-        gl->ActiveTexture(GL_TEXTURE0);
-    }
     do_render(p);
     return VO_TRUE;
 }
@@ -2236,7 +2225,6 @@ static int preinit(struct vo *vo, const char *arg)
         {"pbo",          OPT_ARG_BOOL, &p->use_pbo,      NULL},
         {"glfinish",     OPT_ARG_BOOL, &p->use_glFinish, NULL},
         {"swapinterval", OPT_ARG_INT,  &p->swap_interval,NULL},
-        {"mipmapgen",    OPT_ARG_BOOL, &p->mipmap_gen,   NULL},
         {"osdcolor",     OPT_ARG_INT,  &p->osd_color,    NULL},
         {"stereo",       OPT_ARG_INT,  &p->stereo_mode,  NULL},
         {"lscale",       OPT_ARG_MSTRZ,&scalers[0],      scaler_valid},
@@ -2417,8 +2405,6 @@ static const char help_text[] =
 "    cocoa: Cocoa/OSX\n"
 "    win: Win32/WGL\n"
 "    x11: X11/GLX\n"
-"  mipmapgen\n"
-"    generate mipmaps for the video image (helps with downscaling)\n"
 "  indirect\n"
 "    Do YUV conversion and scaling as separate passes. This will\n"
 "    first render the video into a video-sized RGB texture, and\n"
