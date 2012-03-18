@@ -246,6 +246,11 @@ struct gl_priv {
 
 static const char help_text[];
 
+static void uninit_rendering(struct gl_priv *p);
+static void delete_shaders(struct gl_priv *p);
+
+
+
 struct fmt_entry {
     int mp_format;
     GLint internal_format;
@@ -705,8 +710,6 @@ static bool input_is_subsampled(struct gl_priv *p)
     return false;
 }
 
-static void delete_shaders(struct gl_priv *p);
-
 static void compile_shaders(struct gl_priv *p)
 {
     GL *gl = p->gl;
@@ -961,8 +964,6 @@ static void init_dither(struct gl_priv *p)
     gl->TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     gl->ActiveTexture(GL_TEXTURE0);
 }
-
-static void uninit_rendering(struct gl_priv *p);
 
 static void reinit_rendering(struct gl_priv *p)
 {
