@@ -1867,6 +1867,14 @@ static int create_window_w32_gl3(struct MPGLContext *ctx, int gl_flags,
     /* update function pointers */
     getFunctions(ctx->gl, w32gpa, NULL, true);
 
+    int pfmt = GetPixelFormat(windc);
+    PIXELFORMATDESCRIPTOR pfd;
+    if (DescribePixelFormat(windc, pfmt, sizeof(PIXELFORMATDESCRIPTOR), &pfd)) {
+        ctx->depth_r = pfd.cRedBits;
+        ctx->depth_g = pfd.cGreenBits;
+        ctx->depth_b = pfd.cBlueBits;
+    }
+
     return 0;
 unsupported:
     mp_msg(MSGT_VO, MSGL_ERR, "[gl] The current OpenGL implementation does"
