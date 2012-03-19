@@ -124,9 +124,6 @@ struct texplane {
     int gl_buffer;
     int buffer_size;
     void *buffer_ptr;
-    // value used to clear the image with memset (YUV chroma planes do not use
-    // the value 0 for this)
-    uint8_t clear_val;
 };
 
 struct scaler {
@@ -263,12 +260,6 @@ static const struct fmt_entry mp_to_gl_formats[] = {
     {0},
 };
 
-// Return the high byte of the value that represents white in chroma (U/V)
-static int get_chroma_clear_val(int bit_depth)
-{
-    return 1 << (bit_depth - 1 & 7);
-}
-
 static bool init_format(int fmt, struct gl_priv *init)
 {
     bool supported = false;
@@ -324,8 +315,6 @@ static bool init_format(int fmt, struct gl_priv *init)
 
         plane->shift_x = n > 0 ? dummy_img.chroma_x_shift : 0;
         plane->shift_y = n > 0 ? dummy_img.chroma_y_shift : 0;
-        plane->clear_val = n > 0 && init->is_yuv
-                           ? get_chroma_clear_val(init->plane_bits) : 0;
     }
 
     return true;
@@ -1044,10 +1033,6 @@ static void init_video(struct gl_priv *p)
     tex_size(p, p->image_width, p->image_height,
              &p->texture_width, &p->texture_height);
 
-    void *tmp = NULL;
-    if (!p->use_npot)
-        tmp = malloc(p->texture_width * p->texture_height * p->plane_bytes);
-
     gl->PixelStorei(GL_UNPACK_ALIGNMENT, 4);
     gl->PixelStorei(GL_UNPACK_ROW_LENGTH, 0);
 
@@ -1063,15 +1048,11 @@ static void init_video(struct gl_priv *p)
         gl->GenTextures(1, &plane->gl_texture);
         gl->BindTexture(GL_TEXTURE_2D, plane->gl_texture);
 
-        if (tmp)
-            memset(tmp, plane->clear_val, w * h * p->plane_bytes);
         gl->TexImage2D(GL_TEXTURE_2D, 0, p->gl_internal_format, w, h, 0,
-                       p->gl_format, p->gl_type, tmp);
+                       p->gl_format, p->gl_type, NULL);
         default_tex_params(gl, GL_TEXTURE_2D, GL_LINEAR);
     }
     gl->ActiveTexture(GL_TEXTURE0);
-
-    free(tmp);
 
     glCheckError(gl, "after video texture creation");
 
@@ -2391,7 +2372,8 @@ static const char help_text[] =
 "    size when downscaling. Trades downscaling performance for\n"
 "    reduced quality.\n"
 "  no-npot\n"
-"    Force use of power-of-2 texture sizes.\n"
+"    Force use of power-of-2 texture sizes. For debugging only.\n"
+"    Borders will look discolored due to filtering.\n"
 "  glfinish\n"
 "    Call glFinish() before swapping buffers\n"
 "  backend=<sys>\n"
