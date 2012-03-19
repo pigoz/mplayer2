@@ -373,7 +373,6 @@ struct GL {
     GLenum (GLAPIENTRY *CheckFramebufferStatus)(GLenum);
     void (GLAPIENTRY *FramebufferTexture2D)(GLenum, GLenum, GLenum, GLuint,
                                             GLint);
-    void (GLAPIENTRY *GenerateMipmap)(GLenum);
 
     void (GLAPIENTRY *Uniform1f)(GLint, GLfloat);
     void (GLAPIENTRY *Uniform3f)(GLint, GLfloat, GLfloat, GLfloat);

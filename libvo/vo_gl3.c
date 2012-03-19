@@ -21,13 +21,6 @@
  * version 2.1 of the License, or (at your option) any later version.
  */
 
-//xxx hack for using GL functions without mplayer's function loader
-#if 0
-#define GL_GLEXT_PROTOTYPES
-#include <GL/gl.h>
-#include <GL/glext.h>
-#endif
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
