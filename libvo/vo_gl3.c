@@ -484,11 +484,16 @@ static char *get_section(void *talloc_ctx, struct bstr source,
     return res;
 }
 
+static char *t_concat(void *talloc_ctx, const char *s1, const char *s2)
+{
+    return talloc_asprintf(talloc_ctx, "%s%s", s1, s2);
+}
+
 static GLuint create_shader(GL *gl, GLenum type, const char *header,
                             const char *source)
 {
     void *tmp = talloc_new(NULL);
-    const char *full_source = talloc_asprintf(tmp, "%s%s", header, source);
+    const char *full_source = t_concat(tmp, header, source);
 
     GLuint shader = gl->CreateShader(type);
     gl->ShaderSource(shader, 1, &full_source, NULL);
@@ -697,22 +702,22 @@ static void compile_shaders(struct gl_priv *p)
         // scaled in this scenario.
         shader_def(&header_conv, "SAMPLE_L", "sample_bilinear");
         shader_def_opt(&header_conv, "FIXED_SCALE", true);
-        header_conv = talloc_asprintf(tmp, "%s%s", header, header_conv);
+        header_conv = t_concat(tmp, header, header_conv);
         p->indirect_program =
             create_program(gl, "indirect", header_conv, vertex_shader, s_video);
     } else if (header_sep) {
-        header_sep = talloc_asprintf(tmp, "%s%s", header_sep, header_conv);
+        header_sep = t_concat(tmp, header_sep, header_conv);
     } else {
-        header_final = talloc_asprintf(tmp, "%s%s", header_final, header_conv);
+        header_final = t_concat(tmp, header_final, header_conv);
     }
 
     if (header_sep) {
-        header_sep = talloc_asprintf(tmp, "%s%s", header, header_sep);
+        header_sep = t_concat(tmp, header, header_sep);
         p->scale_sep_program =
             create_program(gl, "scale_sep", header_sep, vertex_shader, s_video);
     }
 
-    header_final = talloc_asprintf(tmp, "%s%s", header, header_final);
+    header_final = t_concat(tmp, header, header_final);
     p->final_program =
         create_program(gl, "final", header_final, vertex_shader, s_video);
 
