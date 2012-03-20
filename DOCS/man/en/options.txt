@@ -1107,16 +1107,6 @@
         :2: iterative motion vector (MV) search (slow)
         :3: all (default)
 
-    er=<value>
-        Set error resilience strategy.
-
-        :0: disabled
-        :1: careful (Should work with broken encoders.)
-        :2: normal (default) (Works with compliant encoders.)
-        :3: aggressive (More checks, but might cause problems even for valid
-            bitstreams.)
-        :4: very aggressive
-
     fast (MPEG-2, MPEG-4, and H.264 only)
         Enable optimizations which do not comply to the specification and
         might potentially cause problems, like simpler dequantization, simpler
