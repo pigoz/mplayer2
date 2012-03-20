@@ -84,7 +84,7 @@ uniform vec3 inv_gamma;
 uniform float conv_gamma;
 uniform float dither_quantization;
 uniform float dither_multiply;
-uniform float filter_strength;
+uniform float filter_param1;
 
 in vec2 texcoord;
 out vec4 out_color;
@@ -256,7 +256,7 @@ vec4 sample_sharpen3(sampler2D tex, vec2 texcoord) {
              + texture(tex, texcoord + st * vec2(+1, -1))
              + texture(tex, texcoord + st * vec2(-1, +1))
              + texture(tex, texcoord + st * vec2(-1, -1));
-    return p + (p - 0.25 * sum) * filter_strength;
+    return p + (p - 0.25 * sum) * filter_param1;
 }
 
 vec4 sample_sharpen5(sampler2D tex, vec2 texcoord) {
@@ -274,7 +274,7 @@ vec4 sample_sharpen5(sampler2D tex, vec2 texcoord) {
               + texture(tex, texcoord + st2 * vec2(-1,  0))
               + texture(tex, texcoord + st2 * vec2( 0, -1));
     vec4 t = p * 0.859375 + sum2 * -0.1171875 + sum1 * -0.09765625;
-    return p + t * filter_strength;
+    return p + t * filter_param1;
 }
 
 void main() {

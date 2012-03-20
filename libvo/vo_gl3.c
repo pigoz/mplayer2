@@ -161,7 +161,6 @@ struct gl_priv {
     int use_gl2;
 
     int dither_depth;
-    float filter_strength;
     int swap_interval;
     GLint fbo_format;
     int stereo_mode;
@@ -449,8 +448,9 @@ static void update_uniforms(struct gl_priv *p, GLuint program)
     gl->Uniform1f(gl->GetUniformLocation(program, "dither_multiply"),
                   p->dither_multiply);
 
-    gl->Uniform1f(gl->GetUniformLocation(program, "filter_strength"),
-                  p->filter_strength);
+    float sparam1 = p->scaler_params[0];
+    gl->Uniform1f(gl->GetUniformLocation(program, "filter_param1"),
+                  isnan(sparam1) ? 0.5f : sparam1);
 
     gl->UseProgram(0);
 
@@ -2122,7 +2122,6 @@ static int preinit(struct vo *vo, const char *arg)
     *p = (struct gl_priv) {
         .vo = vo,
         .colorspace = MP_CSP_DETAILS_DEFAULTS,
-        .filter_strength = 0.5,
         .use_npot = 1,
         .use_pbo = 0,
         .swap_interval = 1,
@@ -2150,7 +2149,6 @@ static int preinit(struct vo *vo, const char *arg)
         {"gamma",               OPT_ARG_BOOL,   &p->use_gamma},
         {"srgb",                OPT_ARG_BOOL,   &p->use_srgb},
         {"npot",                OPT_ARG_BOOL,   &p->use_npot},
-        {"filter-strength",     OPT_ARG_FLOAT,  &p->filter_strength},
         {"pbo",                 OPT_ARG_BOOL,   &p->use_pbo},
         {"glfinish",            OPT_ARG_BOOL,   &p->use_glFinish},
         {"swapinterval",        OPT_ARG_INT,    &p->swap_interval},
@@ -2272,13 +2270,14 @@ static const char help_text[] =
 "    lanczos3: Lanczos with radius=3 (not recommended).\n"
 "    mitchell: Mitchell-Netravali.\n"
 "    Default: lanczos2\n"
-"  filter-strength=<value>\n"
-"    Set the effect strength for the sharpen4/sharpen5 filters.\n"
-"    Default: 0.5\n"
 "  lparam1=<value> / lparam2=<value>\n"
 "    Set parameters for configurable filters. Affects chroma scaler\n"
 "    as well.\n"
-"    Filters which use this: mitchell, kaiser\n"
+"    Filters which use this:\n"
+"     mitchell: b and c params (defaults: b=1/3 c=1/3)\n"
+"     kaiser: (defaults: 6.33 6.33)\n"
+"     sharpen3: lparam1 sets sharpening strength (default: 0.5)\n"
+"     sharpen5: as with sharpen3\n"
 "  osdcolor=<0xAARRGGBB>\n"
 "    Use the given color for the OSD.\n"
 "  stereo=<n>\n"
