@@ -2261,9 +2261,9 @@ err_out:
 const struct vo_driver video_out_gl3 = {
     .is_new = true,
     .info = &(const vo_info_t) {
-        "OpenGL",
+        "OpenGL 3.x",
         "gl3",
-        "Reimar Doeffinger <Reimar.Doeffinger@gmx.de> and others",
+        "Based on vo_gl.c by Reimar Doeffinger",
         ""
     },
     .preinit = preinit,
