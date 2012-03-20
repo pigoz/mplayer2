@@ -766,6 +766,8 @@ static void init_scaler(struct gl_priv *p, struct scaler *scaler)
 
     assert(scaler->name);
 
+    scaler->kernel = NULL;
+
     const struct filter_kernel *t_kernel = mp_find_filter_kernel(scaler->name);
     if (!t_kernel)
         return;
