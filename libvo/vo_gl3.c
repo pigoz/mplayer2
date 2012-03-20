@@ -55,10 +55,10 @@
 #include "fastmemcpy.h"
 #include "sub/ass_mp.h"
 
-// generated from libvo/vo_gl3_shaders.glsl
+// Generated from libvo/vo_gl3_shaders.glsl
 #include "libvo/vo_gl3_shaders.h"
 
-//! How many parts the OSD may consist of at most
+// How many parts the OSD may consist of at most.
 #define MAX_OSD_PARTS 20
 
 // Pixel width of 1D lookup textures.
@@ -112,15 +112,13 @@ struct vertex {
 #define VERTEX_ATTRIB_COLOR 1
 #define VERTEX_ATTRIB_TEXCOORD 2
 
+// 2 triangles primitives per quad = 6 vertices per quad
+// (GL_QUAD is deprecated, strips can't be used with EOSD image lists)
 #define VERTICES_PER_QUAD 6
 
 struct texplane {
-    // chroma shifts
-    // e.g. get the plane's width in pixels with (priv->src_width >> shift_x)
     int shift_x, shift_y;
-    // GL state
     GLuint gl_texture;
-    // temporary locking during uploading the frame (e.g. for draw_slice)
     int gl_buffer;
     int buffer_size;
     void *buffer_ptr;
@@ -150,8 +148,24 @@ struct gl_priv {
     MPGLContext *glctx;
     GL *gl;
 
-    int gl_debug;
-    int force_gl2;
+    int use_indirect;
+    int use_gamma;
+    int use_srgb;
+    int use_scale_sep;
+    int use_fancy_downscaling;
+    int use_lut_3d;
+    int use_npot;
+    int use_pbo;
+    int use_glFinish;
+    int use_gl_debug;
+    int use_gl2;
+
+    int dither_depth;
+    float filter_strength;
+    int swap_interval;
+    GLint fbo_format;
+    int stereo_mode;
+    int osd_color;
 
     GLuint vertex_buffer;
     GLuint vao;
@@ -159,16 +173,15 @@ struct gl_priv {
     GLuint osd_program, eosd_program;
     GLuint indirect_program, scale_sep_program, final_program;
 
-    //! Textures for OSD
-    GLuint osdtex[MAX_OSD_PARTS];
-    int osdtex_count;
-    GLuint eosd_texture;
-    GLuint eosd_buffer;
-    int eosd_texture_width, eosd_texture_height;
-    struct eosd_packer *eosd;
-    struct vertex *eosd_va;
+    GLuint osd_textures[MAX_OSD_PARTS];
+    int osd_textures_count;
     struct vertex osd_va[MAX_OSD_PARTS * VERTICES_PER_QUAD];
-    int osd_color;
+
+    GLuint eosd_texture;
+    int eosd_texture_width, eosd_texture_height;
+    GLuint eosd_buffer;
+    struct vertex *eosd_va;
+    struct eosd_packer *eosd;
 
     GLuint lut_3d_texture;
     int lut_3d_w, lut_3d_h, lut_3d_d;
@@ -178,27 +191,14 @@ struct gl_priv {
     float dither_quantization;
     float dither_multiply;
 
-    int use_indirect;           // convert YUV to RGB texture first
-    int use_gamma;
-    int use_srgb;
-    int use_scale_sep;
-    int use_fancy_downscaling;
-    int use_lut_3d;
-    int dither_depth;
-    struct mp_csp_details colorspace;
-    bool is_yuv;
-    bool is_linear_rgb;
-    float filter_strength;
-    int use_npot;
     uint32_t image_width;
     uint32_t image_height;
     uint32_t image_format;
-    uint32_t image_d_width;
-    uint32_t image_d_height;
-    int use_pbo;
-    int use_glFinish;
-    int swap_interval;
-    GLint fbo_format;
+    int texture_width;
+    int texture_height;
+
+    bool is_yuv;
+    bool is_linear_rgb;
 
     // per pixel (full pixel when packed, each component when planar)
     int plane_bytes;
@@ -214,16 +214,14 @@ struct gl_priv {
     struct fbotex indirect_fbo;         // RGB target
     struct fbotex scale_sep_fbo;        // first pass when doing 2 pass scaling
 
-    // state for luma and chroma scalers
+    // state for luma (0) and chroma (1) scalers
     struct scaler scalers[2];
+    // luma scaler parameters (the same are used for chroma)
     float scaler_params[2];
 
-    int stereo_mode;
-
+    struct mp_csp_details colorspace;
     struct mp_csp_equalizer video_eq;
 
-    int texture_width;
-    int texture_height;
     int mpi_flipped;
     int vo_flipped;
 
@@ -232,13 +230,6 @@ struct gl_priv {
     int border_x, border_y;     // OSD borders
     int vp_x, vp_y, vp_w, vp_h; // GL viewport
 };
-
-static const char help_text[];
-
-static void uninit_rendering(struct gl_priv *p);
-static void delete_shaders(struct gl_priv *p);
-
-
 
 struct fmt_entry {
     int mp_format;
@@ -260,65 +251,12 @@ static const struct fmt_entry mp_to_gl_formats[] = {
     {0},
 };
 
-static bool init_format(int fmt, struct gl_priv *init)
-{
-    bool supported = false;
-    struct gl_priv dummy;
-    if (!init)
-        init = &dummy;
 
-    mp_image_t dummy_img = {0};
-    mp_image_setfmt(&dummy_img, fmt);
+static const char help_text[];
 
-    init->image_format = fmt;
+static void uninit_rendering(struct gl_priv *p);
+static void delete_shaders(struct gl_priv *p);
 
-    // RGB/packed formats
-    for (const struct fmt_entry *e = mp_to_gl_formats; e->mp_format; e++) {
-        if (e->mp_format == fmt) {
-            supported = true;
-            init->plane_bits = dummy_img.bpp;
-            init->gl_format = e->format;
-            init->gl_internal_format = e->internal_format;
-            init->gl_type = e->type;
-            break;
-        }
-    }
-
-    // YUV/planar formats
-    if (!supported && mp_get_chroma_shift(fmt, NULL, NULL, &init->plane_bits)) {
-        init->gl_format = GL_RED;
-        if (init->plane_bits == 8) {
-            supported = true;
-            init->gl_internal_format = GL_RED;
-            init->gl_type = GL_UNSIGNED_BYTE;
-        } else if (IMGFMT_IS_YUVP16_NE(fmt)) {
-            supported = true;
-            init->gl_internal_format = GL_R16;
-            init->gl_type = GL_UNSIGNED_SHORT;
-        }
-    }
-
-    if (!supported)
-        return false;
-
-    init->plane_bytes = (init->plane_bits + 7) / 8;
-    init->is_yuv = dummy_img.flags & MP_IMGFLAG_YUV;
-    init->is_linear_rgb = false;
-
-    // NOTE: we throw away the additional alpha plane, if one exists.
-    init->plane_count = dummy_img.num_planes > 2 ? 3 : 1;
-    assert(dummy_img.num_planes >= init->plane_count);
-    assert(dummy_img.num_planes <= init->plane_count + 1);
-
-    for (int n = 0; n < init->plane_count; n++) {
-        struct texplane *plane = &init->planes[n];
-
-        plane->shift_x = n > 0 ? dummy_img.chroma_x_shift : 0;
-        plane->shift_y = n > 0 ? dummy_img.chroma_y_shift : 0;
-    }
-
-    return true;
-}
 
 static void default_tex_params(struct GL *gl, GLenum target, GLint filter)
 {
@@ -428,7 +366,7 @@ static void fbotex_init(struct gl_priv *p, struct fbotex *fbo, int w, int h)
         != GL_FRAMEBUFFER_COMPLETE)
     {
         mp_msg(MSGT_VO, MSGL_ERR, "[gl] Error: framebuffer completeness "
-                                    "check failed!\n");
+                                  "check failed!\n");
     }
 
     gl->BindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -441,11 +379,8 @@ static void fbotex_uninit(struct gl_priv *p, struct fbotex *fbo)
     GL *gl = p->gl;
 
     gl->DeleteFramebuffers(1, &fbo->fbo);
-    fbo->fbo = 0;
     gl->DeleteTextures(1, &fbo->texture);
-    fbo->texture = 0;
-    fbo->tex_w = fbo->tex_h = 0;
-    fbo->vp_w = fbo->vp_h = 0;
+    *fbo = (struct fbotex) {0};
 }
 
 static void matrix_ortho2d(float m[3][3], float x0, float x1,
@@ -560,9 +495,8 @@ static char *get_section(void *talloc_ctx, struct bstr source,
         struct bstr line = bstr_getline(source, &source);
         if (bstr_eatstart(&line, bstr(SECTION_HEADER))) {
             copy = bstrcmp0(line, section) == 0;
-        } else {
-            if (copy)
-                res = talloc_asprintf_append_buffer(res, "%.*s\n", BSTR_P(line));
+        } else if (copy) {
+            res = talloc_asprintf_append_buffer(res, "%.*s\n", BSTR_P(line));
         }
     }
     return res;
@@ -571,8 +505,8 @@ static char *get_section(void *talloc_ctx, struct bstr source,
 static GLuint create_shader(GL *gl, GLenum type, const char *header,
                             const char *source)
 {
-    void *ctx = talloc_new(NULL);
-    const char *full_source = talloc_asprintf(ctx, "%s%s", header, source);
+    void *tmp = talloc_new(NULL);
+    const char *full_source = talloc_asprintf(tmp, "%s%s", header, source);
 
     GLuint shader = gl->CreateShader(type);
     gl->ShaderSource(shader, 1, &full_source, NULL);
@@ -589,13 +523,13 @@ static GLuint create_shader(GL *gl, GLenum type, const char *header,
         mp_log_source(MSGT_VO, pri, full_source);
     }
     if (log_length > 1) {
-        GLchar *log = talloc_zero_size(ctx, log_length + 1);
+        GLchar *log = talloc_zero_size(tmp, log_length + 1);
         gl->GetShaderInfoLog(shader, log_length, NULL, log);
         mp_msg(MSGT_VO, pri, "[gl] %s shader compile log (status=%d):\n%s\n",
                typestr, status, log);
     }
 
-    talloc_free(ctx);
+    talloc_free(tmp);
 
     return shader;
 }
@@ -744,11 +678,14 @@ static void compile_shaders(struct gl_priv *p)
     bool use_indirect = p->use_indirect;
 
     // It doesn't make sense to scale the chroma with cscale in the 1. scale
-    // step and with lscale in the 2. step. Also, even with 4:4:4 YUV or planar
-    // RGB, the indirection might be faster: the shader can't use one scaler for
-    // sampling from 3 textures, but has to fetch the coefficients for each
-    // texture separately, even though they're the same (this is not an inherent
-    // restriction, but would require to restructure the shader).
+    // step and with lscale in the 2. step. If the chroma is subsampled, a
+    // convolution filter wouldn't even work entirely correctly, because the
+    // luma scaler would sample two texels instead of one per tap for chroma.
+    // Also, even with 4:4:4 YUV or planar RGB, the indirection might be faster,
+    // because the shader can't use one scaler for sampling from 3 textures. It
+    // has to fetch the coefficients for each texture separately, even though
+    // they're the same (this is not an inherent restriction, but would require
+    // to restructure the shader).
     if (header_sep && p->plane_count > 1)
         use_indirect = true;
 
@@ -826,7 +763,7 @@ static bool update_scale_factor(struct gl_priv *p, struct filter_kernel *kernel)
     double scale = get_scale_factor(p);
     if (!p->use_fancy_downscaling && scale < 1.0)
         scale = 1.0;
-    return mp_init_filter(kernel, filter_sizes, FFMAX(1.0, 1.0/scale));
+    return mp_init_filter(kernel, filter_sizes, FFMAX(1.0, 1.0 / scale));
 }
 
 static void init_scaler(struct gl_priv *p, struct scaler *scaler)
@@ -928,7 +865,7 @@ static void init_dither(struct gl_priv *p)
     // dither patterns can be visible.
     p->dither_quantization = (1 << dst_depth) - 1;
     int size = 8;
-    p->dither_multiply = p->dither_quantization + 1. / (size*size);
+    p->dither_multiply = p->dither_quantization + 1.0 / (size*size);
     unsigned char dither[256];
     make_dither_matrix(dither, size);
 
@@ -988,8 +925,6 @@ static void init_lut_3d(struct gl_priv *p)
 {
     GL *gl = p->gl;
 
-    mp_msg(MSGT_VO, MSGL_V, "[gl] upload 3dlut\n");
-
     gl->GenTextures(1, &p->lut_3d_texture);
     gl->ActiveTexture(GL_TEXTURE0 + TEXUNIT_3DLUT);
     gl->BindTexture(GL_TEXTURE_3D, p->lut_3d_texture);
@@ -1004,8 +939,6 @@ static void init_lut_3d(struct gl_priv *p)
     gl->TexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
     gl->ActiveTexture(GL_TEXTURE0);
 
-    mp_msg(MSGT_VO, MSGL_V, "[gl] end upload 3dlut\n");
-
     glCheckError(gl, "after 3d lut creation");
 }
 
@@ -1015,8 +948,6 @@ static void init_video(struct gl_priv *p)
 
     if (p->use_lut_3d && !p->lut_3d_texture)
         init_lut_3d(p);
-
-    init_format(p->image_format, p);
 
     if (!p->is_yuv && (p->use_srgb || p->use_lut_3d)) {
         p->is_linear_rgb = true;
@@ -1032,9 +963,6 @@ static void init_video(struct gl_priv *p)
 
     tex_size(p, p->image_width, p->image_height,
              &p->texture_width, &p->texture_height);
-
-    gl->PixelStorei(GL_UNPACK_ALIGNMENT, 4);
-    gl->PixelStorei(GL_UNPACK_ROW_LENGTH, 0);
 
     for (int n = 0; n < p->plane_count; n++) {
         struct texplane *plane = &p->planes[n];
@@ -1059,7 +987,6 @@ static void init_video(struct gl_priv *p)
     reinit_rendering(p);
 }
 
-// Free resources specific to video size or pixel format.
 static void uninit_video(struct gl_priv *p)
 {
     GL *gl = p->gl;
@@ -1247,7 +1174,7 @@ static void resize(struct gl_priv *p)
     }
     if (too_small)
         mp_msg(MSGT_VO, MSGL_WARN, "[gl] Can't downscale that much, window "
-               "output may look suboptimal.\n");
+                                   "output may look suboptimal.\n");
 
     update_window_sized_objects(p);
     update_all_uniforms(p);
@@ -1419,8 +1346,8 @@ static mp_image_t *get_screenshot(struct gl_priv *p)
     image->width = p->image_width;
     image->height = p->image_height;
 
-    image->w = p->image_d_width;
-    image->h = p->image_d_height;
+    image->w = p->vo->aspdat.prew;
+    image->h = p->vo->aspdat.preh;
 
     return image;
 }
@@ -1429,15 +1356,13 @@ static mp_image_t *get_window_screenshot(struct gl_priv *p)
 {
     GL *gl = p->gl;
 
-    GLint vp[4]; //x, y, w, h
-    gl->GetIntegerv(GL_VIEWPORT, vp);
-    mp_image_t *image = alloc_mpi(vp[2], vp[3], IMGFMT_RGB24);
+    mp_image_t *image = alloc_mpi(p->vp_w, p->vp_h, IMGFMT_RGB24);
     gl->PixelStorei(GL_PACK_ALIGNMENT, 4);
     gl->PixelStorei(GL_PACK_ROW_LENGTH, 0);
     gl->ReadBuffer(GL_FRONT);
-    //flip image while reading
-    for (int y = 0; y < vp[3]; y++) {
-        gl->ReadPixels(vp[0], vp[1] + vp[3] - y - 1, vp[2], 1,
+    // flip image while reading
+    for (int y = 0; y < p->vp_h; y++) {
+        gl->ReadPixels(p->vp_x, p->vp_y + p->vp_h - y - 1, p->vp_w, 1,
                        GL_RGB, GL_UNSIGNED_BYTE,
                        image->planes[0] + y * image->stride[0]);
     }
@@ -1448,10 +1373,10 @@ static void clear_osd(struct gl_priv *p)
 {
     GL *gl = p->gl;
 
-    if (!p->osdtex_count)
+    if (!p->osd_textures_count)
         return;
-    gl->DeleteTextures(p->osdtex_count, p->osdtex);
-    p->osdtex_count = 0;
+    gl->DeleteTextures(p->osd_textures_count, p->osd_textures);
+    p->osd_textures_count = 0;
 }
 
 static void create_osd_texture(void *ctx, int x0, int y0, int w, int h,
@@ -1461,48 +1386,44 @@ static void create_osd_texture(void *ctx, int x0, int y0, int w, int h,
     struct gl_priv *p = ctx;
     GL *gl = p->gl;
 
-    // initialize to 8 to avoid special-casing on alignment
-    int sx = 8, sy = 8;
-
     if (w <= 0 || h <= 0 || stride < w) {
         mp_msg(MSGT_VO, MSGL_V, "Invalid dimensions OSD for part!\n");
         return;
     }
-    tex_size(p, w, h, &sx, &sy);
 
-    if (p->osdtex_count >= MAX_OSD_PARTS) {
+    if (p->osd_textures_count >= MAX_OSD_PARTS) {
         mp_msg(MSGT_VO, MSGL_ERR, "Too many OSD parts, contact the developers!\n");
         return;
     }
 
-    gl->GenTextures(1, &p->osdtex[p->osdtex_count]);
-    gl->BindTexture(GL_TEXTURE_2D, p->osdtex[p->osdtex_count]);
+    int sx, sy;
+    tex_size(p, w, h, &sx, &sy);
+
+    gl->GenTextures(1, &p->osd_textures[p->osd_textures_count]);
+    gl->BindTexture(GL_TEXTURE_2D, p->osd_textures[p->osd_textures_count]);
     gl->TexImage2D(GL_TEXTURE_2D, 0, GL_RG, sx, sy, 0, GL_RG, GL_UNSIGNED_BYTE,
                    NULL);
     default_tex_params(gl, GL_TEXTURE_2D, GL_NEAREST);
-    {
-        int i;
-        unsigned char *tmp = malloc(stride * h * 2);
-        // convert alpha from weird MPlayer scale.
-        for (i = 0; i < h * stride; i++) {
-            tmp[i*2+0] = src[i];
-            tmp[i*2+1] = -srca[i];
-        }
-        glUploadTex(gl, GL_TEXTURE_2D, GL_RG, GL_UNSIGNED_BYTE, tmp, stride * 2,
-                    0, 0, w, h, 0);
-        free(tmp);
+    unsigned char *tmp = malloc(stride * h * 2);
+    // Convert alpha from weird MPlayer scale.
+    for (int i = 0; i < h * stride; i++) {
+        tmp[i*2+0] = src[i];
+        tmp[i*2+1] = -srca[i];
     }
+    glUploadTex(gl, GL_TEXTURE_2D, GL_RG, GL_UNSIGNED_BYTE, tmp, stride * 2,
+                0, 0, w, h, 0);
+    free(tmp);
 
     gl->BindTexture(GL_TEXTURE_2D, 0);
 
     uint8_t color[4] = {(p->osd_color >> 16) & 0xff, (p->osd_color >> 8) & 0xff,
                         p->osd_color & 0xff, 0xff - (p->osd_color >> 24)};
 
-    write_quad(&p->osd_va[p->osdtex_count * VERTICES_PER_QUAD],
+    write_quad(&p->osd_va[p->osd_textures_count * VERTICES_PER_QUAD],
                x0, y0, x0 + w, y0 + h, 0, 0, w, h,
                sx, sy, color, false);
 
-    p->osdtex_count++;
+    p->osd_textures_count++;
 }
 
 static void draw_osd(struct vo *vo, struct osd_state *osd)
@@ -1518,15 +1439,15 @@ static void draw_osd(struct vo *vo, struct osd_state *osd)
                           p->image_height, create_osd_texture, p);
     }
 
-    if (p->osdtex_count > 0) {
+    if (p->osd_textures_count > 0) {
         gl->Enable(GL_BLEND);
         // OSD bitmaps use premultiplied alpha.
         gl->BlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
         gl->UseProgram(p->osd_program);
 
-        for (int n = 0; n < p->osdtex_count; n++) {
-            gl->BindTexture(GL_TEXTURE_2D, p->osdtex[n]);
+        for (int n = 0; n < p->osd_textures_count; n++) {
+            gl->BindTexture(GL_TEXTURE_2D, p->osd_textures[n]);
             draw_triangles(p, &p->osd_va[n * VERTICES_PER_QUAD],
                            VERTICES_PER_QUAD);
         }
@@ -1571,8 +1492,6 @@ static void gen_eosd(struct gl_priv *p, mp_eosd_images_t *imgs)
         gl->BindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
     }
 
-    // 2 triangles primitives per quad = 6 vertices per quad
-    // not using GL_QUADS, as it is deprecated in OpenGL 3.x and later
     p->eosd_va = talloc_realloc_size(p->eosd, p->eosd_va,
                                      p->eosd->targets_count
                                      * sizeof(struct vertex)
@@ -1673,7 +1592,6 @@ static void setup_vertex_array(GL *gl)
                             stride, (void*)offsetof(struct vertex, texcoord));
 }
 
-// First-time initialization of the GL state.
 static int init_gl(struct gl_priv *p)
 {
     GL *gl = p->gl;
@@ -1746,16 +1664,87 @@ static void uninit_gl(struct gl_priv *p)
     p->lut_3d_texture = 0;
 }
 
+static bool init_format(int fmt, struct gl_priv *init)
+{
+    bool supported = false;
+    struct gl_priv dummy;
+    if (!init)
+        init = &dummy;
+
+    mp_image_t dummy_img = {0};
+    mp_image_setfmt(&dummy_img, fmt);
+
+    init->image_format = fmt;
+
+    // RGB/packed formats
+    for (const struct fmt_entry *e = mp_to_gl_formats; e->mp_format; e++) {
+        if (e->mp_format == fmt) {
+            supported = true;
+            init->plane_bits = dummy_img.bpp;
+            init->gl_format = e->format;
+            init->gl_internal_format = e->internal_format;
+            init->gl_type = e->type;
+            break;
+        }
+    }
+
+    // YUV/planar formats
+    if (!supported && mp_get_chroma_shift(fmt, NULL, NULL, &init->plane_bits)) {
+        init->gl_format = GL_RED;
+        if (init->plane_bits == 8) {
+            supported = true;
+            init->gl_internal_format = GL_RED;
+            init->gl_type = GL_UNSIGNED_BYTE;
+        } else if (IMGFMT_IS_YUVP16_NE(fmt)) {
+            supported = true;
+            init->gl_internal_format = GL_R16;
+            init->gl_type = GL_UNSIGNED_SHORT;
+        }
+    }
+
+    if (!supported)
+        return false;
+
+    init->plane_bytes = (init->plane_bits + 7) / 8;
+    init->is_yuv = dummy_img.flags & MP_IMGFLAG_YUV;
+    init->is_linear_rgb = false;
+
+    // NOTE: we throw away the additional alpha plane, if one exists.
+    init->plane_count = dummy_img.num_planes > 2 ? 3 : 1;
+    assert(dummy_img.num_planes >= init->plane_count);
+    assert(dummy_img.num_planes <= init->plane_count + 1);
+
+    for (int n = 0; n < init->plane_count; n++) {
+        struct texplane *plane = &init->planes[n];
+
+        plane->shift_x = n > 0 ? dummy_img.chroma_x_shift : 0;
+        plane->shift_y = n > 0 ? dummy_img.chroma_y_shift : 0;
+    }
+
+    return true;
+}
+
+static int query_format(uint32_t format)
+{
+    int caps = VFCAP_CSP_SUPPORTED | VFCAP_CSP_SUPPORTED_BY_HW | VFCAP_FLIP |
+               VFCAP_HWSCALE_UP | VFCAP_HWSCALE_DOWN | VFCAP_ACCEPT_STRIDE |
+               VFCAP_OSD | VFCAP_EOSD | VFCAP_EOSD_UNSCALED;
+    if (!init_format(format, NULL))
+        return 0;
+    return caps;
+}
+
 static bool config_window(struct gl_priv *p, uint32_t d_width,
                           uint32_t d_height, uint32_t flags)
 {
     if (p->stereo_mode == GL_3D_QUADBUFFER)
         flags |= VOFLAG_STEREO;
 
-    int mpgl_version = p->force_gl2 ? MPGL_VER(2, 1) : MPGL_VER(3, 2);
-    int mpgl_flags = 0;
-    if (p->gl_debug)
-        mpgl_flags |= MPGLFLAG_DEBUG;
+    int mpgl_version = MPGL_VER(3, 2);
+    int mpgl_flags = p->use_gl_debug ? MPGLFLAG_DEBUG : 0;
+
+    if (p->use_gl2)
+        mpgl_version = MPGL_VER(2, 1);
 
     if (create_mpglcontext(p->glctx, mpgl_flags, mpgl_version, d_width,
                            d_height, flags) == SET_WINDOW_FAILED)
@@ -1776,8 +1765,6 @@ static int config(struct vo *vo, uint32_t width, uint32_t height,
     if (!config_window(p, d_width, d_height, flags))
         return -1;
 
-    p->image_d_width = d_width;
-    p->image_d_height = d_height;
     p->vo_flipped = !!(flags & VOFLAG_FLIPPING);
 
     if (p->image_format != format || p->image_width != width
@@ -1786,23 +1773,13 @@ static int config(struct vo *vo, uint32_t width, uint32_t height,
         uninit_video(p);
         p->image_height = height;
         p->image_width = width;
-        p->image_format = format;
+        init_format(format, p);
         init_video(p);
     }
 
     resize(p);
 
     return 0;
-}
-
-static int query_format(uint32_t format)
-{
-    int caps = VFCAP_CSP_SUPPORTED | VFCAP_CSP_SUPPORTED_BY_HW | VFCAP_FLIP |
-               VFCAP_HWSCALE_UP | VFCAP_HWSCALE_DOWN | VFCAP_ACCEPT_STRIDE |
-               VFCAP_OSD | VFCAP_EOSD | VFCAP_EOSD_UNSCALED;
-    if (!init_format(format, NULL))
-        return 0;
-    return caps;
 }
 
 static void check_events(struct vo *vo)
@@ -1869,7 +1846,7 @@ static int control(struct vo *vo, uint32_t request, void *data)
     case VOCTRL_GET_EQUALIZER: {
         struct voctrl_get_equalizer_args *args = data;
         return mp_csp_equalizer_get(&p->video_eq, args->name, args->valueptr)
-                >= 0 ? VO_TRUE : VO_NOTIMPL;
+               >= 0 ? VO_TRUE : VO_NOTIMPL;
     }
     case VOCTRL_SET_EQUALIZER: {
         struct voctrl_set_equalizer_args *args = data;
@@ -2009,8 +1986,6 @@ static bool load_icc(struct gl_priv *p, const char *icc_file,
     if (!trafo)
         goto error_exit;
 
-    mp_msg(MSGT_VO, MSGL_V, "[gl] DoTransform\n");
-
     // transform a (s_r)x(s_g)x(s_b) cube, with 3 components per channel
     uint16_t *input = talloc_array(tmp, uint16_t, s_r * 3);
     for (int b = 0; b < s_b; b++) {
@@ -2024,8 +1999,6 @@ static bool load_icc(struct gl_priv *p, const char *icc_file,
             cmsDoTransform(trafo, input, output + base, s_r);
         }
     }
-
-    mp_msg(MSGT_VO, MSGL_V, "[gl] end DoTransform\n");
 
     cmsDeleteTransform(trafo);
 
@@ -2206,8 +2179,8 @@ static int preinit(struct vo *vo, const char *arg)
         {"lparam1",             OPT_ARG_FLOAT,  &p->scaler_params[0]},
         {"lparam2",             OPT_ARG_FLOAT,  &p->scaler_params[1]},
         {"fancy-downscaling",   OPT_ARG_BOOL,   &p->use_fancy_downscaling},
-        {"debug",               OPT_ARG_BOOL,   &p->gl_debug},
-        {"force-gl2",           OPT_ARG_BOOL,   &p->force_gl2},
+        {"debug",               OPT_ARG_BOOL,   &p->use_gl_debug},
+        {"force-gl2",           OPT_ARG_BOOL,   &p->use_gl2},
         {"indirect",            OPT_ARG_BOOL,   &p->use_indirect},
         {"scale-sep",           OPT_ARG_BOOL,   &p->use_scale_sep},
         {"fbo-format",          OPT_ARG_MSTRZ,  &fbo_format, fbo_format_valid},
@@ -2314,15 +2287,16 @@ static const char help_text[] =
 "    sharpen3: unsharp masking (sharpening) with radius=3.\n"
 "    sharpen5: unsharp masking (sharpening) with radius=5.\n"
 "    lanczos2: Lanczos with radius=2 (default, recommended).\n"
-"    lanczos3: Lanczos with radius=3.\n"
+"    lanczos3: Lanczos with radius=3 (not recommended).\n"
+"    mitchell: Mitchell-Netravali.\n"
 "    Default: lanczos2\n"
 "  filter-strength=<value>\n"
 "    Set the effect strength for the sharpen4/sharpen5 filters.\n"
 "    Default: 0.5\n"
 "  lparam1=<value> / lparam2=<value>\n"
-"    Set parameters for configurable filters. Currently only the\n"
-"    filters 'mitchell' (Mitchell-Netravali) and 'kaiser' support\n"
-"    this. Affects chroma scaler as well.\n"
+"    Set parameters for configurable filters. Affects chroma scaler\n"
+"    as well.\n"
+"    Filters which use this: mitchell, kaiser\n"
 "  osdcolor=<0xAARRGGBB>\n"
 "    Use the given color for the OSD.\n"
 "  stereo=<n>\n"
@@ -2364,9 +2338,9 @@ static const char help_text[] =
 "    Note that chroma scalers are always done as 1-pass filters.\n"
 "  cscale=<n>\n"
 "    As lscale but for chroma (2x slower with little visible effect).\n"
-"    Note that with some scaling filters, upscaling is always done\n"
-"    in RGB. Setting this option doesn't necessarily help with\n"
-"    anything.\n"
+"    Note that with some scaling filters, upscaling is always done in\n"
+"    RGB. If chroma is not subsampled, this option is ignored, and the\n"
+"    luma scaler is used instead. Setting this option is often useless.\n"
 "  no-fancy-downscaling\n"
 "    When using convolution based filters, don't extend the filter\n"
 "    size when downscaling. Trades downscaling performance for\n"
