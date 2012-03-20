@@ -637,11 +637,13 @@ static void compile_shaders(struct gl_priv *p)
     char *header_final = talloc_strdup(tmp, "");
     char *header_sep = NULL;
 
+    bool convert_input_to_linear = !p->is_linear_rgb
+                                   && (p->use_srgb || p->use_lut_3d);
+
     shader_def_opt(&header_conv, "USE_PLANAR", p->plane_count > 1);
     shader_def_opt(&header_conv, "USE_YGRAY", p->is_yuv && p->plane_count == 1);
     shader_def_opt(&header_conv, "USE_COLORMATRIX", p->is_yuv);
-    shader_def_opt(&header_conv, "USE_LINEAR_CONV",
-                   !p->is_linear_rgb && (p->use_srgb || p->use_lut_3d));
+    shader_def_opt(&header_conv, "USE_LINEAR_CONV", convert_input_to_linear);
 
     shader_def_opt(&header_final, "USE_LINEAR_CONV_INV", p->use_lut_3d);
     shader_def_opt(&header_final, "USE_GAMMA_POW", p->use_gamma);
@@ -657,7 +659,17 @@ static void compile_shaders(struct gl_priv *p)
         shader_setup_scaler(&header_final, &p->scalers[0], -1);
     }
 
+    // We want to do scaling in linear light. Scaling is closely connected to
+    // texture sampling due to how the shader is structured (or if GL bilinear
+    // scaling is used). The purpose of the "indirect" pass is to convert the
+    // input video to linear RGB.
+    // Another purpose is reducing input to a single texture for scaling.
     bool use_indirect = p->use_indirect;
+
+    // Don't sample from input video textures before converting the input to
+    // linear light. (Unneeded when sRGB textures are used.)
+    if (convert_input_to_linear)
+        use_indirect = true;
 
     // It doesn't make sense to scale the chroma with cscale in the 1. scale
     // step and with lscale in the 2. step. If the chroma is subsampled, a
@@ -680,11 +692,6 @@ static void compile_shaders(struct gl_priv *p)
                    use_indirect ? "sample_bilinear" : "SAMPLE_L");
     }
 
-    // We want to do scaling in linear light. Scaling is closely connected to
-    // texture sampling due to how the shader is structured (or if GL bilinear
-    // scaling is used). The purpose of the "indirect" pass is to convert the
-    // input video to linear RGB.
-    // Another purpose is reducing input to a single texture for scaling.
     if (use_indirect) {
         // We don't use filtering for the Y-plane (luma), because it's never
         // scaled in this scenario.
@@ -1999,7 +2006,6 @@ done:
     p->lut_3d_data = talloc_steal(p, output);
     p->lut_3d_w = s_r, p->lut_3d_h = s_g, p->lut_3d_d = s_b;
     p->use_lut_3d = true;
-    p->use_indirect = true;
 
     talloc_free(tmp);
     return true;
@@ -2178,9 +2184,6 @@ static int preinit(struct vo *vo, const char *arg)
         mp_msg(MSGT_VO, MSGL_FATAL, help_text);
         goto err_out;
     }
-
-    if (p->use_srgb)
-        p->use_indirect = 1;
 
     int backend = backend_arg ? mpgl_find_backend(backend_arg) : GLTYPE_AUTO;
     free(backend_arg);

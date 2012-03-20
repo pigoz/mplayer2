@@ -20,8 +20,8 @@
 // text processing functions, and in fact contains multiple vertex and fragment
 // shaders.
 
-#!section prelude
 // inserted at the beginning of all shaders
+#!section prelude
 #version 150
 
 #!section vertex_all
