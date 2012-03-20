@@ -425,50 +425,32 @@ static void update_uniforms(struct gl_priv *p, GLuint program)
         gl->UniformMatrix4x3fv(loc, 1, GL_TRUE, &yuv2rgb[0][0]);
     }
 
-    loc = gl->GetUniformLocation(program, "inv_gamma");
-    if (loc >= 0) {
-        gl->Uniform3f(loc, 1.0 / cparams.rgamma, 1.0 / cparams.ggamma,
-                      1.0 / cparams.bgamma);
-    }
+    gl->Uniform3f(gl->GetUniformLocation(program, "inv_gamma"),
+                  1.0 / cparams.rgamma,
+                  1.0 / cparams.ggamma,
+                  1.0 / cparams.bgamma);
 
-    loc = gl->GetUniformLocation(program, "texture1");
-    if (loc >= 0)
-        gl->Uniform1i(loc, 0);
-    loc = gl->GetUniformLocation(program, "texture2");
-    if (loc >= 0)
-        gl->Uniform1i(loc, 1);
-    loc = gl->GetUniformLocation(program, "texture3");
-    if (loc >= 0)
-        gl->Uniform1i(loc, 2);
+    gl->Uniform1i(gl->GetUniformLocation(program, "texture1"), 0);
+    gl->Uniform1i(gl->GetUniformLocation(program, "texture2"), 1);
+    gl->Uniform1i(gl->GetUniformLocation(program, "texture3"), 2);
 
-    loc = gl->GetUniformLocation(program, "lut_3d");
-    if (loc >= 0)
-        gl->Uniform1i(loc, TEXUNIT_3DLUT);
+    gl->Uniform1i(gl->GetUniformLocation(program, "lut_3d"), TEXUNIT_3DLUT);
 
     for (int n = 0; n < 2; n++) {
         const char *lut = p->scalers[n].lut_name;
-        if (lut) {
-            GLint loc = gl->GetUniformLocation(program, lut);
-            if (loc >= 0)
-                gl->Uniform1i(loc, TEXUNIT_SCALERS + n);
-        }
+        if (lut)
+            gl->Uniform1i(gl->GetUniformLocation(program, lut),
+                          TEXUNIT_SCALERS + n);
     }
 
-    loc = gl->GetUniformLocation(program, "dither");
-    if (loc >= 0)
-        gl->Uniform1i(loc, TEXUNIT_DITHER);
+    gl->Uniform1i(gl->GetUniformLocation(program, "dither"), TEXUNIT_DITHER);
+    gl->Uniform1f(gl->GetUniformLocation(program, "dither_quantization"),
+                  p->dither_quantization);
+    gl->Uniform1f(gl->GetUniformLocation(program, "dither_multiply"),
+                  p->dither_multiply);
 
-    loc = gl->GetUniformLocation(program, "dither_quantization");
-    if (loc >= 0)
-        gl->Uniform1f(loc, p->dither_quantization);
-
-    loc = gl->GetUniformLocation(program, "dither_multiply");
-    if (loc >= 0)
-        gl->Uniform1f(loc, p->dither_multiply);
-
-    loc = gl->GetUniformLocation(program, "filter_strength");
-    if (loc >= 0)
-        gl->Uniform1f(loc, p->filter_strength);
+    gl->Uniform1f(gl->GetUniformLocation(program, "filter_strength"),
+                  p->filter_strength);
 
     gl->UseProgram(0);
 
