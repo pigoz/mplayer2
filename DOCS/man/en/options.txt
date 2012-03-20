@@ -494,6 +494,12 @@
     Automatically attaches gdb upon crash or **SIGTRAP**. Support must be
     compiled in by configuring with ``--enable-crash-debug``.
 
+--cursor-autohide-delay=<number>
+    Make mouse cursor automatically hide after given number of milliseconds.
+    A value of -1 will disable cursor autohide. A value of -2 means the cursor
+    will stay hidden. Supported by video output drivers which use X11 or
+    OS X Cocoa.
+
 --delay=<sec>
     audio delay in seconds (positive or negative float value) Negative values
     delay the audio, and positive values delay the video.
