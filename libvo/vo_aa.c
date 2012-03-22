@@ -39,7 +39,6 @@
 #include "aspect.h"
 #include "libswscale/swscale.h"
 #include "libmpcodecs/vf_scale.h"
-#include "sub/font_load.h"
 #include "sub/sub.h"
 
 #include "input/keycodes.h"
@@ -88,7 +87,6 @@ char posbar[MESSAGE_SIZE];
 static int osdx, osdy;
 static int osd_text_length = 0;
 int aaconfigmode=1;
-font_desc_t* vo_font_save = NULL;
 static struct SwsContext *sws=NULL;
 
 /* configuration */
@@ -229,8 +227,6 @@ config(uint32_t width, uint32_t height, uint32_t d_width,
      * called by mplayer
      */
 
-    int i;
-
     aspect_save_orig(width,height);
     aspect_save_prescale(d_width,d_height);
 
@@ -240,38 +236,6 @@ config(uint32_t width, uint32_t height, uint32_t d_width,
 
     /* nothing will change its size, be we need some values initialized */
     resize();
-
-    /* now init our own 'font' */
-    if(!vo_font_save) vo_font_save = vo_font;
-    if(vo_font == vo_font_save) {
-      vo_font=malloc(sizeof(font_desc_t));//if(!desc) return NULL;
-      memset(vo_font,0,sizeof(font_desc_t));
-      vo_font->pic_a[0]=malloc(sizeof(raw_file));
-      memset(vo_font->pic_a[0],0,sizeof(raw_file));
-      vo_font->pic_b[0]=malloc(sizeof(raw_file));
-      memset(vo_font->pic_b[0],0,sizeof(raw_file));
-
-#ifdef CONFIG_FREETYPE
-      vo_font->dynamic = 0;
-#endif
-
-      vo_font->spacewidth=1;
-      vo_font->charspace=0;
-      vo_font->height=1;
-      vo_font->pic_a[0]->bmp=malloc(255);
-      vo_font->pic_a[0]->pal=NULL;
-      vo_font->pic_b[0]->bmp=malloc(255);
-      vo_font->pic_b[0]->pal=NULL;
-      vo_font->pic_a[0]->w=1;
-      vo_font->pic_a[0]->h=1;
-      for (i=0; i<255; i++){
-	vo_font->width[i]=1;
-	vo_font->font[i]=0;
-	vo_font->start[i]=i;
-	vo_font->pic_a[0]->bmp[i]=i;
-	vo_font->pic_b[0]->bmp[i]=i;
-      }
-    }
 
     /* say hello */
     osdmessage(5, 1, "Welcome to ASCII ART MPlayer");
@@ -502,55 +466,12 @@ uninit(void) {
     if (strstr(c->driver->name,"Curses") || strstr(c->driver->name,"Linux")){
 	freopen("/dev/tty", "w", stderr);
     }
-    if(vo_font_save) {
-      free(vo_font->pic_a[0]->bmp);
-      free(vo_font->pic_a[0]);
-      free(vo_font->pic_b[0]->bmp);
-      free(vo_font->pic_b[0]);
-      free(vo_font);
-      vo_font = vo_font_save;
-      vo_font_save = NULL;
-    }
     aa_close(c);
 }
 
-static void draw_alpha(int x,int y, int w,int h, unsigned char* src, unsigned char *srca, int stride){
-    int i,j;
-    for (i = 0; i < h; i++) {
-	for (j = 0; j < w; j++) {
-	    if (src[i*stride+j] > 0) {
-		c->textbuffer[x + j + (y+i)*aa_scrwidth(c)] = src[i*stride+j];
-		c->attrbuffer[x + j + (y+i)*aa_scrwidth(c)] = aaopt_subcolor;
-	    }
-	}
-    }
-}
-
-static void clear_alpha(int x0,int y0, int w,int h) {
-  int l;
-
-  for(l = 0 ; l < h ; l++) {
-    memset(c->textbuffer + (y0 + l) * aa_scrwidth(c) + x0,' ',w);
-    memset(c->attrbuffer + (y0 + l) * aa_scrwidth(c) + x0,0,w);
-  }
-}
-
-
 static void
 draw_osd(void){
-    char vo_osd_text_save;
-    int vo_osd_progbar_type_save;
-
     printosdprogbar();
-    /* let vo_draw_text only write subtitle */
-    vo_osd_text_save = global_osd->osd_text[0];
-    global_osd->osd_text[0] = 0;
-    vo_osd_progbar_type_save=vo_osd_progbar_type;
-    vo_osd_progbar_type=-1;
-    vo_remove_text(aa_scrwidth(c), aa_scrheight(c),clear_alpha);
-    vo_draw_text(aa_scrwidth(c), aa_scrheight(c), draw_alpha);
-    global_osd->osd_text[0] = vo_osd_text_save;
-    vo_osd_progbar_type=vo_osd_progbar_type_save;
 }
 
 static int
