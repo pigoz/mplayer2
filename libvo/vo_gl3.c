@@ -202,6 +202,7 @@ struct gl_priv {
     // per pixel (full pixel when packed, each component when planar)
     int plane_bytes;
     int plane_bits;
+    int component_bits;
 
     GLint gl_internal_format;
     GLenum gl_format;
@@ -234,19 +235,20 @@ struct fmt_entry {
     int mp_format;
     GLint internal_format;
     GLenum format;
+    int component_bits;
     GLenum type;
 };
 
 static const struct fmt_entry mp_to_gl_formats[] = {
-    {IMGFMT_RGB48NE, GL_RGB16, GL_RGB,  GL_UNSIGNED_SHORT},
-    {IMGFMT_RGB24,   GL_RGB,   GL_RGB,  GL_UNSIGNED_BYTE},
-    {IMGFMT_RGBA,    GL_RGBA,  GL_RGBA, GL_UNSIGNED_BYTE},
-    {IMGFMT_RGB15,   GL_RGBA,  GL_RGBA, GL_UNSIGNED_SHORT_1_5_5_5_REV},
-    {IMGFMT_RGB16,   GL_RGB,   GL_RGB,  GL_UNSIGNED_SHORT_5_6_5_REV},
-    {IMGFMT_BGR15,   GL_RGBA,  GL_BGRA, GL_UNSIGNED_SHORT_1_5_5_5_REV},
-    {IMGFMT_BGR16,   GL_RGB,   GL_RGB,  GL_UNSIGNED_SHORT_5_6_5},
-    {IMGFMT_BGR24,   GL_RGB,   GL_BGR,  GL_UNSIGNED_BYTE},
-    {IMGFMT_BGRA,    GL_RGBA,  GL_BGRA, GL_UNSIGNED_BYTE},
+    {IMGFMT_RGB48NE, GL_RGB16, GL_RGB,  16, GL_UNSIGNED_SHORT},
+    {IMGFMT_RGB24,   GL_RGB,   GL_RGB,  8,  GL_UNSIGNED_BYTE},
+    {IMGFMT_RGBA,    GL_RGBA,  GL_RGBA, 8,  GL_UNSIGNED_BYTE},
+    {IMGFMT_RGB15,   GL_RGBA,  GL_RGBA, 5,  GL_UNSIGNED_SHORT_1_5_5_5_REV},
+    {IMGFMT_RGB16,   GL_RGB,   GL_RGB,  6,  GL_UNSIGNED_SHORT_5_6_5_REV},
+    {IMGFMT_BGR15,   GL_RGBA,  GL_BGRA, 5,  GL_UNSIGNED_SHORT_1_5_5_5_REV},
+    {IMGFMT_BGR16,   GL_RGB,   GL_RGB,  6,  GL_UNSIGNED_SHORT_5_6_5},
+    {IMGFMT_BGR24,   GL_RGB,   GL_BGR,  8,  GL_UNSIGNED_BYTE},
+    {IMGFMT_BGRA,    GL_RGBA,  GL_BGRA, 8,  GL_UNSIGNED_BYTE},
     {0},
 };
 
@@ -846,8 +848,7 @@ static void init_dither(struct gl_priv *p)
     if (p->dither_depth > 0)
         dst_depth = p->dither_depth;
 
-    // not sure how to get per-component bit depth for RGB formats
-    int src_depth = p->is_yuv ? p->plane_bits : -1;
+    int src_depth = p->component_bits;
     if (p->use_lut_3d)
         src_depth = 16;
 
@@ -1672,6 +1673,7 @@ static bool init_format(int fmt, struct gl_priv *init)
     mp_image_setfmt(&dummy_img, fmt);
 
     init->image_format = fmt;
+    init->component_bits = -1;
 
     // RGB/packed formats
     for (const struct fmt_entry *e = mp_to_gl_formats; e->mp_format; e++) {
@@ -1680,6 +1682,7 @@ static bool init_format(int fmt, struct gl_priv *init)
             init->plane_bits = dummy_img.bpp;
             init->gl_format = e->format;
             init->gl_internal_format = e->internal_format;
+            init->component_bits = e->component_bits;
             init->gl_type = e->type;
             break;
         }
@@ -1688,6 +1691,7 @@ static bool init_format(int fmt, struct gl_priv *init)
     // YUV/planar formats
     if (!supported && mp_get_chroma_shift(fmt, NULL, NULL, &init->plane_bits)) {
         init->gl_format = GL_RED;
+        init->component_bits = init->plane_bits;
         if (init->plane_bits == 8) {
             supported = true;
             init->gl_internal_format = GL_RED;
@@ -1702,7 +1706,7 @@ static bool init_format(int fmt, struct gl_priv *init)
     // RGB/planar
     if (!supported && fmt == IMGFMT_GBRP) {
         supported = true;
-        init->plane_bits = 8;
+        init->plane_bits = init->component_bits = 8;
         init->gl_format = GL_RED;
         init->gl_internal_format = GL_RED;
         init->gl_type = GL_UNSIGNED_BYTE;
