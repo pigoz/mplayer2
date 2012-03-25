@@ -1918,7 +1918,7 @@ static struct bstr load_file(struct gl_priv *p, void *talloc_ctx,
     return res;
 }
 
-#define LUT3D_CACHE_HEADER "mplayer2 2dlut cache 1.0\n"
+#define LUT3D_CACHE_HEADER "mplayer2 3dlut cache 1.0\n"
 
 static bool load_icc(struct gl_priv *p, const char *icc_file,
                      const char *icc_cache, int icc_intent,
