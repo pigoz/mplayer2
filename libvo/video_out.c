@@ -103,6 +103,7 @@ extern struct vo_driver video_out_caca;
 extern struct vo_driver video_out_mpegpes;
 extern struct vo_driver video_out_yuv4mpeg;
 extern struct vo_driver video_out_direct3d;
+extern struct vo_driver video_out_direct3d_shaders;
 extern struct vo_driver video_out_directx;
 extern struct vo_driver video_out_kva;
 extern struct vo_driver video_out_dxr3;
@@ -129,11 +130,12 @@ const struct vo_driver *video_out_drivers[] =
 #ifdef CONFIG_TDFX_VID
         &video_out_tdfx_vid,
 #endif
+#ifdef CONFIG_DIRECT3D
+        &video_out_direct3d_shaders,
+        &video_out_direct3d,
+#endif
 #ifdef CONFIG_DIRECTX
         &video_out_directx,
-#endif
-#ifdef CONFIG_DIRECT3D
-        &video_out_direct3d,
 #endif
 #ifdef CONFIG_KVA
         &video_out_kva,

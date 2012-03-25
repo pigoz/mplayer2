@@ -215,6 +215,7 @@ static const struct {
     {"BGR32", IMGFMT_BGR32},
     {"RGB1",  IMGFMT_RGB1},
     {"BGR1",  IMGFMT_BGR1},
+    {"GBRP",  IMGFMT_GBRP},
 
     {"MPES",  IMGFMT_MPEGPES},
 

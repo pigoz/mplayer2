@@ -18,6 +18,7 @@
 
 #include <stdio.h>
 #include <limits.h>
+#include <assert.h>
 #include <windows.h>
 #include <windowsx.h>
 
@@ -30,6 +31,8 @@
 #include "aspect.h"
 #include "w32_common.h"
 #include "mp_fifo.h"
+#include "osdep/io.h"
+#include "talloc.h"
 
 #ifndef WM_XBUTTONDOWN
 # define WM_XBUTTONDOWN    0x020B
@@ -43,16 +46,25 @@
 
 #define WIN_ID_TO_HWND(x) ((HWND)(uint32_t)(x))
 
-static const char classname[] = "MPlayer - The Movie Player";
+static const char classname[] = "mplayer2";
 int vo_vm = 0;
 
 static int depthonscreen;
-// last non-fullscreen extends
+// last non-fullscreen extends (updated only on fullscreen or on initialization)
 static int prev_width;
 static int prev_height;
 static int prev_x;
 static int prev_y;
 
+// whether the window position and size were intialized
+static bool window_bounds_initialized;
+
+static bool current_fs;
+
+static int window_x;
+static int window_y;
+
+// video size
 static uint32_t o_dwidth;
 static uint32_t o_dheight;
 
@@ -92,6 +104,38 @@ static const struct mp_keymap vk_map[] = {
     {0, 0}
 };
 
+static void vo_rect_add_window_borders(RECT *rc)
+{
+    AdjustWindowRect(rc, GetWindowLong(vo_window, GWL_STYLE), 0);
+}
+
+// basically a reverse AdjustWindowRect (win32 doesn't appear to have this)
+static void subtract_window_borders(RECT *rc)
+{
+    RECT b = { 0, 0, 0, 0 };
+    vo_rect_add_window_borders(&b);
+    rc->left -= b.left;
+    rc->top -= b.top;
+    rc->right -= b.right;
+    rc->bottom -= b.bottom;
+}
+
+// turn a WMSZ_* input value in v into the border that should be resized
+// returns: 0=left, 1=top, 2=right, 3=bottom, -1=undefined
+static int get_resize_border(int v) {
+    switch (v) {
+    case WMSZ_LEFT: return 3;
+    case WMSZ_TOP: return 2;
+    case WMSZ_RIGHT: return 3;
+    case WMSZ_BOTTOM: return 2;
+    case WMSZ_TOPLEFT: return 1;
+    case WMSZ_TOPRIGHT: return 1;
+    case WMSZ_BOTTOMLEFT: return 3;
+    case WMSZ_BOTTOMRIGHT: return 3;
+    default: return -1;
+    }
+}
+
 static LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
     RECT r;
     POINT p;
@@ -107,30 +151,39 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM l
             p.x = 0;
             p.y = 0;
             ClientToScreen(vo_window, &p);
-            vo_dx = p.x;
-            vo_dy = p.y;
+            window_x = p.x;
+            window_y = p.y;
+            mp_msg(MSGT_VO, MSGL_V, "[vo] move window: %d:%d\n",
+                   window_x, window_y);
             break;
         case WM_SIZE:
             event_flags |= VO_EVENT_RESIZE;
             GetClientRect(vo_window, &r);
             vo_dwidth = r.right;
             vo_dheight = r.bottom;
+            mp_msg(MSGT_VO, MSGL_V, "[vo] resize window: %d:%d\n",
+                   vo_dwidth, vo_dheight);
             break;
-        case WM_WINDOWPOSCHANGING:
+        case WM_SIZING:
             if (vo_keepaspect && !vo_fs && WinID < 0) {
-                WINDOWPOS *wpos = (WINDOWPOS*)lParam;
-                int xborder, yborder;
-                r.left = r.top = 0;
-                r.right = wpos->cx;
-                r.bottom = wpos->cy;
-                AdjustWindowRect(&r, GetWindowLong(vo_window, GWL_STYLE), 0);
-                xborder = (r.right - r.left) - wpos->cx;
-                yborder = (r.bottom - r.top) - wpos->cy;
-                wpos->cx -= xborder; wpos->cy -= yborder;
-                aspect_fit(global_vo, &wpos->cx, &wpos->cy, wpos->cx, wpos->cy);
-                wpos->cx += xborder; wpos->cy += yborder;
+                RECT *rc = (RECT*)lParam;
+                // get client area of the windows if it had the rect rc
+                // (subtracting the window borders)
+                r = *rc;
+                subtract_window_borders(&r);
+                int c_w = r.right - r.left, c_h = r.bottom - r.top;
+                float aspect = global_vo->aspdat.asp;
+                int d_w = c_h * aspect - c_w;
+                int d_h = c_w / aspect - c_h;
+                int d_corners[4] = { d_w, d_h, -d_w, -d_h };
+                int corners[4] = { rc->left, rc->top, rc->right, rc->bottom };
+                int corner = get_resize_border(wParam);
+                if (corner >= 0)
+                    corners[corner] -= d_corners[corner];
+                *rc = (RECT) { corners[0], corners[1], corners[2], corners[3] };
+                return TRUE;
             }
-            return 0;
+            break;
         case WM_CLOSE:
             mplayer_put_key(KEY_CLOSE_WIN);
             break;
@@ -230,8 +283,8 @@ int vo_w32_check_events(void) {
         }
         p.x = 0; p.y = 0;
         ClientToScreen(vo_window, &p);
-        if (p.x != vo_dx || p.y != vo_dy) {
-            vo_dx = p.x; vo_dy = p.y;
+        if (p.x != window_x || p.y != window_y) {
+            window_x = p.x; window_y = p.y;
             event_flags |= VO_EVENT_MOVE;
         }
         res = GetClientRect(WIN_ID_TO_HWND(WinID), &r);
@@ -348,19 +401,34 @@ static void changeMode(void) {
 
 static void resetMode(void) {
     if (vo_vm)
-    ChangeDisplaySettings(0, 0);
+        ChangeDisplaySettings(0, 0);
 }
 
-static int createRenderingContext(void) {
+// Update the window title, position, size, and border style from vo_* values.
+static int reinit_window_state(void) {
+    const LONG NO_FRAME = WS_POPUP;
+    const LONG FRAME = WS_OVERLAPPEDWINDOW | WS_SIZEBOX;
     HWND layer = HWND_NOTOPMOST;
     RECT r;
-    int style = (vo_border && !vo_fs) ?
-                (WS_OVERLAPPEDWINDOW | WS_SIZEBOX) : WS_POPUP;
 
     if (WinID >= 0)
         return 1;
 
-    if (vo_fs || vo_ontop) layer = HWND_TOPMOST;
+    wchar_t *title = mp_from_utf8(NULL, vo_get_window_title(global_vo));
+    SetWindowTextW(vo_window, title);
+    talloc_free(title);
+
+    bool toggle_fs = current_fs != vo_fs;
+    current_fs = vo_fs;
+
+    LONG style = GetWindowLong(vo_window, GWL_STYLE);
+    style &= ~(NO_FRAME | FRAME);
+    style |= (vo_border && !vo_fs) ? FRAME : NO_FRAME;
+
+    if (vo_fs || vo_ontop)
+        layer = HWND_TOPMOST;
+
+    // xxx not sure if this can trigger any unwanted messages (WM_MOVE/WM_SIZE)
     if (vo_fs) {
         changeMode();
         while (ShowCursor(0) >= 0) /**/ ;
@@ -369,37 +437,54 @@ static int createRenderingContext(void) {
         while (ShowCursor(1) < 0) /**/ ;
     }
     updateScreenProperties();
-    ShowWindow(vo_window, SW_HIDE);
-    SetWindowLong(vo_window, GWL_STYLE, style);
+
     if (vo_fs) {
-        prev_width = vo_dwidth;
-        prev_height = vo_dheight;
-        prev_x = vo_dx;
-        prev_y = vo_dy;
+        // Save window position and size when switching to fullscreen.
+        if (toggle_fs) {
+            prev_width = vo_dwidth;
+            prev_height = vo_dheight;
+            prev_x = window_x;
+            prev_y = window_y;
+            mp_msg(MSGT_VO, MSGL_V, "[vo] save window bounds: %d:%d:%d:%d\n",
+                   prev_x, prev_y, prev_width, prev_height);
+        }
         vo_dwidth = vo_screenwidth;
         vo_dheight = vo_screenheight;
-        vo_dx = xinerama_x;
-        vo_dy = xinerama_y;
+        window_x = xinerama_x;
+        window_y = xinerama_y;
     } else {
-        // make sure there are no "stale" resize events
-        // that would set vo_d* to wrong values
-        vo_w32_check_events();
-        vo_dwidth = prev_width;
-        vo_dheight = prev_height;
-        vo_dx = prev_x;
-        vo_dy = prev_y;
-        // HACK around what probably is a windows focus bug:
-        // when pressing 'f' on the console, then 'f' again to
-        // return to windowed mode, any input into the video
-        // window is lost forever.
-        SetFocus(vo_window);
+        if (toggle_fs) {
+            // Restore window position and size when switching from fullscreen.
+            mp_msg(MSGT_VO, MSGL_V, "[vo] restore window bounds: %d:%d:%d:%d\n",
+                   prev_x, prev_y, prev_width, prev_height);
+            vo_dwidth = prev_width;
+            vo_dheight = prev_height;
+            window_x = prev_x;
+            window_y = prev_y;
+        }
     }
-    r.left = vo_dx;
+
+    r.left = window_x;
     r.right = r.left + vo_dwidth;
-    r.top = vo_dy;
+    r.top = window_y;
     r.bottom = r.top + vo_dheight;
-    AdjustWindowRect(&r, style, 0);
-    SetWindowPos(vo_window, layer, r.left, r.top, r.right - r.left, r.bottom - r.top, SWP_SHOWWINDOW);
+
+    SetWindowLong(vo_window, GWL_STYLE, style);
+    vo_rect_add_window_borders(&r);
+
+    mp_msg(MSGT_VO, MSGL_V, "[vo] reset window bounds: %ld:%ld:%ld:%ld\n",
+           r.left, r.top, r.right - r.left, r.bottom - r.top);
+
+    SetWindowPos(vo_window, layer, r.left, r.top, r.right - r.left,
+                 r.bottom - r.top, SWP_FRAMECHANGED);
+    // For some reason, moving SWP_SHOWWINDOW to a second call works better
+    // with wine: returning from fullscreen doesn't cause a bogus resize to
+    // screen size.
+    // It's not needed on Windows XP or wine with a virtual desktop.
+    // It doesn't seem to have any negative effects.
+    SetWindowPos(vo_window, NULL, 0, 0, 0, 0,
+                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_SHOWWINDOW);
+
     return 1;
 }
 
@@ -408,10 +493,6 @@ static int createRenderingContext(void) {
  *
  * This function should be called in libvo's "config" callback.
  * It configures a window and shows it on the screen.
- *
- * Global libvo variables changed:
- * vo_fs
- * vo_vm
  *
  * \return 1 - Success, 0 - Failure
  */
@@ -442,21 +523,41 @@ int vo_w32_config(uint32_t width, uint32_t height, uint32_t flags) {
     // we already have a fully initialized window, so nothing needs to be done
     if (flags & VOFLAG_HIDDEN)
         return 1;
-    // store original size for videomode switching
+
+    bool reset_size = !(o_dwidth == width && o_dheight == height);
+
     o_dwidth = width;
     o_dheight = height;
 
+    // the desired size is ignored in wid mode, it always matches the window size.
     if (WinID < 0) {
-        // the desired size is ignored in wid mode, it always matches the window size.
-        prev_width = vo_dwidth = width;
-        prev_height = vo_dheight = height;
-        prev_x = vo_dx;
-        prev_y = vo_dy;
+        if (window_bounds_initialized) {
+            // restore vo_dwidth/vo_dheight, which are reset against our will
+            // in vo_config()
+            RECT r;
+            GetClientRect(vo_window, &r);
+            vo_dwidth = r.right;
+            vo_dheight = r.bottom;
+        } else {
+            // first vo_config call; vo_config() will always set vo_dx/dy so
+            // that the window is centered on the screen, and this is the only
+            // time we actually want to use vo_dy/dy (this is not sane, and
+            // video_out.h should provide a function to query the initial
+            // window position instead)
+            window_bounds_initialized = true;
+            reset_size = true;
+            window_x = prev_x = vo_dx;
+            window_y = prev_y = vo_dy;
+        }
+        if (reset_size) {
+            prev_width = vo_dwidth = width;
+            prev_height = vo_dheight = height;
+        }
     }
 
     vo_fs = flags & VOFLAG_FULLSCREEN;
     vo_vm = flags & VOFLAG_MODESWITCHING;
-    return createRenderingContext();
+    return reinit_window_state();
 }
 
 /**
@@ -505,7 +606,7 @@ int vo_w32_init(void) {
         mplayerIcon = LoadIcon(0, IDI_APPLICATION);
 
   {
-    WNDCLASSEX wcex = { sizeof wcex, CS_OWNDC | CS_DBLCLKS, WndProc, 0, 0, hInstance, mplayerIcon, LoadCursor(0, IDC_ARROW), NULL, 0, classname, mplayerIcon };
+    WNDCLASSEX wcex = { sizeof wcex, CS_OWNDC | CS_DBLCLKS | CS_HREDRAW | CS_VREDRAW, WndProc, 0, 0, hInstance, mplayerIcon, LoadCursor(0, IDC_ARROW), NULL, 0, classname, mplayerIcon };
 
     if (!RegisterClassEx(&wcex)) {
         mp_msg(MSGT_VO, MSGL_ERR, "vo: win32: unable to register window class!\n");
@@ -569,7 +670,7 @@ int vo_w32_init(void) {
 void vo_w32_fullscreen(void) {
     vo_fs = !vo_fs;
 
-    createRenderingContext();
+    reinit_window_state();
 }
 
 /**
@@ -582,7 +683,7 @@ void vo_w32_fullscreen(void) {
  */
 void vo_w32_border(void) {
     vo_border = !vo_border;
-    createRenderingContext();
+    reinit_window_state();
 }
 
 /**
@@ -597,7 +698,7 @@ void vo_w32_ontop( void )
 {
     vo_ontop = !vo_ontop;
     if (!vo_fs) {
-        createRenderingContext();
+        reinit_window_state();
     }
 }
 
@@ -618,6 +719,7 @@ void vo_w32_uninit(void) {
     DestroyWindow(vo_window);
     vo_window = 0;
     UnregisterClass(classname, 0);
+    o_dwidth = o_dheight = 0;
 }
 
 /**
