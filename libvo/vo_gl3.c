@@ -646,6 +646,7 @@ static void compile_shaders(struct gl_priv *p)
                                    && (p->use_srgb || p->use_lut_3d);
 
     shader_def_opt(&header_conv, "USE_PLANAR", p->plane_count > 1);
+    shader_def_opt(&header_conv, "USE_GBRP", p->image_format == IMGFMT_GBRP);
     shader_def_opt(&header_conv, "USE_YGRAY", p->is_yuv && p->plane_count == 1);
     shader_def_opt(&header_conv, "USE_COLORMATRIX", p->is_yuv);
     shader_def_opt(&header_conv, "USE_LINEAR_CONV", convert_input_to_linear);
@@ -1696,6 +1697,15 @@ static bool init_format(int fmt, struct gl_priv *init)
             init->gl_internal_format = GL_R16;
             init->gl_type = GL_UNSIGNED_SHORT;
         }
+    }
+
+    // RGB/planar
+    if (!supported && fmt == IMGFMT_GBRP) {
+        supported = true;
+        init->plane_bits = 8;
+        init->gl_format = GL_RED;
+        init->gl_internal_format = GL_RED;
+        init->gl_type = GL_UNSIGNED_BYTE;
     }
 
     if (!supported)
