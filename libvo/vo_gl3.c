@@ -421,8 +421,9 @@ static void update_uniforms(struct gl_priv *p, GLuint program)
 
     loc = gl->GetUniformLocation(program, "colormatrix");
     if (loc >= 0) {
-        float yuv2rgb[3][4];
-        mp_get_yuv2rgb_coeffs(&cparams, yuv2rgb);
+        float yuv2rgb[3][4] = {{0}};
+        if (p->is_yuv)
+            mp_get_yuv2rgb_coeffs(&cparams, yuv2rgb);
         gl->UniformMatrix4x3fv(loc, 1, GL_TRUE, &yuv2rgb[0][0]);
     }
 
