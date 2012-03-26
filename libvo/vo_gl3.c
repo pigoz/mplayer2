@@ -147,6 +147,7 @@ struct gl_priv {
     struct vo *vo;
     MPGLContext *glctx;
     GL *gl;
+    const char *shader_version;
 
     int use_indirect;
     int use_gamma;
@@ -630,7 +631,8 @@ static void compile_shaders(struct gl_priv *p)
     char *s_eosd = get_section(tmp, src, "frag_eosd");
     char *s_osd = get_section(tmp, src, "frag_osd");
 
-    char *header = talloc_strdup(tmp, shader_prelude);
+    char *header = talloc_asprintf(tmp, "#version %s\n%s", p->shader_version,
+                                   shader_prelude);
 
     char *header_eosd = talloc_strdup(tmp, header);
     shader_def_opt(&header_eosd, "USE_3DLUT", p->use_lut_3d);
@@ -1607,6 +1609,16 @@ static int init_gl(struct gl_priv *p)
     mp_msg(MSGT_VO, MSGL_V, "[gl] Display depth: R=%d, G=%d, B=%d\n",
            p->glctx->depth_r, p->glctx->depth_g, p->glctx->depth_b);
 
+    GLint major, minor;
+    gl->GetIntegerv(GL_MAJOR_VERSION, &major);
+    gl->GetIntegerv(GL_MINOR_VERSION, &minor);
+
+    p->shader_version = "130";
+
+    // Hack for OSX: it only creates 3.2 contexts.
+    if (MPGL_VER(major, minor) >= MPGL_VER(3, 2))
+        p->shader_version = "150";
+
     gl->Disable(GL_DITHER);
     gl->Disable(GL_BLEND);
     gl->Disable(GL_DEPTH_TEST);
@@ -1751,7 +1763,7 @@ static bool config_window(struct gl_priv *p, uint32_t d_width,
     if (p->stereo_mode == GL_3D_QUADBUFFER)
         flags |= VOFLAG_STEREO;
 
-    int mpgl_version = MPGL_VER(3, 2);
+    int mpgl_version = MPGL_VER(3, 0);
     int mpgl_flags = p->use_gl_debug ? MPGLFLAG_DEBUG : 0;
 
     if (p->use_gl2)

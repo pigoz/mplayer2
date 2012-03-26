@@ -22,8 +22,6 @@
 
 // inserted at the beginning of all shaders
 #!section prelude
-#version 150
-
 #!section vertex_all
 uniform mat3 transform;
 uniform sampler3D lut_3d;
