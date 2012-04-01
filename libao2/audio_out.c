@@ -41,7 +41,6 @@ extern const struct ao_driver audio_out_pulse;
 extern const struct ao_driver audio_out_jack;
 extern const struct ao_driver audio_out_openal;
 extern const struct ao_driver audio_out_null;
-extern const struct ao_driver audio_out_alsa5;
 extern const struct ao_driver audio_out_alsa;
 extern const struct ao_driver audio_out_nas;
 extern const struct ao_driver audio_out_sdl;
@@ -82,9 +81,6 @@ static const struct ao_driver * const audio_out_drivers[] = {
 #endif
 #ifdef CONFIG_OSS_AUDIO
     &audio_out_oss,
-#endif
-#ifdef CONFIG_ALSA5
-    &audio_out_alsa5,
 #endif
 #ifdef CONFIG_SGI_AUDIO
     &audio_out_sgi,
@@ -140,10 +136,11 @@ void list_audio_out(void)
     mp_msg(MSGT_GLOBAL, MSGL_INFO,"\n");
 }
 
-struct ao *ao_create(void)
+struct ao *ao_create(struct MPOpts *opts, struct input_ctx *input)
 {
     struct ao *r = talloc(NULL, struct ao);
-    *r = (struct ao){.outburst = OUTBURST, .buffersize = -1};
+    *r = (struct ao){.outburst = OUTBURST, .buffersize = -1,
+                     .opts = opts, .input_ctx = input };
     return r;
 }
 

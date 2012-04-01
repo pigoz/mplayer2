@@ -23,8 +23,7 @@ include config.mak
 
 ###### variable declarations #######
 
-SRCS_AUDIO_INPUT-$(ALSA1X)           += stream/ai_alsa1x.c
-SRCS_AUDIO_INPUT-$(ALSA9)            += stream/ai_alsa.c
+SRCS_AUDIO_INPUT-$(ALSA)             += stream/ai_alsa1x.c
 SRCS_AUDIO_INPUT-$(OSS)              += stream/ai_oss.c
 SRCS_COMMON-$(AUDIO_INPUT)           += $(SRCS_AUDIO_INPUT-yes)
 SRCS_COMMON-$(BITMAP_FONT)           += sub/font_load.c
@@ -93,13 +92,14 @@ SRCS_COMMON-$(LIBMAD)                += libmpcodecs/ad_libmad.c
 SRCS_COMMON-$(LIBNEMESI)             += libmpdemux/demux_nemesi.c \
                                         stream/stream_nemesi.c
 SRCS_COMMON-$(LIBNUT)                += libmpdemux/demux_nut.c
+SRCS_COMMON-$(LIBPOSTPROC)           += libmpcodecs/vf_pp.c
 SRCS_COMMON-$(LIBSMBCLIENT)          += stream/stream_smb.c
 
 SRCS_COMMON-$(LIBTHEORA)             += libmpcodecs/vd_theora.c
 SRCS_COMMON-$(LIVE555)               += libmpdemux/demux_rtp.cpp \
                                         libmpdemux/demux_rtp_codec.cpp \
                                         stream/stream_live555.c
-SRCS_COMMON-$(MACOSX_FINDER)         += osdep/macosx_finder_args.c
+SRCS_COMMON-$(MACOSX_FINDER)         += osdep/macosx_finder_args.m
 SRCS_COMMON-$(MNG)                   += libmpdemux/demux_mng.c
 SRCS_COMMON-$(MPG123)                += libmpcodecs/ad_mpg123.c
 
@@ -218,7 +218,6 @@ SRCS_COMMON = asxparser.c \
               codec-cfg.c \
               cpudetect.c \
               defaultopts.c \
-              edl.c \
               fmt-conversion.c \
               m_config.c \
               m_option.c \
@@ -331,7 +330,6 @@ SRCS_COMMON = asxparser.c \
               libmpcodecs/vf_palette.c \
               libmpcodecs/vf_perspective.c \
               libmpcodecs/vf_phase.c \
-              libmpcodecs/vf_pp.c \
               libmpcodecs/vf_pp7.c \
               libmpcodecs/vf_pullup.c \
               libmpcodecs/vf_qp.c \
@@ -406,6 +404,7 @@ SRCS_COMMON = asxparser.c \
               libvo/osd.c \
               libvo/eosd_packer.c \
               osdep/numcores.c \
+              osdep/io.c \
               osdep/$(GETCH) \
               osdep/$(TIMER) \
               stream/open.c \
@@ -417,12 +416,12 @@ SRCS_COMMON = asxparser.c \
               stream/stream_null.c \
               stream/url.c \
               sub/av_sub.c \
-              sub/sub.c \
-              sub/sub_cc.c \
               sub/dec_sub.c \
               sub/find_sub.c \
               sub/find_subfiles.c \
               sub/spudec.c \
+              sub/sub.c \
+              sub/sub_cc.c \
               sub/subassconvert.c \
               sub/subreader.c \
               sub/vobsub.c \
@@ -434,9 +433,7 @@ SRCS_COMMON = asxparser.c \
 
 SRCS_MPLAYER-$(3DFX)         += libvo/vo_3dfx.c
 SRCS_MPLAYER-$(AA)           += libvo/vo_aa.c
-SRCS_MPLAYER-$(ALSA1X)       += libao2/ao_alsa.c
-SRCS_MPLAYER-$(ALSA5)        += libao2/ao_alsa5.c
-SRCS_MPLAYER-$(ALSA9)        += libao2/ao_alsa.c
+SRCS_MPLAYER-$(ALSA)         += libao2/ao_alsa.c
 SRCS_MPLAYER-$(APPLE_IR)     += input/appleir.c
 SRCS_MPLAYER-$(APPLE_REMOTE) += input/ar.c
 SRCS_MPLAYER-$(ARTS)         += libao2/ao_arts.c
@@ -454,7 +451,7 @@ SRCS_MPLAYER-$(ESD)          += libao2/ao_esd.c
 SRCS_MPLAYER-$(FBDEV)        += libvo/vo_fbdev.c libvo/vo_fbdev2.c
 SRCS_MPLAYER-$(GGI)          += libvo/vo_ggi.c
 SRCS_MPLAYER-$(GIF)          += libvo/vo_gif89a.c
-SRCS_MPLAYER-$(GL)           += libvo/gl_common.c libvo/vo_gl.c \
+SRCS_MPLAYER-$(GL)           += libvo/gl_common.c libvo/vo_gl.c libvo/vo_gl3.c \
                                 pnm_loader.c
 SRCS_MPLAYER-$(GL_COCOA)     += libvo/cocoa_common.m
 SRCS_MPLAYER-$(GL_SDL)       += libvo/sdl_common.c
@@ -486,7 +483,6 @@ SRCS_MPLAYER-$(OPENAL)        += libao2/ao_openal.c
 SRCS_MPLAYER-$(OSS)           += libao2/ao_oss.c
 SRCS_MPLAYER-$(PNM)           += libvo/vo_pnm.c
 SRCS_MPLAYER-$(PULSE)         += libao2/ao_pulse.c
-SRCS_MPLAYER-$(QUARTZ)        += libvo/vo_quartz.c libvo/osx_common.c
 SRCS_MPLAYER-$(RSOUND)        += libao2/ao_rsound.c
 SRCS_MPLAYER-$(S3FB)          += libvo/vo_s3fb.c
 SRCS_MPLAYER-$(SDL)           += libao2/ao_sdl.c libvo/vo_sdl.c libvo/sdl_common.c
@@ -524,6 +520,7 @@ SRCS_MPLAYER = command.c \
                libao2/audio_out.c \
                libvo/aspect.c \
                libvo/csputils.c \
+               libvo/filter_kernels.c \
                libvo/geometry.c \
                libvo/old_vo_wrapper.c \
                libvo/spuenc.c \
@@ -541,7 +538,7 @@ OBJS_MPLAYER-$(PE_EXECUTABLE) += osdep/mplayer-rc.o
 OBJS_MPLAYER   += $(OBJS_MPLAYER-yes)
 
 MPLAYER_DEPS  = $(OBJS_MPLAYER)  $(OBJS_COMMON) $(COMMON_LIBS)
-DEP_FILES = $(patsubst %.S,%.d,$(patsubst %.cpp,%.d,$(patsubst %.c,%.d,$(SRCS_COMMON) $(SRCS_MPLAYER:.m=.d))))
+DEP_FILES = $(patsubst %.S,%.d,$(patsubst %.cpp,%.d,$(patsubst %.c,%.d,$(SRCS_COMMON:.m=.d) $(SRCS_MPLAYER:.m=.d))))
 
 ALL_PRG-$(MPLAYER)  += mplayer$(EXESUF)
 
@@ -619,6 +616,11 @@ codec-cfg$(EXESUF): codec-cfg.c codec-cfg.h
 
 codecs.conf.h: codec-cfg$(EXESUF) etc/codecs.conf
 	./$^ > $@
+
+libvo/vo_gl3_shaders.h: libvo/vo_gl3_shaders.glsl
+	python ./bin_to_header.py $^ $@
+
+libvo/vo_gl3.c: libvo/vo_gl3_shaders.h
 
 # ./configure must be rerun if it changed
 config.mak: configure

@@ -99,9 +99,7 @@ void mp_image_setfmt(mp_image_t* mpi,unsigned int out_fmt){
     mpi->flags&=~(MP_IMGFLAG_PLANAR|MP_IMGFLAG_YUV|MP_IMGFLAG_SWAPPED);
     mpi->imgfmt=out_fmt;
     // compressed formats
-    if(out_fmt == IMGFMT_MPEGPES ||
-       out_fmt == IMGFMT_ZRMJPEGNI || out_fmt == IMGFMT_ZRMJPEGIT || out_fmt == IMGFMT_ZRMJPEGIB ||
-       IMGFMT_IS_HWACCEL(out_fmt)){
+    if(out_fmt == IMGFMT_MPEGPES || IMGFMT_IS_HWACCEL(out_fmt)){
 	mpi->bpp=0;
 	return;
     }
@@ -121,8 +119,13 @@ void mp_image_setfmt(mp_image_t* mpi,unsigned int out_fmt){
 	mpi->flags|=MP_IMGFLAG_SWAPPED;
 	return;
     }
-    mpi->flags|=MP_IMGFLAG_YUV;
     mpi->num_planes=3;
+    if (out_fmt == IMGFMT_GBRP) {
+        mpi->bpp=24;
+        mpi->flags|=MP_IMGFLAG_PLANAR;
+        return;
+    }
+    mpi->flags|=MP_IMGFLAG_YUV;
     if (mp_get_chroma_shift(out_fmt, NULL, NULL, NULL)) {
         mpi->flags|=MP_IMGFLAG_PLANAR;
         mpi->bpp = mp_get_chroma_shift(out_fmt, &mpi->chroma_x_shift, &mpi->chroma_y_shift, NULL);

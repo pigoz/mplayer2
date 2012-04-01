@@ -106,6 +106,7 @@ extern const vf_info_t vf_info_divtc;
 extern const vf_info_t vf_info_harddup;
 extern const vf_info_t vf_info_softskip;
 extern const vf_info_t vf_info_screenshot;
+extern const vf_info_t vf_info_screenshot_force;
 extern const vf_info_t vf_info_ass;
 extern const vf_info_t vf_info_mcdeint;
 extern const vf_info_t vf_info_yadif;
@@ -134,10 +135,13 @@ static const vf_info_t *const filter_list[] = {
     &vf_info_palette,
     &vf_info_pp7,
 
+#ifdef CONFIG_LIBPOSTPROC
     &vf_info_pp,
+#endif
     &vf_info_lavc,
     &vf_info_lavcdeint,
     &vf_info_screenshot,
+    &vf_info_screenshot_force,
     &vf_info_fspp,
     &vf_info_uspp,
 

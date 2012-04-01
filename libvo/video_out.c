@@ -84,6 +84,7 @@ extern struct vo_driver video_out_vdpau;
 extern struct vo_driver video_out_xv;
 extern struct vo_driver video_out_gl_nosw;
 extern struct vo_driver video_out_gl;
+extern struct vo_driver video_out_gl3;
 extern struct vo_driver video_out_dga;
 extern struct vo_driver video_out_sdl;
 extern struct vo_driver video_out_3dfx;
@@ -102,6 +103,7 @@ extern struct vo_driver video_out_caca;
 extern struct vo_driver video_out_mpegpes;
 extern struct vo_driver video_out_yuv4mpeg;
 extern struct vo_driver video_out_direct3d;
+extern struct vo_driver video_out_direct3d_shaders;
 extern struct vo_driver video_out_directx;
 extern struct vo_driver video_out_kva;
 extern struct vo_driver video_out_dxr3;
@@ -116,7 +118,6 @@ extern struct vo_driver video_out_tdfx_vid;
 extern struct vo_driver video_out_xvr100;
 extern struct vo_driver video_out_tga;
 extern struct vo_driver video_out_corevideo;
-extern struct vo_driver video_out_quartz;
 extern struct vo_driver video_out_pnm;
 extern struct vo_driver video_out_md5sum;
 
@@ -128,20 +129,21 @@ const struct vo_driver *video_out_drivers[] =
 #ifdef CONFIG_TDFX_VID
         &video_out_tdfx_vid,
 #endif
+#ifdef CONFIG_DIRECT3D
+        &video_out_direct3d_shaders,
+        &video_out_direct3d,
+#endif
 #ifdef CONFIG_DIRECTX
         &video_out_directx,
-#endif
-#ifdef CONFIG_DIRECT3D
-        &video_out_direct3d,
 #endif
 #ifdef CONFIG_KVA
         &video_out_kva,
 #endif
+#ifdef CONFIG_GL_COCOA
+        &video_out_gl,
+#endif
 #ifdef CONFIG_COREVIDEO
         &video_out_corevideo,
-#endif
-#ifdef CONFIG_QUARTZ
-        &video_out_quartz,
 #endif
 #ifdef CONFIG_XMGA
         &video_out_xmga,
@@ -167,6 +169,9 @@ const struct vo_driver *video_out_drivers[] =
 #ifdef CONFIG_XV
         &video_out_xv,
 #endif
+#ifdef CONFIG_GL
+        &video_out_gl3,
+#endif
 #ifdef CONFIG_X11
 #ifdef CONFIG_GL
         &video_out_gl_nosw,
@@ -177,7 +182,7 @@ const struct vo_driver *video_out_drivers[] =
 #ifdef CONFIG_SDL
         &video_out_sdl,
 #endif
-#ifdef CONFIG_GL
+#if (defined CONFIG_GL && !defined CONFIG_GL_COCOA)
         &video_out_gl,
 #endif
 #ifdef CONFIG_DGA
@@ -281,7 +286,7 @@ int vo_draw_image(struct vo *vo, struct mp_image *mpi, double pts)
 
 int vo_redraw_frame(struct vo *vo)
 {
-    if (!vo->config_ok)
+    if (!vo->config_ok || !vo->hasframe)
         return -1;
     if (vo_control(vo, VOCTRL_REDRAW_FRAME, NULL) == true) {
         vo->redrawing = true;
@@ -354,6 +359,7 @@ void vo_flip_page(struct vo *vo, unsigned int pts_us, int duration)
         vo->driver->flip_page_timed(vo, pts_us, duration);
     else
         vo->driver->flip_page(vo);
+    vo->hasframe = true;
 }
 
 void vo_check_events(struct vo *vo)
@@ -371,6 +377,7 @@ void vo_seek_reset(struct vo *vo)
 {
     vo_control(vo, VOCTRL_RESET, NULL);
     vo->frame_loaded = false;
+    vo->hasframe = false;
 }
 
 void vo_destroy(struct vo *vo)
@@ -496,6 +503,7 @@ int vo_config(struct vo *vo, uint32_t width, uint32_t height,
     vo->frame_loaded = false;
     vo->waiting_mpi = NULL;
     vo->redrawing = false;
+    vo->hasframe = false;
     return ret;
 }
 

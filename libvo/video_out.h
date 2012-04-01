@@ -265,6 +265,7 @@ struct vo {
     double next_pts2;   // optional pts of frame after that
     bool want_redraw;   // visible frame wrong (window resize), needs refresh
     bool redrawing;     // between redrawing frame and flipping it
+    bool hasframe;      // >= 1 frame has been drawn, so redraw is possible
 
     double flip_queue_offset; // queue flip events at most this much in advance
 
@@ -377,7 +378,6 @@ struct vo_rect {
 void calc_src_dst_rects(struct vo *vo, int src_width, int src_height,
                         struct vo_rect *src, struct vo_rect *dst,
                         struct vo_rect *borders, const struct vo_rect *crop);
-struct input_ctx;
 void vo_mouse_movement(struct vo *vo, int posx, int posy);
 
 static inline int aspect_scaling(void)

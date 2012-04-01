@@ -93,7 +93,7 @@ extern int audio_substream_id;
 extern off_t ps_probe;
 
 extern int sws_flags;
-extern char* pp_help;
+extern const char pp_help[];
 
 #ifdef CONFIG_RADIO
 const m_option_t radioopts_conf[]={
@@ -495,12 +495,13 @@ const m_option_t common_opts[] = {
     OPT_TIME("ss", seek_to_sec, 0),
 
     // start paused
-    OPT_FLAG_ON("paused", start_paused, 0),
+    OPT_FLAG_ON("pause", start_paused, 0),
 
     // stop at given position
     {"endpos", &end_at, CONF_TYPE_TIME_SIZE, 0, 0, 0, NULL},
 
-    {"edl", &edl_filename,  CONF_TYPE_STRING, 0, 0, 0, NULL},
+    OPT_ERRORMESSAGE("edl", "Old EDL functionality using the --edl option is "
+                     "not supported.\n"),
 
     // AVI specific: force non-interleaved mode
     {"ni", &force_ni, CONF_TYPE_FLAG, 0, 0, 1, NULL},
@@ -608,7 +609,9 @@ const m_option_t common_opts[] = {
 
     // postprocessing:
     {"pp", &divx_quality, CONF_TYPE_INT, 0, 0, 0, NULL},
+#ifdef CONFIG_LIBPOSTPROC
     {"pphelp", &pp_help, CONF_TYPE_PRINT, CONF_NOCFG, 0, 0, NULL},
+#endif
 
     // scaling:
     {"sws", &sws_flags, CONF_TYPE_INT, 0, 0, 2, NULL},
@@ -737,11 +740,10 @@ const m_option_t mplayer_opts[]={
     {"border", &vo_border, CONF_TYPE_FLAG, 0, 0, 1, NULL},
     {"noborder", &vo_border, CONF_TYPE_FLAG, 0, 1, 0, NULL},
 
-    {"mixer", &mixer_device, CONF_TYPE_STRING, 0, 0, 0, NULL},
-    {"mixer-channel", &mixer_channel, CONF_TYPE_STRING, 0, 0, 0, NULL},
-    {"softvol", &soft_vol, CONF_TYPE_FLAG, 0, 0, 1, NULL},
-    {"nosoftvol", &soft_vol, CONF_TYPE_FLAG, 0, 1, 0, NULL},
-    {"softvol-max", &soft_vol_max, CONF_TYPE_FLOAT, CONF_RANGE, 10, 10000, NULL},
+    OPT_STRING("mixer", mixer_device, 0),
+    OPT_STRING("mixer-channel", mixer_channel, 0),
+    OPT_MAKE_FLAGS("softvol", softvol, 0),
+    OPT_FLOATRANGE("softvol-max", softvol_max, 0, 10, 10000),
     {"volstep", &volstep, CONF_TYPE_INT, CONF_RANGE, 0, 100, NULL},
     {"volume", &start_volume, CONF_TYPE_FLOAT, CONF_RANGE, -1, 10000, NULL},
     OPT_MAKE_FLAGS("gapless-audio", gapless_audio, 0),
@@ -813,6 +815,7 @@ const m_option_t mplayer_opts[]={
 
     {"grabpointer", &vo_grabpointer, CONF_TYPE_FLAG, 0, 0, 1, NULL},
     {"nograbpointer", &vo_grabpointer, CONF_TYPE_FLAG, 0, 1, 0, NULL},
+    OPT_INTRANGE("cursor-autohide-delay", cursor_autohide_delay, 0, -2, 30000),
 
     {"adapter", &vo_adapter_num, CONF_TYPE_INT, CONF_RANGE, 0, 5, NULL},
     {"refreshrate",&vo_refresh_rate,CONF_TYPE_INT,CONF_RANGE, 0,100, NULL},
@@ -960,6 +963,7 @@ const m_option_t mplayer_opts[]={
     OPT_INTRANGE("screenshot-jpeg-quality", screenshot_jpeg_quality, 0, 0, 100),
     OPT_INTRANGE("screenshot-png-compression", screenshot_png_compression, 0, 0, 9),
     OPT_STRING("screenshot-filetype", screenshot_filetype, 0),
+    OPT_STRING("screenshot-template", screenshot_template, 0),
 
     OPT_FLAG_ON("list-properties", list_properties, CONF_GLOBAL),
     {"identify", &mp_msg_levels[MSGT_IDENTIFY], CONF_TYPE_FLAG, CONF_GLOBAL, 0, MSGL_V, NULL},

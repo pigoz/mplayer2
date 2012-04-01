@@ -49,6 +49,8 @@
 #define IMGFMT_BGR24 (IMGFMT_BGR|24)
 #define IMGFMT_BGR32 (IMGFMT_BGR|32)
 
+#define IMGFMT_GBRP (('G'<<24)|('B'<<16)|('R'<<8)|24)
+
 #if HAVE_BIGENDIAN
 #define IMGFMT_ABGR IMGFMT_RGB32
 #define IMGFMT_BGRA (IMGFMT_RGB32|64)
@@ -190,11 +192,6 @@
 /* Compressed Formats */
 #define IMGFMT_MPEGPES (('M'<<24)|('P'<<16)|('E'<<8)|('S'))
 #define IMGFMT_MJPEG (('M')|('J'<<8)|('P'<<16)|('G'<<24))
-/* Formats that are understood by zoran chips, we include
- * non-interlaced, interlaced top-first, interlaced bottom-first */
-#define IMGFMT_ZRMJPEGNI  (('Z'<<24)|('R'<<16)|('N'<<8)|('I'))
-#define IMGFMT_ZRMJPEGIT (('Z'<<24)|('R'<<16)|('I'<<8)|('T'))
-#define IMGFMT_ZRMJPEGIB (('Z'<<24)|('R'<<16)|('I'<<8)|('B'))
 
 // I think that this code could not be used by any other codec/format
 #define IMGFMT_XVMC 0x1DC70000
