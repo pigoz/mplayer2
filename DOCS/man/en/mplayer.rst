@@ -217,8 +217,8 @@ or hue filter (``--vf=hue``).)
 7 and 8
     Adjust saturation.
 
-(The following keys are valid only when using the quartz or corevideo video
-output driver.)
+(The following keys are valid only when using the corevideo video output
+driver.)
 
 command + 0
     Resize movie window to half its original size.
@@ -568,26 +568,6 @@ dsound (Windows only)
         Sets the device number to use. Playing a file with ``-v`` will show a
         list of available devices.
 
-kai (OS/2 only)
-    OS/2 KAI audio output driver
-
-    uniaud
-        Force UNIAUD mode.
-    dart
-        Force DART mode.
-    (no-)share
-        Open audio in shareable or exclusive mode.
-    bufsize=<size>
-        Set buffer size to <size> in samples (default: 2048).
-
-dart (OS/2 only)
-    OS/2 DART audio output driver
-
-    (no-)share
-        Open DART in shareable or exclusive mode.
-    bufsize=<size>
-        Set buffer size to <size> in samples (default: 2048).
-
 ivtv (IVTV only)
     IVTV specific MPEG audio output driver. Works with ``--ac=hwmpa`` only.
 
@@ -814,29 +794,6 @@ directx (Windows only)
     noaccel
         Turns off hardware acceleration. Try this option if you have display
         problems.
-
-kva (OS/2 only)
-    Video output driver that uses the libkva interface.
-
-    snap
-        Force SNAP mode.
-    wo
-        Force WarpOverlay! mode.
-    dive
-        Force DIVE mode.
-    (no-)t23
-        Enable or disable workaround for T23 laptop (default: disabled). Try
-        to enable this option if your video card supports upscaling only.
-
-quartz (Mac OS X only)
-    Mac OS X Quartz video output driver. Under some circumstances, it might be
-    more efficient to force a packed YUV output format, with e.g.
-    ``--vf=format=yuy2``.
-
-    device_id=<number>
-        Choose the display device to use in fullscreen.
-    fs_res=<width>:<height>
-        Specify the fullscreen resolution (useful on slow systems).
 
 corevideo (Mac OS X 10.4 or 10.3.9 with QuickTime 7)
     Mac OS X CoreVideo video output driver

@@ -1408,8 +1408,8 @@
 
 --ontop
     Makes the player window stay on top of other windows. Supported by video
-    output drivers which use X11, except SDL, as well as directx, corevideo,
-    quartz and ggi.
+    output drivers which use X11, except SDL, as well as directx, corevideo
+    and ggi.
 
 --ordered-chapters, --no-ordered-chapters
     Enabled by default.
@@ -1508,9 +1508,9 @@
     Use IPv6 on network connections. Falls back on IPv4 automatically.
 
 --priority=<prio>
-    (Windows and OS/2 only.)
+    (Windows only.)
     Set process priority for MPlayer according to the predefined priorities
-    available under Windows and OS/2.
+    available under Windows.
 
     Possible values of <prio>:
     idle|belownormal|normal|abovenormal|high|realtime
