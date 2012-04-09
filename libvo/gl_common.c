@@ -350,6 +350,7 @@ static const extfunc_desc_t extfuncs[] = {
     DEF_FUNC_DESC(TexParameterf),
     DEF_FUNC_DESC(TexParameterfv),
     DEF_FUNC_DESC(TexCoord2f),
+    DEF_FUNC_DESC(TexCoord2fv),
     DEF_FUNC_DESC(Vertex2f),
     DEF_FUNC_DESC(Vertex3f),
     DEF_FUNC_DESC(Normal3f),

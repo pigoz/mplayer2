@@ -77,10 +77,13 @@ static void resize(struct vo *vo, int width, int height)
     GL *gl = p->mpglctx->gl;
     int d_width, d_height;
 
-    mp_msg(MSGT_VO, MSGL_V, "[vo_corevideo] New OpenGL Viewport (0, 0, %d, %d)\n", width, height);
+    mp_msg(MSGT_VO, MSGL_V, "[vo_corevideo] New OpenGL Viewport (0, 0, %d, "
+                            "%d)\n", width, height);
 
     aspect(vo, &d_width, &d_height, A_WINZOOM);
-    p->textureFrame = NSMakeRect((vo->dwidth - d_width) / 2, (vo->dheight - d_height) / 2, d_width, d_height);
+    p->textureFrame = NSMakeRect((vo->dwidth - d_width) / 2,
+                                 (vo->dheight - d_height) / 2,
+                                 d_width, d_height);
 
     gl->Viewport(0, 0, width, height);
     gl->MatrixMode(GL_PROJECTION);
@@ -104,8 +107,8 @@ static int init_gl(struct vo *vo, uint32_t d_width, uint32_t d_height)
     const char *version    = gl->GetString(GL_VERSION);
     const char *renderer   = gl->GetString(GL_RENDERER);
 
-    mp_msg(MSGT_VO, MSGL_V, "[vo_corevideo] Running on OpenGL '%s' by '%s', version '%s'\n",
-           renderer, vendor, version);
+    mp_msg(MSGT_VO, MSGL_V, "[vo_corevideo] Running on OpenGL '%s' by '%s',"
+           " version '%s'\n", renderer, vendor, version);
 
     gl->Disable(GL_BLEND);
     gl->Disable(GL_DEPTH_TEST);
@@ -141,6 +144,11 @@ static int config(struct vo *vo, uint32_t width, uint32_t height,
     if (p->mpglctx->setGlWindow(p->mpglctx) == SET_WINDOW_FAILED)
         return -1;
 
+	  if (flags & VOFLAG_FLIPPING) {
+		    mp_msg(MSGT_VO, MSGL_ERR,
+          "[corevideo]: using flipped video (only with RGB/BGR/packed YUV)\n");
+    }
+
     init_gl(vo, vo->dwidth, vo->dheight);
 
     return 0;
@@ -166,7 +174,8 @@ static void create_osd_texture(void *ctx, int x0, int y0, int w, int h,
     }
 
     if (osd->tex_cnt >= CV_MAX_OSD_PARTS) {
-        mp_msg(MSGT_VO, MSGL_ERR, "Too many OSD parts, contact the developers!\n");
+        mp_msg(MSGT_VO, MSGL_ERR, "Too many OSD parts, contact the"
+                                  " developers!\n");
         return;
     }
 
@@ -212,7 +221,8 @@ static void draw_osd(struct vo *vo, struct osd_state *osd_s)
     if (vo_osd_changed(0)) {
         clearOSD(vo);
         osd_draw_text_ext(osd_s, vo->dwidth, vo->dheight, 0, 0, 0, 0,
-                          p->image_width, p->image_height, create_osd_texture, vo);
+                          p->image_width, p->image_height, create_osd_texture,
+                          vo);
     }
 
     if (osd->tex_cnt > 0) {
@@ -224,7 +234,8 @@ static void draw_osd(struct vo *vo, struct osd_state *osd_s)
         for (int n = 0; n < osd->tex_cnt; n++) {
             NSRect tr = osd->tex_rect[n];
             gl->BindTexture(GL_TEXTURE_2D, osd->tex[n]);
-            glDrawTex(gl, tr.origin.x, tr.origin.y, tr.size.width, tr.size.height,
+            glDrawTex(gl, tr.origin.x, tr.origin.y,
+                      tr.size.width, tr.size.height,
                       0, 0, 1.0, 1.0, 1, 1, 0, 0, 0);
         }
 
@@ -239,9 +250,11 @@ static void prepare_texture(void)
     struct quad *q = p->quad;
 
     CVOpenGLTextureRelease(p->texture);
-    error = CVOpenGLTextureCacheCreateTextureFromImage(NULL, p->textureCache, p->pixelBuffer, 0, &p->texture);
+    error = CVOpenGLTextureCacheCreateTextureFromImage(NULL,
+                p->textureCache, p->pixelBuffer, 0, &p->texture);
     if(error != kCVReturnSuccess)
-        mp_msg(MSGT_VO, MSGL_ERR,"[vo_corevideo] Failed to create OpenGL texture(%d)\n", error);
+        mp_msg(MSGT_VO, MSGL_ERR,"[vo_corevideo] Failed to create OpenGL"
+                                 " texture(%d)\n", error);
 
     CVOpenGLTextureGetCleanTexCoords(p->texture, q->lowerLeft, q->lowerRight,
                                                  q->upperRight, q->upperLeft);
@@ -253,15 +266,24 @@ static void do_render(struct vo *vo)
     GL *gl = p->mpglctx->gl;
     prepare_texture();
 
+    float x0 = p->textureFrame.origin.x - (vo->panscan_x >> 1);
+    float y0 = p->textureFrame.origin.y - (vo->panscan_y >> 1);
+    float xm = NSMaxX(p->textureFrame)  + (vo->panscan_x >> 1);
+    float ym = NSMaxY(p->textureFrame)  + (vo->panscan_y >> 1);
+
     gl->Enable(CVOpenGLTextureGetTarget(p->texture));
-    gl->BindTexture(CVOpenGLTextureGetTarget(p->texture), CVOpenGLTextureGetName(p->texture));
+    gl->BindTexture(
+            CVOpenGLTextureGetTarget(p->texture),
+            CVOpenGLTextureGetName(p->texture));
 
     gl->Begin(GL_QUADS);
-    gl->TexCoord2f(q->upperLeft[0], q->upperLeft[1]); gl->Vertex2f(p->textureFrame.origin.x-(vo->panscan_x >> 1), p->textureFrame.origin.y-(vo->panscan_y >> 1));
-    gl->TexCoord2f(q->lowerLeft[0], q->lowerLeft[1]); gl->Vertex2f(p->textureFrame.origin.x-(vo->panscan_x >> 1), NSMaxY(p->textureFrame)+(vo->panscan_y >> 1));
-    gl->TexCoord2f(q->lowerRight[0], q->lowerRight[1]); gl->Vertex2f(NSMaxX(p->textureFrame)+(vo->panscan_x >> 1), NSMaxY(p->textureFrame)+(vo->panscan_y >> 1));
-    gl->TexCoord2f(q->upperRight[0], q->upperRight[1]); gl->Vertex2f(NSMaxX(p->textureFrame)+(vo->panscan_x >> 1), p->textureFrame.origin.y-(vo->panscan_y >> 1));
+    // vertexes are flipped
+    gl->TexCoord2fv(q->upperLeft);  gl->Vertex2f(x0, y0);
+    gl->TexCoord2fv(q->lowerLeft);  gl->Vertex2f(x0, ym);
+    gl->TexCoord2fv(q->lowerRight); gl->Vertex2f(xm, ym);
+    gl->TexCoord2fv(q->upperRight); gl->Vertex2f(xm, y0);
     gl->End();
+
     gl->Disable(CVOpenGLTextureGetTarget(p->texture));
 }
 
@@ -276,44 +298,46 @@ static uint32_t draw_image(struct vo *vo, mp_image_t *mpi)
     CVReturn error;
 
     if (!p->textureCache || !p->pixelBuffer) {
-        error = CVOpenGLTextureCacheCreate(NULL, 0, vo_cocoa_cgl_context(), vo_cocoa_cgl_pixel_format(), 0, &p->textureCache);
+        error = CVOpenGLTextureCacheCreate(NULL, 0, vo_cocoa_cgl_context(),
+                    vo_cocoa_cgl_pixel_format(), 0, &p->textureCache);
         if(error != kCVReturnSuccess)
-            mp_msg(MSGT_VO, MSGL_ERR,"[vo_corevideo] Failed to create OpenGL texture Cache(%d)\n", error);
+            mp_msg(MSGT_VO, MSGL_ERR,"[vo_corevideo] Failed to create OpenGL"
+                                     " texture Cache(%d)\n", error);
 
-        error = CVPixelBufferCreateWithBytes(NULL, mpi->width, mpi->height, p->pixelFormat,
-                                             mpi->planes[0], mpi->width * mpi->bpp / 8, NULL, NULL, NULL, &p->pixelBuffer);
+        error = CVPixelBufferCreateWithBytes(NULL, mpi->width, mpi->height,
+                    p->pixelFormat, mpi->planes[0], mpi->width * mpi->bpp / 8,
+                    NULL, NULL, NULL, &p->pixelBuffer);
         if(error != kCVReturnSuccess)
-            mp_msg(MSGT_VO, MSGL_ERR,"[vo_corevideo] Failed to create Pixel Buffer(%d)\n", error);
+            mp_msg(MSGT_VO, MSGL_ERR,"[vo_corevideo] Failed to create Pixel"
+                                     "Buffer(%d)\n", error);
     }
 
     do_render(vo);
-
     return VO_TRUE;
 }
 
 static int query_format(uint32_t format)
 {
-    const int supportflags = VFCAP_CSP_SUPPORTED | VFCAP_CSP_SUPPORTED_BY_HW |
-                             VFCAP_OSD | VFCAP_HWSCALE_UP | VFCAP_HWSCALE_DOWN |
-                             VOCAP_NOSLICES;
+    const int flags = VFCAP_CSP_SUPPORTED | VFCAP_CSP_SUPPORTED_BY_HW |
+                      VFCAP_OSD | VFCAP_HWSCALE_UP | VFCAP_HWSCALE_DOWN |
+                      VOCAP_NOSLICES;
 
-    switch(format)
-    {
+    switch (format) {
         case IMGFMT_YUY2:
             p->pixelFormat = kYUVSPixelFormat;
-            return supportflags;
+            return flags;
 
         case IMGFMT_RGB24:
             p->pixelFormat = k24RGBPixelFormat;
-            return supportflags;
+            return flags;
 
         case IMGFMT_ARGB:
             p->pixelFormat = k32ARGBPixelFormat;
-            return supportflags;
+            return flags;
 
         case IMGFMT_BGRA:
             p->pixelFormat = k32BGRAPixelFormat;
-            return supportflags;
+            return flags;
     }
     return 0;
 }
