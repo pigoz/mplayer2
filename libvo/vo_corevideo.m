@@ -127,15 +127,21 @@ static int init_gl(struct vo *vo, uint32_t d_width, uint32_t d_height)
     return 1;
 }
 
-static int config(struct vo *vo, uint32_t width, uint32_t height,
-                  uint32_t d_width, uint32_t d_height, uint32_t flags,
-                  uint32_t format)
-{
+static void release_cv_entities(void) {
     CVPixelBufferRelease(p->pixelBuffer);
     p->pixelBuffer = NULL;
     CVOpenGLTextureRelease(p->texture);
     p->texture = NULL;
+    CVOpenGLTextureCacheRelease(p->textureCache);
+    p->textureCache = NULL;
 
+}
+
+static int config(struct vo *vo, uint32_t width, uint32_t height,
+                  uint32_t d_width, uint32_t d_height, uint32_t flags,
+                  uint32_t format)
+{
+    release_cv_entities();
     p->image_width = width;
     p->image_height = height;
 
@@ -345,6 +351,7 @@ static int query_format(uint32_t format)
 static void uninit(struct vo *vo)
 {
     p->mpglctx->releaseGlContext(p->mpglctx);
+    release_cv_entities();
     talloc_free(p);
 }
 
