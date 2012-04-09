@@ -23,6 +23,7 @@
 
 // mplayer includes
 #import "fastmemcpy.h"
+#import "talloc.h"
 #import "video_out.h"
 #import "aspect.h"
 #import "sub/font_load.h"
@@ -37,40 +38,49 @@
 #import "gl_common.h"
 #import "cocoa_common.h"
 
-OSType pixelFormat;
-
-CVPixelBufferRef pixelBuffer;
-CVOpenGLTextureCacheRef textureCache;
-CVOpenGLTextureRef texture;
-NSRect textureFrame;
-
-GLfloat lowerLeft[2];
-GLfloat lowerRight[2];
-GLfloat upperRight[2];
-GLfloat upperLeft[2];
-
-MPGLContext *mpglctx;
+struct quad {
+    GLfloat lowerLeft[2];
+    GLfloat lowerRight[2];
+    GLfloat upperRight[2];
+    GLfloat upperLeft[2];
+};
 
 #define CV_VERTICES_PER_QUAD 6
 #define CV_MAX_OSD_PARTS 20
 
-GLuint osdtex[CV_MAX_OSD_PARTS];
-NSRect osdtexrect[CV_MAX_OSD_PARTS];
-unsigned int image_width;
-unsigned int image_height;
-int osdtexCnt = 0;
+struct osd_p {
+    GLuint tex[CV_MAX_OSD_PARTS];
+    NSRect tex_rect[CV_MAX_OSD_PARTS];
+    int tex_cnt;
+};
 
-static struct mp_csp_details colorspace = MP_CSP_DETAILS_DEFAULTS;
+struct priv {
+    MPGLContext *mpglctx;
+    OSType pixelFormat;
+    unsigned int image_width;
+    unsigned int image_height;
+    struct mp_csp_details colorspace;
+
+    CVPixelBufferRef pixelBuffer;
+    CVOpenGLTextureCacheRef textureCache;
+    CVOpenGLTextureRef texture;
+    NSRect textureFrame;
+    struct quad *quad;
+
+    struct osd_p *osd;
+};
+
+static struct priv *p;
 
 static void resize(struct vo *vo, int width, int height)
 {
-    GL *gl = mpglctx->gl;
+    GL *gl = p->mpglctx->gl;
     int d_width, d_height;
 
     mp_msg(MSGT_VO, MSGL_V, "[vo_corevideo] New OpenGL Viewport (0, 0, %d, %d)\n", width, height);
 
     aspect(vo, &d_width, &d_height, A_WINZOOM);
-    textureFrame = NSMakeRect((vo->dwidth - d_width) / 2, (vo->dheight - d_height) / 2, d_width, d_height);
+    p->textureFrame = NSMakeRect((vo->dwidth - d_width) / 2, (vo->dheight - d_height) / 2, d_width, d_height);
 
     gl->Viewport(0, 0, width, height);
     gl->MatrixMode(GL_PROJECTION);
@@ -88,7 +98,7 @@ static void resize(struct vo *vo, int width, int height)
 
 static int init_gl(struct vo *vo, uint32_t d_width, uint32_t d_height)
 {
-    GL *gl = mpglctx->gl;
+    GL *gl = p->mpglctx->gl;
 
     const char *vendor     = gl->GetString(GL_VENDOR);
     const char *version    = gl->GetString(GL_VERSION);
@@ -118,17 +128,17 @@ static int config(struct vo *vo, uint32_t width, uint32_t height,
                   uint32_t d_width, uint32_t d_height, uint32_t flags,
                   uint32_t format)
 {
-    CVPixelBufferRelease(pixelBuffer);
-    pixelBuffer = NULL;
-    CVOpenGLTextureRelease(texture);
-    texture = NULL;
+    CVPixelBufferRelease(p->pixelBuffer);
+    p->pixelBuffer = NULL;
+    CVOpenGLTextureRelease(p->texture);
+    p->texture = NULL;
 
-    image_width = width;
-    image_height = height;
+    p->image_width = width;
+    p->image_height = height;
 
-    if (mpglctx->create_window(mpglctx, d_width, d_height, flags) < 0)
+    if (p->mpglctx->create_window(p->mpglctx, d_width, d_height, flags) < 0)
         return -1;
-    if (mpglctx->setGlWindow(mpglctx) == SET_WINDOW_FAILED)
+    if (p->mpglctx->setGlWindow(p->mpglctx) == SET_WINDOW_FAILED)
         return -1;
 
     init_gl(vo, vo->dwidth, vo->dheight);
@@ -138,7 +148,7 @@ static int config(struct vo *vo, uint32_t width, uint32_t height,
 
 static void check_events(struct vo *vo)
 {
-    int e = mpglctx->check_events(vo);
+    int e = p->mpglctx->check_events(vo);
     if (e & VO_EVENT_RESIZE)
         resize(vo, vo->dwidth, vo->dheight);
 }
@@ -147,21 +157,21 @@ static void create_osd_texture(void *ctx, int x0, int y0, int w, int h,
                                unsigned char *src, unsigned char *srca,
                                int stride)
 {
-    struct vo *vo = ctx;
-    GL *gl = mpglctx->gl;
+    struct osd_p *osd = p->osd;
+    GL *gl = p->mpglctx->gl;
 
     if (w <= 0 || h <= 0 || stride < w) {
         mp_msg(MSGT_VO, MSGL_V, "Invalid dimensions OSD for part!\n");
         return;
     }
 
-    if (osdtexCnt >= CV_MAX_OSD_PARTS) {
+    if (osd->tex_cnt >= CV_MAX_OSD_PARTS) {
         mp_msg(MSGT_VO, MSGL_ERR, "Too many OSD parts, contact the developers!\n");
         return;
     }
 
-    gl->GenTextures(1, &osdtex[osdtexCnt]);
-    gl->BindTexture(GL_TEXTURE_2D, osdtex[osdtexCnt]);
+    gl->GenTextures(1, &osd->tex[osd->tex_cnt]);
+    gl->BindTexture(GL_TEXTURE_2D, osd->tex[osd->tex_cnt]);
     glCreateClearTex(gl, GL_TEXTURE_2D, GL_LUMINANCE_ALPHA, GL_LUMINANCE_ALPHA,
                      GL_UNSIGNED_BYTE, GL_LINEAR, w, h, 0);
     {
@@ -177,40 +187,43 @@ static void create_osd_texture(void *ctx, int x0, int y0, int w, int h,
         free(tmp);
     }
 
-    osdtexrect[osdtexCnt] = NSMakeRect(x0, y0, w, h);
+    osd->tex_rect[osd->tex_cnt] = NSMakeRect(x0, y0, w, h);
 
     gl->BindTexture(GL_TEXTURE_2D, 0);
-    osdtexCnt++;
+    osd->tex_cnt++;
 }
 
 static void clearOSD(struct vo *vo)
 {
-    GL *gl = mpglctx->gl;
-    if (!osdtexCnt)
+    struct osd_p *osd = p->osd;
+    GL *gl = p->mpglctx->gl;
+
+    if (!osd->tex_cnt)
         return;
-    gl->DeleteTextures(osdtexCnt, osdtex);
-    osdtexCnt = 0;
+    gl->DeleteTextures(osd->tex_cnt, osd->tex);
+    osd->tex_cnt = 0;
 }
 
-static void draw_osd(struct vo *vo, struct osd_state *osd)
+static void draw_osd(struct vo *vo, struct osd_state *osd_s)
 {
-    GL *gl = mpglctx->gl;
+    struct osd_p *osd = p->osd;
+    GL *gl = p->mpglctx->gl;
 
     if (vo_osd_changed(0)) {
         clearOSD(vo);
-        osd_draw_text_ext(osd, vo->dwidth, vo->dheight, 0, 0, 0, 0,
-                          image_width, image_height, create_osd_texture, vo);
+        osd_draw_text_ext(osd_s, vo->dwidth, vo->dheight, 0, 0, 0, 0,
+                          p->image_width, p->image_height, create_osd_texture, vo);
     }
 
-    if (osdtexCnt > 0) {
+    if (osd->tex_cnt > 0) {
         gl->Enable(GL_BLEND);
 
         // OSD bitmaps use premultiplied alpha.
         gl->BlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
-        for (int n = 0; n < osdtexCnt; n++) {
-            NSRect tr = osdtexrect[n];
-            gl->BindTexture(GL_TEXTURE_2D, osdtex[n]);
+        for (int n = 0; n < osd->tex_cnt; n++) {
+            NSRect tr = osd->tex_rect[n];
+            gl->BindTexture(GL_TEXTURE_2D, osd->tex[n]);
             glDrawTex(gl, tr.origin.x, tr.origin.y, tr.size.width, tr.size.height,
                       0, 0, 1.0, 1.0, 1, 1, 0, 0, 0);
         }
@@ -223,48 +236,52 @@ static void draw_osd(struct vo *vo, struct osd_state *osd)
 static void prepare_texture(void)
 {
     CVReturn error;
-    CVOpenGLTextureRelease(texture);
-    error = CVOpenGLTextureCacheCreateTextureFromImage(NULL, textureCache, pixelBuffer, 0, &texture);
+    struct quad *q = p->quad;
+
+    CVOpenGLTextureRelease(p->texture);
+    error = CVOpenGLTextureCacheCreateTextureFromImage(NULL, p->textureCache, p->pixelBuffer, 0, &p->texture);
     if(error != kCVReturnSuccess)
         mp_msg(MSGT_VO, MSGL_ERR,"[vo_corevideo] Failed to create OpenGL texture(%d)\n", error);
 
-    CVOpenGLTextureGetCleanTexCoords(texture, lowerLeft, lowerRight, upperRight, upperLeft);
+    CVOpenGLTextureGetCleanTexCoords(p->texture, q->lowerLeft, q->lowerRight,
+                                                 q->upperRight, q->upperLeft);
 }
 
 static void do_render(struct vo *vo)
 {
-    GL *gl = mpglctx->gl;
+    struct quad *q = p->quad;
+    GL *gl = p->mpglctx->gl;
     prepare_texture();
 
-    gl->Enable(CVOpenGLTextureGetTarget(texture));
-    gl->BindTexture(CVOpenGLTextureGetTarget(texture), CVOpenGLTextureGetName(texture));
+    gl->Enable(CVOpenGLTextureGetTarget(p->texture));
+    gl->BindTexture(CVOpenGLTextureGetTarget(p->texture), CVOpenGLTextureGetName(p->texture));
 
     gl->Begin(GL_QUADS);
-    gl->TexCoord2f(upperLeft[0], upperLeft[1]); gl->Vertex2f(textureFrame.origin.x-(vo->panscan_x >> 1), textureFrame.origin.y-(vo->panscan_y >> 1));
-    gl->TexCoord2f(lowerLeft[0], lowerLeft[1]); gl->Vertex2f(textureFrame.origin.x-(vo->panscan_x >> 1), NSMaxY(textureFrame)+(vo->panscan_y >> 1));
-    gl->TexCoord2f(lowerRight[0], lowerRight[1]); gl->Vertex2f(NSMaxX(textureFrame)+(vo->panscan_x >> 1), NSMaxY(textureFrame)+(vo->panscan_y >> 1));
-    gl->TexCoord2f(upperRight[0], upperRight[1]); gl->Vertex2f(NSMaxX(textureFrame)+(vo->panscan_x >> 1), textureFrame.origin.y-(vo->panscan_y >> 1));
+    gl->TexCoord2f(q->upperLeft[0], q->upperLeft[1]); gl->Vertex2f(p->textureFrame.origin.x-(vo->panscan_x >> 1), p->textureFrame.origin.y-(vo->panscan_y >> 1));
+    gl->TexCoord2f(q->lowerLeft[0], q->lowerLeft[1]); gl->Vertex2f(p->textureFrame.origin.x-(vo->panscan_x >> 1), NSMaxY(p->textureFrame)+(vo->panscan_y >> 1));
+    gl->TexCoord2f(q->lowerRight[0], q->lowerRight[1]); gl->Vertex2f(NSMaxX(p->textureFrame)+(vo->panscan_x >> 1), NSMaxY(p->textureFrame)+(vo->panscan_y >> 1));
+    gl->TexCoord2f(q->upperRight[0], q->upperRight[1]); gl->Vertex2f(NSMaxX(p->textureFrame)+(vo->panscan_x >> 1), p->textureFrame.origin.y-(vo->panscan_y >> 1));
     gl->End();
-    gl->Disable(CVOpenGLTextureGetTarget(texture));
+    gl->Disable(CVOpenGLTextureGetTarget(p->texture));
 }
 
 static void flip_page(struct vo *vo)
 {
-    mpglctx->swapGlBuffers(mpglctx);
-    mpglctx->gl->Clear(GL_COLOR_BUFFER_BIT);
+    p->mpglctx->swapGlBuffers(p->mpglctx);
+    p->mpglctx->gl->Clear(GL_COLOR_BUFFER_BIT);
 }
 
 static uint32_t draw_image(struct vo *vo, mp_image_t *mpi)
 {
     CVReturn error;
 
-    if (!textureCache || !pixelBuffer) {
-        error = CVOpenGLTextureCacheCreate(NULL, 0, vo_cocoa_cgl_context(), vo_cocoa_cgl_pixel_format(), 0, &textureCache);
+    if (!p->textureCache || !p->pixelBuffer) {
+        error = CVOpenGLTextureCacheCreate(NULL, 0, vo_cocoa_cgl_context(), vo_cocoa_cgl_pixel_format(), 0, &p->textureCache);
         if(error != kCVReturnSuccess)
             mp_msg(MSGT_VO, MSGL_ERR,"[vo_corevideo] Failed to create OpenGL texture Cache(%d)\n", error);
 
-        error = CVPixelBufferCreateWithBytes(NULL, mpi->width, mpi->height, pixelFormat,
-                                             mpi->planes[0], mpi->width * mpi->bpp / 8, NULL, NULL, NULL, &pixelBuffer);
+        error = CVPixelBufferCreateWithBytes(NULL, mpi->width, mpi->height, p->pixelFormat,
+                                             mpi->planes[0], mpi->width * mpi->bpp / 8, NULL, NULL, NULL, &p->pixelBuffer);
         if(error != kCVReturnSuccess)
             mp_msg(MSGT_VO, MSGL_ERR,"[vo_corevideo] Failed to create Pixel Buffer(%d)\n", error);
     }
@@ -283,19 +300,19 @@ static int query_format(uint32_t format)
     switch(format)
     {
         case IMGFMT_YUY2:
-            pixelFormat = kYUVSPixelFormat;
+            p->pixelFormat = kYUVSPixelFormat;
             return supportflags;
 
         case IMGFMT_RGB24:
-            pixelFormat = k24RGBPixelFormat;
+            p->pixelFormat = k24RGBPixelFormat;
             return supportflags;
 
         case IMGFMT_ARGB:
-            pixelFormat = k32ARGBPixelFormat;
+            p->pixelFormat = k32ARGBPixelFormat;
             return supportflags;
 
         case IMGFMT_BGRA:
-            pixelFormat = k32BGRAPixelFormat;
+            p->pixelFormat = k32BGRAPixelFormat;
             return supportflags;
     }
     return 0;
@@ -303,15 +320,17 @@ static int query_format(uint32_t format)
 
 static void uninit(struct vo *vo)
 {
-    mpglctx->releaseGlContext(mpglctx);
+    p->mpglctx->releaseGlContext(p->mpglctx);
+    talloc_free(p);
 }
 
-static const opt_t subopts[] = {
-{NULL}
-};
 
 static int preinit(struct vo *vo, const char *arg)
 {
+    const opt_t subopts[] = {
+        {NULL}
+    };
+
     if (subopt_parse(arg, subopts) != 0) {
         mp_msg(MSGT_VO, MSGL_FATAL,
                 "\n-vo corevideo command line help:\n"
@@ -320,14 +339,24 @@ static int preinit(struct vo *vo, const char *arg)
         return -1;
     }
 
-    mpglctx = init_mpglcontext(GLTYPE_COCOA, vo);
+    p = talloc_ptrtype(NULL, p);
+    *p = (struct priv) {
+        .mpglctx = init_mpglcontext(GLTYPE_COCOA, vo),
+        .colorspace = MP_CSP_DETAILS_DEFAULTS,
+        .quad = talloc_ptrtype(p, p->quad),
+        .osd = talloc_ptrtype(p, p->osd),
+    };
+
+    *p->osd = (struct osd_p) {
+        .tex_cnt = 0,
+    };
 
     return 0;
 }
 
 static CFStringRef get_cv_csp_matrix(void)
 {
-    switch (colorspace.format) {
+    switch (p->colorspace.format) {
         case MP_CSP_BT_601:
             return kCVImageBufferYCbCrMatrix_ITU_R_601_4;
         case MP_CSP_BT_709:
@@ -340,7 +369,7 @@ static CFStringRef get_cv_csp_matrix(void)
 
 static void set_yuv_colorspace(struct vo *vo)
 {
-    CVBufferSetAttachment(pixelBuffer,
+    CVBufferSetAttachment(p->pixelBuffer,
                           kCVImageBufferYCbCrMatrixKey, get_cv_csp_matrix(),
                           kCVAttachmentMode_ShouldPropagate);
     vo->want_redraw = true;
@@ -354,10 +383,10 @@ static int control(struct vo *vo, uint32_t request, void *data)
         case VOCTRL_QUERY_FORMAT:
             return query_format(*(uint32_t*)data);
         case VOCTRL_ONTOP:
-            mpglctx->ontop(vo);
+            p->mpglctx->ontop(vo);
             return VO_TRUE;
         case VOCTRL_FULLSCREEN:
-            mpglctx->fullscreen(vo);
+            p->mpglctx->fullscreen(vo);
             resize(vo, vo->dwidth, vo->dheight);
             return VO_TRUE;
         case VOCTRL_GET_PANSCAN:
@@ -366,17 +395,17 @@ static int control(struct vo *vo, uint32_t request, void *data)
             panscan_calc_windowed(vo);
             return VO_TRUE;
         case VOCTRL_UPDATE_SCREENINFO:
-            mpglctx->update_xinerama_info(vo);
+            p->mpglctx->update_xinerama_info(vo);
             return VO_TRUE;
         case VOCTRL_REDRAW_FRAME:
             do_render(vo);
             return VO_TRUE;
         case VOCTRL_SET_YUV_COLORSPACE:
-            colorspace.format = ((struct mp_csp_details *)data)->format;
+            p->colorspace.format = ((struct mp_csp_details *)data)->format;
             set_yuv_colorspace(vo);
             return VO_TRUE;
         case VOCTRL_GET_YUV_COLORSPACE:
-            *(struct mp_csp_details *)data = colorspace;
+            *(struct mp_csp_details *)data = p->colorspace;
             return VO_TRUE;
     }
     return VO_NOTIMPL;
