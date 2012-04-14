@@ -22,6 +22,8 @@
 
 #include "video_out.h"
 
+void *vo_cocoa_glgetaddr(const char *s);
+
 int vo_cocoa_init(struct vo *vo);
 void vo_cocoa_uninit(struct vo *vo);
 
