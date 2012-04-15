@@ -17,7 +17,6 @@
  */
 
 #import <Cocoa/Cocoa.h>
-#import <ApplicationServices/ApplicationServices.h>
 #include <stdio.h>
 #include "macosx_finder_args.h"
 
