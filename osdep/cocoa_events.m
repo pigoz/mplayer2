@@ -35,6 +35,7 @@
  */
 
 #include "cocoa_events.h"
+#include "libvo/cocoa_common.h"
 #include "talloc.h"
 
 #import <Cocoa/Cocoa.h>
@@ -118,8 +119,8 @@ void cocoa_events_uninit(void)
 void cocoa_events_read_all_events(struct input_ctx *ictx, int time)
 {
     // don't bother delegating the select to the async queue if the blocking
-    // time is really low.
-    if (time > MP_ASYNC_THRESHOLD) {
+    // time is really low or if we are not running a GUI
+    if (time > MP_ASYNC_THRESHOLD && vo_cocoa_gui_running()) {
         dispatch_async(p->select_queue, ^{
             p->read_all_fd_events(ictx, time);
             cocoa_wake_runloop();
