@@ -182,7 +182,7 @@ static ASS_Track *create_osd_ass_track(struct osd_state *osd)
 
     track->PlayResX = track->PlayResY * 1.33333;
 
-    update_font_scale(track, style, text_font_scale_factor);
+    update_font_scale(track, style, osd_font_scale_factor);
 
     style->Alignment = 5;
 
