@@ -36,6 +36,7 @@
  */
 
 #include <CoreServices/CoreServices.h>
+#include <CoreAudio/CoreAudio.h>
 #include <AudioUnit/AudioUnit.h>
 #include <AudioToolbox/AudioToolbox.h>
 #include <stdio.h>
@@ -146,8 +147,17 @@ static OSStatus theRenderProc(void *inRefCon,
                               UInt32 inBusNumber, UInt32 inNumFrames,
                               AudioBufferList *ioData)
 {
+AudioTimeStamp host_time;
 int amt=av_fifo_size(ao->buffer);
 int req=(inNumFrames)*ao->packetSize;
+
+  p_sys->clock_diff = - (mtime_t)
+    AudioConvertHostTimeToNanos(AudioGetCurrentHostTime()) / 1000;
+  p_sys->clock_diff += mdate();
+
+  //host_time.mFlags = kAudioTimeStampHostTimeValid;
+  //AudioDeviceTranslateTime(ao->i_selected_dev, inTimeStamp, &host_time);
+  //mp_msg(MSGT_AO, MSGL_WARN, "asd: %d\n", AudioConvertHostTimeToNanos(host_time.mHostTime));
 
 	if(amt>req)
  		amt=req;
