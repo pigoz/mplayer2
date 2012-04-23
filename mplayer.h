@@ -31,8 +31,6 @@ extern char ** video_driver_list;
 extern char ** audio_driver_list;
 extern float  audio_delay;
 
-extern unsigned int osd_visible;
-
 extern double force_fps;
 
 extern int stream_cache_size;
