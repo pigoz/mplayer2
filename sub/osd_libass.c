@@ -187,7 +187,7 @@ static ASS_Track *create_osd_ass_track(struct osd_state *osd)
     style->Alignment = 5;
 
     free(style->FontName);
-    style->FontName = strdup(font_name);
+    style->FontName = strdup(font_name ? font_name : "Sans");
 
     return track;
 }
