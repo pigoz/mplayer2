@@ -693,6 +693,7 @@ _coreaudio=auto
 _corevideo=auto
 _cocoa=auto
 _sharedbuffer=auto
+_iosurface=auto
 quicktime=auto
 _macosx_finder=no
 _macosx_bundle=auto
@@ -1124,6 +1125,8 @@ for ac_option do
   --disable-cocoa) _cocoa=no ;;
   --enable-sharedbuffer) _sharedbuffer=yes ;;
   --disable-sharedbuffer) _sharedbuffer=no ;;
+  --enable-iosurface) _iosurface=yes ;;
+  --disable-iosurface) _iosurface=no ;;
   --enable-macosx-finder) _macosx_finder=yes ;;
   --disable-macosx-finder) _macosx_finder=no ;;
   --enable-macosx-bundle) _macosx_bundle=yes ;;
@@ -3870,6 +3873,25 @@ else
 fi
 echores "$_sharedbuffer"
 
+echocheck "IOSurface"
+if test "$_iosurface" = auto ; then
+  cat > $TMPC <<EOF
+#include <IOSurface/IOSurface.h>
+int main(void) {
+  NSApplicationLoad();
+}
+EOF
+  _iosurface=no
+  cc_check -framework Cocoa -framework IOSurface && _iosurface=yes
+fi
+if test "$_iosurface" = yes ; then
+  libs_mplayer="$libs_mplayer -framework Cocoa -framework IOSurfac"
+  def_iosurface='#define CONFIG_IOSURFACE 1'
+else
+  def_iosurface='#undef CONFIG_IOSURFACE'
+fi
+echores "$_iosurface"
+
 depends_on_application_services(){
   test "$_corevideo" = yes
 }
@@ -6407,6 +6429,7 @@ COCOA = $_cocoa
 COREAUDIO = $_coreaudio
 COREVIDEO = $_corevideo
 SHAREDBUFFER = $_sharedbuffer
+IOSURFACE = $_iosurface
 DGA = $_dga
 DIRECT3D = $_direct3d
 DIRECTFB = $_directfb
@@ -6808,6 +6831,7 @@ $def_caca
 $def_corevideo
 $def_cocoa
 $def_sharedbuffer
+$def_iosurface
 $def_dga
 $def_dga1
 $def_dga2
