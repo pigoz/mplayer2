@@ -34,6 +34,13 @@
     available cards when you run this option with ``-v``. Currently only works
     with the directx video output driver.
 
+--af=<filter1[=parameter1:parameter2:...],filter2,...>
+    Specify a list of audio filters to apply to the audio stream. See
+    :ref:`audio_filters` for details and descriptions of the available filters.
+    The option variants ``--af-add``, ``--af-pre``, ``--af-del`` and
+    ``--af-clr`` exist to modify a previously specified list, but you
+    shouldn't need these for typical use.
+
 --af-adv=<force=(0-7):list=(filters)>
     See also ``--af``.
     Specify advanced audio filter options:
@@ -101,6 +108,12 @@
         English if Hungarian is not available.
     ``mplayer --alang=jpn example.mkv``
         Plays a Matroska file in Japanese.
+
+--ao=<driver1[:suboption1[=value]:...],driver2,...[,]>
+    Specify a priority list of audio output drivers to be used. For
+    interactive use you'd normally specify a single one to use, but in
+    configuration files specifying a list of fallbacks may make sense. See
+    :ref:`audio_outputs` for details and descriptions of available drivers.
 
 --ar, --no-ar
       Enable/disable AppleIR remote support. Enabled by default.
@@ -2376,6 +2389,13 @@
     :``--vc=ffmpeg12,mpeg12,``: Try libavcodec's MPEG-1/2 codec, then
                                 libmpeg2, then others.
 
+--vf=<filter1[=parameter1:parameter2:...],filter2,...>
+    Specify a list of video filters to apply to the video stream. See
+    :ref:`video_filters` for details and descriptions of the available filters.
+    The option variants ``--vf-add``, ``--vf-pre``, ``--vf-del`` and
+    ``--vf-clr`` exist to modify a previously specified list, but you
+    shouldn't need these for typical use.
+
 --vfm=<driver1,driver2,...>
     Specify a priority list of video codec families to be used, according to
     their names in codecs.conf. Falls back on the default codecs if none of
@@ -2406,6 +2426,12 @@
     sdl and directx video output drivers. If used with the directx video
     output driver the ``--screenw``, ``--screenh``, ``--bpp`` and
     ``--refreshrate`` options can be used to set the new display mode.
+
+--vo=<driver1[:suboption1[=value]:...],driver2,...[,]>
+    Specify a priority list of video output drivers to be used. For
+    interactive use you'd normally specify a single one to use, but in
+    configuration files specifying a list of fallbacks may make sense. See
+    :ref:`video_outputs` for details and descriptions of available drivers.
 
 --vobsub=<file>
     Specify a VOBsub file to use for subtitles. Has to be the full pathname
