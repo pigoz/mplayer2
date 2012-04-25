@@ -140,25 +140,3 @@ void config_movie_aspect(float config_aspect)
         old_movie_aspect = config_aspect;
     our_aspect_change = 0;
 }
-
-/** This chunk of code is heavily based off SDL_macosx.m from SDL.
- *  The CPSEnableForegroundOperation that was here before is private
- *  and should not be used.
- *  Replaced by a call to the 10.3+ TransformProcessType.
- */
-void osx_foreground_hack(void)
-{
-#if !defined (CONFIG_MACOSX_FINDER) || !defined (CONFIG_SDL)
-    ProcessSerialNumber myProc, frProc;
-    Boolean sameProc;
-
-    if (GetFrontProcess(&frProc)   == noErr &&
-        GetCurrentProcess(&myProc) == noErr) {
-        if (SameProcess(&frProc, &myProc, &sameProc) == noErr && !sameProc) {
-            TransformProcessType(&myProc,
-                                 kProcessTransformToForegroundApplication);
-        }
-        SetFrontProcess(&myProc);
-    }
-#endif
-}
