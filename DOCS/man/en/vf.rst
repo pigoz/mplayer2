@@ -1,3 +1,5 @@
+.. _video_filters:
+
 VIDEO FILTERS
 =============
 

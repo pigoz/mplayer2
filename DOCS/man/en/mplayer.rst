@@ -1,19 +1,7 @@
-.. vim: set et sts=4 sw=4:
-.. mplayer2 © 2000-2011 mplayer2 Team
-.. This man page was/is done by Gabucino, Diego Biurrun, Jonas Jermann.
+mplayer2 manual page
+####################
 
-========
-mplayer2
-========
-
-------------
-movie player
-------------
-
-:Manual section: 1
-
-
-SYNOPSIS
+Synopsis
 ========
 
 | **mplayer** [options] [file|URL|playlist|-]
@@ -419,6 +407,20 @@ option. To end the profile, start another one or use the profile name
 |
 | [ao.alsa]
 | device=spdif
+
+
+OPTIONS
+=======
+
+.. include:: options.rst
+
+.. include:: ao.rst
+
+.. include:: vo.rst
+
+.. include:: af.rst
+
+.. include:: vf.rst
 
 
 ENVIRONMENT VARIABLES

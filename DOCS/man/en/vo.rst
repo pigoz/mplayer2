@@ -1,3 +1,5 @@
+.. _video_outputs:
+
 VIDEO OUTPUT DRIVERS
 ====================
 
