@@ -260,6 +260,7 @@ struct GL {
     void (GLAPIENTRY *TexParameterf)(GLenum, GLenum, GLfloat);
     void (GLAPIENTRY *TexParameterfv)(GLenum, GLenum, const GLfloat *);
     void (GLAPIENTRY *TexCoord2f)(GLfloat, GLfloat);
+    void (GLAPIENTRY *TexCoord2fv)(const GLfloat *);
     void (GLAPIENTRY *Vertex2f)(GLfloat, GLfloat);
     void (GLAPIENTRY *GetIntegerv)(GLenum, GLint *);
     void (GLAPIENTRY *GetBooleanv)(GLenum, GLboolean *);
@@ -274,7 +275,6 @@ struct GL {
     void (GLAPIENTRY *EnableClientState)(GLenum);
     void (GLAPIENTRY *DisableClientState)(GLenum);
     GLenum (GLAPIENTRY *GetError)(void);
-
 
     // OpenGL extension functions
     void (GLAPIENTRY *GenBuffers)(GLsizei, GLuint *);

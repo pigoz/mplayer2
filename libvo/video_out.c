@@ -118,6 +118,7 @@ extern struct vo_driver video_out_tdfx_vid;
 extern struct vo_driver video_out_xvr100;
 extern struct vo_driver video_out_tga;
 extern struct vo_driver video_out_corevideo;
+extern struct vo_driver video_out_sharedbuffer;
 extern struct vo_driver video_out_pnm;
 extern struct vo_driver video_out_md5sum;
 
@@ -171,9 +172,6 @@ const struct vo_driver *video_out_drivers[] =
 #endif
 #ifdef CONFIG_GL
         &video_out_gl3,
-#if !defined CONFIG_GL_COCOA
-        &video_out_gl,
-#endif
 #endif
 #ifdef CONFIG_X11
         &video_out_x11,
@@ -181,6 +179,15 @@ const struct vo_driver *video_out_drivers[] =
 #endif
 #ifdef CONFIG_SDL
         &video_out_sdl,
+#endif
+#if (defined CONFIG_GL && !defined CONFIG_GL_COCOA)
+        &video_out_gl,
+#endif
+#ifdef CONFIG_SHAREDBUFFER
+        &video_out_sharedbuffer,
+#endif
+#ifdef CONFIG_GL_SDL
+        &video_out_gl_sdl,
 #endif
 #ifdef CONFIG_DGA
         &video_out_dga,

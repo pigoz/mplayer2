@@ -21,6 +21,8 @@
 #import <OpenGL/OpenGL.h>
 #import <QuartzCore/QuartzCore.h>
 #import <CoreServices/CoreServices.h> // for CGDisplayHideCursor and Gestalt
+#include <dlfcn.h>
+
 #include "cocoa_common.h"
 
 #include "options.h"
@@ -66,6 +68,7 @@ struct vo_cocoa_state {
     NSAutoreleasePool *pool;
     GLMPlayerWindow *window;
     NSOpenGLContext *glContext;
+    NSOpenGLPixelFormat *pixelFormat;
 
     NSSize current_video_size;
     NSSize previous_video_size;
@@ -125,6 +128,24 @@ struct vo_cocoa_state *vo_cocoa_init_state(void)
     return s;
 }
 
+bool vo_cocoa_gui_running(void)
+{
+    return !!s;
+}
+
+void *vo_cocoa_glgetaddr(const char *s)
+{
+    void *ret = NULL;
+    void *handle = dlopen(
+        "/System/Library/Frameworks/OpenGL.framework/OpenGL",
+        RTLD_LAZY | RTLD_LOCAL);
+    if (!handle)
+        return NULL;
+    ret = dlsym(handle, s);
+    dlclose(handle);
+    return ret;
+}
+
 int vo_cocoa_init(struct vo *vo)
 {
     s = vo_cocoa_init_state();
@@ -140,6 +161,8 @@ int vo_cocoa_init(struct vo *vo)
 void vo_cocoa_uninit(struct vo *vo)
 {
     CGDisplayShowCursor(kCGDirectMainDisplay);
+    [NSApp setPresentationOptions:NSApplicationPresentationDefault];
+
     [s->window release];
     s->window = nil;
     [s->glContext release];
@@ -148,6 +171,7 @@ void vo_cocoa_uninit(struct vo *vo)
     s->pool = nil;
 
     talloc_free(s);
+    s = nil;
 }
 
 void update_screen_info(void)
@@ -213,6 +237,7 @@ int vo_cocoa_create_window(struct vo *vo, uint32_t d_width,
     if (s->current_video_size.width > 0 || s->current_video_size.height > 0)
         s->previous_video_size = s->current_video_size;
     s->current_video_size = NSMakeSize(d_width, d_height);
+    config_movie_aspect((float)d_width/d_height);
 
     if (!(s->window || s->glContext)) { // keep using the same window
         s->window = [[GLMPlayerWindow alloc] initWithContentRect:NSMakeRect(0, 0, d_width, d_height)
@@ -232,8 +257,8 @@ int vo_cocoa_create_window(struct vo *vo, uint32_t d_width,
         attr[i++] = (NSOpenGLPixelFormatAttribute)16; // 16 bit depth buffer
         attr[i] = (NSOpenGLPixelFormatAttribute)0;
 
-        NSOpenGLPixelFormat *pixelFormat = [[NSOpenGLPixelFormat alloc] initWithAttributes:attr];
-        s->glContext = [[NSOpenGLContext alloc] initWithFormat:pixelFormat shareContext:nil];
+        s->pixelFormat = [[[NSOpenGLPixelFormat alloc] initWithAttributes:attr] autorelease];
+        s->glContext = [[NSOpenGLContext alloc] initWithFormat:s->pixelFormat shareContext:nil];
 
         create_menu();
 
@@ -333,7 +358,6 @@ int vo_cocoa_check_events(struct vo *vo)
         return 0;
     l_vo = vo;
     [NSApp sendEvent:event];
-    l_vo = nil;
 
     if (s->did_resize) {
         s->did_resize = NO;
@@ -365,27 +389,78 @@ int vo_cocoa_swap_interval(int enabled)
     return 0;
 }
 
+void *vo_cocoa_cgl_context(void)
+{
+    return [s->glContext CGLContextObj];
+}
+
+void *vo_cocoa_cgl_pixel_format(void)
+{
+    return [s->pixelFormat CGLPixelFormatObj];
+}
+
+static NSMenuItem *new_menu_item(NSMenu *parent_menu, NSString *title,
+                                 SEL action, NSString *key_equivalent)
+{
+    NSMenuItem *new_item = [[NSMenuItem alloc]
+                                initWithTitle:title
+                                       action:action
+                                keyEquivalent:key_equivalent];
+    [parent_menu addItem:new_item];
+    return [new_item autorelease];
+}
+
+static NSMenuItem *new_main_menu_item(NSMenu *parent_menu, NSMenu *child_menu,
+                                      NSString *title)
+{
+    NSMenuItem *new_item = [[NSMenuItem alloc]
+                                initWithTitle:title
+                                       action:nil
+                                keyEquivalent:@""];
+    [new_item setSubmenu:child_menu];
+    [parent_menu addItem:new_item];
+    return [new_item autorelease];
+}
+
+static NSMenuItem *new_separator(NSMenu *parent_menu)
+{
+    NSMenuItem *new_item = [NSMenuItem separatorItem];
+    [parent_menu addItem:new_item];
+    return new_item;
+}
+
 void create_menu()
 {
-    NSMenu *menu;
-    NSMenuItem *menuItem;
+    NSAutoreleasePool *pool = [NSAutoreleasePool new];
+    NSMenu *main_menu, *m_menu, *a_menu, *w_menu;
+    NSMenuItem *mi;
 
-    menu = [[NSMenu new] autorelease];
-    menuItem = [[NSMenuItem new] autorelease];
-    [menu addItem: menuItem];
-    [NSApp setMainMenu: menu];
+    main_menu = [[NSMenu new] autorelease];
+    mi = [[NSMenuItem new] autorelease];
+    [main_menu addItem: mi];
+    [NSApp setMainMenu: main_menu];
 
-    menu = [[NSMenu alloc] initWithTitle:@"Movie"];
-    menuItem = [[NSMenuItem alloc] initWithTitle:@"Half Size" action:@selector(halfSize) keyEquivalent:@"0"]; [menu addItem:menuItem];
-    menuItem = [[NSMenuItem alloc] initWithTitle:@"Normal Size" action:@selector(normalSize) keyEquivalent:@"1"]; [menu addItem:menuItem];
-    menuItem = [[NSMenuItem alloc] initWithTitle:@"Double Size" action:@selector(doubleSize) keyEquivalent:@"2"]; [menu addItem:menuItem];
+    m_menu = [[[NSMenu alloc] initWithTitle:@"Movie"] autorelease];
+    new_menu_item(m_menu, @"Half Size", @selector(halfSize), @"0");
+    new_menu_item(m_menu, @"Normal Size", @selector(normalSize), @"1");
+    new_menu_item(m_menu, @"Double Size", @selector(doubleSize), @"2");
 
-    menuItem = [[NSMenuItem alloc] initWithTitle:@"Movie" action:nil keyEquivalent:@""];
-    [menuItem setSubmenu:menu];
-    [[NSApp mainMenu] addItem:menuItem];
+    a_menu = [[[NSMenu alloc] initWithTitle:@"Aspect Ratio"] autorelease];
+    new_menu_item(a_menu, @"Original", @selector(aspectOriginal), @"7");
+    new_menu_item(a_menu, @"4:3", @selector(aspectFull), @"8");
+    new_menu_item(a_menu, @"16:9", @selector(aspectWide), @"9");
 
-    [menu release];
-    [menuItem release];
+    new_separator(m_menu);
+    new_main_menu_item(m_menu, a_menu, @"Aspect Ratio");
+
+    new_main_menu_item(main_menu, m_menu, @"Movie");
+
+    w_menu = [[[NSMenu alloc] initWithTitle:@"Window"] autorelease];
+    new_menu_item(w_menu, @"Minimize", @selector(performMiniaturize:), @"m");
+    new_menu_item(w_menu, @"Zoom", @selector(performZoom:), @"z");
+
+    new_main_menu_item(main_menu, w_menu, @"Window");
+    [pool release];
 }
 
 bool is_lion_or_better(void)
@@ -565,18 +640,19 @@ bool is_lion_or_better(void)
 - (void) applicationWillBecomeActive:(NSNotification *)aNotification
 {
     if (vo_fs) {
+        [s->window makeKeyAndOrderFront:s->window];
         [s->window setLevel:s->fullscreen_window_level];
-        [NSApp setPresentationOptions:NSApplicationPresentationHideDock|NSApplicationPresentationHideMenuBar];
-        [s->window makeKeyAndOrderFront:nil];
-        [NSApp activateIgnoringOtherApps: YES];
+        [NSApp setPresentationOptions:NSApplicationPresentationHideDock|
+                                      NSApplicationPresentationHideMenuBar];
     }
 }
 
 - (void) applicationWillResignActive:(NSNotification *)aNotification
 {
     if (vo_fs) {
-        [s->window setLevel:s->windowed_window_level];
         [NSApp setPresentationOptions:NSApplicationPresentationDefault];
+        [s->window setLevel:s->windowed_window_level];
+        [s->window orderBack:s->window];
     }
 }
 
@@ -611,6 +687,24 @@ bool is_lion_or_better(void)
         size.height = s->current_video_size.height * (multiplier);
         [self setContentSize:size keepCentered:YES];
     }
+}
+
+- (void) aspectOriginal {
+    change_movie_aspect(l_vo, -1);
+}
+
+- (void) aspectFull {
+    change_movie_aspect(l_vo, 4.0f/3.0f);
+}
+
+- (void) aspectWide {
+    change_movie_aspect(l_vo, 16.0f/9.0f);
+}
+
+- (void) performZoom:(id)sender
+{
+    [super performZoom:sender];
+    s->did_resize = YES;
 }
 
 - (void) setContentSize:(NSSize)ns keepCentered:(BOOL)keepCentered

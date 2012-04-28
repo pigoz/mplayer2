@@ -302,6 +302,14 @@ static const extfunc_desc_t extfuncs[] = {
     DEF_FUNC_DESC(TexParameteri),
     DEF_FUNC_DESC(TexParameterf),
     DEF_FUNC_DESC(TexParameterfv),
+    DEF_FUNC_DESC(TexCoord2f),
+    DEF_FUNC_DESC(TexCoord2fv),
+    DEF_FUNC_DESC(Vertex2f),
+    DEF_FUNC_DESC(Vertex3f),
+    DEF_FUNC_DESC(Normal3f),
+    DEF_FUNC_DESC(Lightfv),
+    DEF_FUNC_DESC(ColorMaterial),
+    DEF_FUNC_DESC(ShadeModel),
     DEF_FUNC_DESC(GetIntegerv),
     DEF_FUNC_DESC(GetBooleanv),
     DEF_FUNC_DESC(ColorMask),
@@ -310,6 +318,12 @@ static const extfunc_desc_t extfuncs[] = {
     DEF_FUNC_DESC(DrawArrays),
     DEF_FUNC_DESC(GetString),
     DEF_FUNC_DESC(GetError),
+    DEF_FUNC_DESC(VertexPointer),
+    DEF_FUNC_DESC(ColorPointer),
+    DEF_FUNC_DESC(TexCoordPointer),
+    DEF_FUNC_DESC(DrawArrays),
+    DEF_FUNC_DESC(EnableClientState),
+    DEF_FUNC_DESC(DisableClientState),
 
     // legacy GL functions (1.x - 2.x)
     DEF_FUNC_DESC(Begin),
@@ -1732,7 +1746,7 @@ static int create_window_cocoa_gl3(struct MPGLContext *ctx, int gl_flags,
 static int setGlWindow_cocoa(MPGLContext *ctx)
 {
     vo_cocoa_change_attributes(ctx->vo);
-    getFunctions(ctx->gl, (void *)getdladdr, NULL, false);
+    getFunctions(ctx->gl, (void *)vo_cocoa_glgetaddr, NULL);
     if (!ctx->gl->SwapInterval)
         ctx->gl->SwapInterval = vo_cocoa_swap_interval;
     return SET_WINDOW_OK;
