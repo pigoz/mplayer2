@@ -186,9 +186,6 @@ const struct vo_driver *video_out_drivers[] =
 #ifdef CONFIG_SHAREDBUFFER
         &video_out_sharedbuffer,
 #endif
-#ifdef CONFIG_GL_SDL
-        &video_out_gl_sdl,
-#endif
 #ifdef CONFIG_DGA
         &video_out_dga,
 #endif
