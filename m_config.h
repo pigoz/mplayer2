@@ -55,6 +55,8 @@ struct m_config_option {
     struct m_config_save_slot *slots;
     // See \ref ConfigOptionFlags.
     unsigned int flags;
+    // Points to the actual option data.
+    void *data;
 };
 
 // Profiles allow to predefine some sets of options that can then

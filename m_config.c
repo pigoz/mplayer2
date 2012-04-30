@@ -148,21 +148,17 @@ static int list_options(struct m_option *opt, char *name, char *param)
 }
 
 static void m_option_save(const struct m_config *config,
-                          const struct m_option *opt, void *dst)
+                          const struct m_config_option *copt, void *dst)
 {
-    if (opt->type->save) {
-        const void *src = m_option_get_ptr(opt, config->optstruct);
-        opt->type->save(opt, dst, src);
-    }
+    if (copt->opt->type->save)
+        copt->opt->type->save(copt->opt, dst, copt->data);
 }
 
 static void m_option_set(const struct m_config *config,
-                         const struct m_option *opt, const void *src)
+                         const struct m_config_option *copt, const void *src)
 {
-    if (opt->type->set) {
-        void *dst = m_option_get_ptr(opt, config->optstruct);
-        opt->type->set(opt, dst, src);
-    }
+    if (copt->opt->type->set)
+        copt->opt->type->set(copt->opt, copt->data, src);
 }
 
 
@@ -224,7 +220,7 @@ static int m_config_dtor(void *p)
         if (copt->flags & M_CFG_OPT_ALIAS)
             continue;
         if (copt->opt->type->flags & M_OPT_TYPE_DYNAMIC) {
-            void *ptr = m_option_get_ptr(copt->opt, config->optstruct);
+            void *ptr = copt->data;
             if (ptr)
                 m_option_free(copt->opt, ptr);
         }
@@ -259,7 +255,7 @@ void m_config_push(struct m_config *config)
             continue;
 
         // Update the current status
-        m_option_save(config, co->opt, co->slots->data);
+        m_option_save(config, co, co->slots->data);
 
         // Allocate a new slot
         slot = talloc_zero_size(co, sizeof(struct m_config_save_slot) +
@@ -305,14 +301,15 @@ void m_config_pop(struct m_config *config)
             pop++;
         }
         if (pop) // We removed some ctx -> set the previous value
-            m_option_set(config, co->opt, co->slots->data);
+            m_option_set(config, co, co->slots->data);
     }
 
     config->lvl--;
     mp_msg(MSGT_CFGPARSER, MSGL_DBG2, "Config poped level=%d\n", config->lvl);
 }
 
-static void add_options(struct m_config *config, const struct m_option *defs,
+static void add_options(struct m_config *config,
+                        const struct m_option *defs,
                         const char *prefix, char *disabled_feature)
 {
     char *dis = disabled_feature;
@@ -350,6 +347,8 @@ static void m_config_add_option(struct m_config *config,
     co->opt = arg;
     co->disabled_feature = disabled_feature;
 
+    char *optstruct = (char *) config->optstruct;
+    co->data = arg->new ? optstruct + arg->offset : arg->p;
     // Fill in the full name
     if (prefix && *prefix)
         co->name = talloc_asprintf(co, "%s:%s", prefix, arg->name);
@@ -362,10 +361,9 @@ static void m_config_add_option(struct m_config *config,
     } else {
         struct m_config_option *i;
         // Check if there is already an option pointing to this address
-        if (arg->p || arg->new && arg->offset >= 0) {
+        if (co->data) {
             for (i = config->opts; i; i = i->next) {
-                if (arg->new ? (i->opt->new && i->opt->offset == arg->offset)
-                    : (!i->opt->new && i->opt->p == arg->p)) {
+                if (co->data == i->data) {
                     // So we don't save the same vars more than 1 time
                     co->slots = i->slots;
                     co->flags |= M_CFG_OPT_ALIAS;
@@ -377,14 +375,14 @@ static void m_config_add_option(struct m_config *config,
             // Allocate a slot for the defaults
             sl = talloc_zero_size(co, sizeof(struct m_config_save_slot) +
                                   arg->type->size);
-            m_option_save(config, arg, sl->data);
+            m_option_save(config, co, sl->data);
             // Hack to avoid too much trouble with dynamically allocated data:
             // We replace original default and always use a dynamic version
             if ((arg->type->flags & M_OPT_TYPE_DYNAMIC)) {
-                char **hackptr = m_option_get_ptr(arg, config->optstruct);
+                char **hackptr = co->data;
                 if (hackptr && *hackptr) {
                     *hackptr = NULL;
-                    m_option_set(config, arg, sl->data);
+                    m_option_set(config, co, sl->data);
                 }
             }
             sl->lvl = 0;
@@ -521,7 +519,7 @@ static int m_config_parse_option(const struct m_config *config,
         return r;
     // Set the option
     if (set) {
-        m_option_set(config, co->opt, co->slots->data);
+        m_option_set(config, co, co->slots->data);
         co->flags |= M_CFG_OPT_SET;
     }
 
