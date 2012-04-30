@@ -29,6 +29,8 @@
 #include "libmpcodecs/img_format.h"
 #include "mpcommon.h"
 
+struct m_sub_options;
+
 #define VO_EVENT_EXPOSE 1
 #define VO_EVENT_RESIZE 2
 #define VO_EVENT_KEYPRESS 4
@@ -166,6 +168,12 @@ struct vo_driver {
     // Driver buffers or adds (deinterlace) frames and will keep track
     // of pts values itself
     bool buffer_frames;
+
+    // Describe options that can be passed to the VO. If this is NULL,
+    // arguments will be passed as string to preinit(). Otherwise, NULL is
+    // passed to preinit, and vo.priv will be set to an accordingly allocated
+    // struct, with the members set according to the options.
+    struct m_sub_options *options;
 
     // This is set if the driver is not new and contains pointers to
     // old-API functions to be used instead of the ones below.

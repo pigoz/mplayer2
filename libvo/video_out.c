@@ -36,6 +36,7 @@
 #include "old_vo_wrapper.h"
 #include "input/input.h"
 #include "mp_fifo.h"
+#include "m_config.h"
 
 
 #include "mp_msg.h"
@@ -260,6 +261,15 @@ const struct vo_driver *video_out_drivers[] =
 
 static int vo_preinit(struct vo *vo, const char *arg)
 {
+    if (vo->driver->options) {
+        struct m_config *config =
+            m_config_parse_suboptions(vo->driver->options, arg, NULL);
+        if (!config)
+            return -1;
+        talloc_steal(vo, config);
+        vo->priv = config->optstruct;
+        arg = NULL;
+    }
     return vo->driver->preinit(vo, arg);
 }
 
