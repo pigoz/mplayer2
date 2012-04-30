@@ -1078,6 +1078,9 @@ static int parse_subconf(const m_option_t *opt, struct bstr name,
         for (i = 0; subopts[i].name; i++)
             if (!bstrcmp0(subopt, subopts[i].name))
                 break;
+    /* xxx m_config.c wants the names only, and does further verification itself
+     *     on the other hand, does any code even rely on this?
+     *     maybe the suboption parsing code should be refactored
         if (!subopts[i].name) {
             mp_msg(MSGT_CFGPARSER, MSGL_ERR,
                    "Option %.*s: Unknown suboption %.*s\n",
@@ -1087,6 +1090,7 @@ static int parse_subconf(const m_option_t *opt, struct bstr name,
         int r = m_option_parse(&subopts[i], subopt, subparam, false, NULL);
         if (r < 0)
             return r;
+    */
         if (dst) {
             lst = talloc_realloc(NULL, lst, char *, 2 * (nr + 2));
             lst[2 * nr] = bstrdup0(NULL, subopt);
