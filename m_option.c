@@ -1025,7 +1025,7 @@ static int parse_subconf(const m_option_t *opt, struct bstr name,
     int nr = 0, i;
     char **lst = NULL;
 
-    if (param.len == 0)
+    if (param.len == 0 && !(opt->flags & M_OPT_IMPLICIT_DEFAULT))
         return M_OPT_MISSING_PARAM;
 
     struct bstr p = param;
