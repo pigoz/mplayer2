@@ -719,10 +719,11 @@ const m_option_t tvscan_conf[]={
 };
 #endif
 
+extern const struct m_sub_options image_writer_conf;
+
 const m_option_t screenshot_conf[] = {
-    OPT_INTRANGE("jpeg-quality", screenshot_jpeg_quality, 0, 0, 100),
-    OPT_INTRANGE("png-compression", screenshot_png_compression, 0, 0, 9),
-    OPT_STRING("filetype", screenshot_filetype, 0),
+    {"-", (void *) &image_writer_conf, &m_option_type_subconfig_struct,
+     M_OPT_MERGE, .new = 1, .offset = offsetof(MPOpts, screenshot_image_opts)},
     OPT_STRING("template", screenshot_template, 0),
     {0},
 };
