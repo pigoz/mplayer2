@@ -43,6 +43,27 @@
 #include "libmpcodecs/vf_scale.h"
 #include "libvo/csputils.h"
 
+#include "m_option.h"
+
+// MPOpts -> image_writer_opts
+// xxx these macros should take the struct as parameter, but it would be too
+//     much to change right now
+#undef OPT_INTRANGE
+#undef OPT_STRING
+#define OPT_INTRANGE(optname, varname, flags, min, max) {optname, NULL, &m_option_type_int, (flags) | CONF_RANGE, min, max, NULL, 1, offsetof(struct image_writer_opts, varname)}
+#define OPT_STRING(optname, varname, flags) {optname, NULL, &m_option_type_string, flags, 0, 0, NULL, 1, offsetof(struct image_writer_opts, varname)}
+
+const struct m_sub_options image_writer_conf = {
+    .opts = (m_option_t[]) {
+        OPT_INTRANGE("jpeg-quality", jpeg_quality, 0, 0, 100),
+        OPT_INTRANGE("png-compression", png_compression, 0, 0, 9),
+        OPT_STRING("filetype", filetype, 0),
+        {0},
+    },
+    .size = sizeof(struct image_writer_opts),
+    .defs = &(struct image_writer_opts) IMAGE_WRITER_OPTS_DEFAULTS,
+};
+
 struct img_writer {
     const char *file_ext;
     int (*write)(const struct image_writer_opts *opts,

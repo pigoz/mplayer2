@@ -26,6 +26,8 @@ struct image_writer_opts {
 
 #define IMAGE_WRITER_OPTS_DEFAULTS {"png", 7, 85}
 
+extern const struct m_sub_options image_writer_conf;
+
 // Return the file extension that will be used, e.g. "png".
 const char *image_writer_file_ext(const struct image_writer_opts *opts);
 
