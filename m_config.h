@@ -223,6 +223,24 @@ int m_config_set_profile_option(struct m_config *config, struct m_profile *p,
  */
 void m_config_set_profile(struct m_config *config, struct m_profile *p);
 
+/*  Parse a sub-option string according to the description in opts.
+ *  Return a m_config struct, which has the opstruct field set to a newly
+ *  allocated struct as described in opts (or set to the optstruct parameter,
+ *  if it was not NULL).
+ *
+ *  NOTE: if optstruct is not NULL, it is not initialized with 0 or with
+ *        opts->defs ! The caller is responsible to do this.
+ *
+ *  Can be free'd with m_config_free().
+ *
+ *  \param opts Describes the arguments and the optstruct to init and return.
+ *  \param args String that should be parsed.
+ *  \param optstruct Target struct. This can be NULL.
+ */
+struct m_config *m_config_parse_suboptions(const struct m_sub_options *opts,
+                                           const char *args,
+                                           void *optstruct);
+
 void *m_config_alloc_struct(void *talloc_parent,
                             const struct m_sub_options *subopts);
 

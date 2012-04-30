@@ -703,6 +703,30 @@ void m_config_set_profile(struct m_config *config, struct m_profile *p)
     config->mode = prev_mode;
 }
 
+struct m_config *m_config_parse_suboptions(const struct m_sub_options *opts,
+                                           const char *args,
+                                           void *optstruct)
+{
+    static const struct m_option dummyopt_data[] = {
+        {"args", NULL, &m_option_type_subconfig_struct,
+         .flags = M_OPT_IMPLICIT_DEFAULT, .new = 1, .offset = 0},
+        {0},
+    };
+    void **dummyopt_struct = optstruct;
+    struct m_config *config = m_config_new(&dummyopt_struct, NULL);
+    struct m_option *dummyopt = talloc_size(config, sizeof(dummyopt_data));
+    memcpy(dummyopt, dummyopt_data, sizeof(dummyopt_data));
+    dummyopt->p = (void *)opts;
+    m_config_register_options(config, dummyopt);
+    if (m_config_set_option0(config, "args", args, 0) != 1) {
+        m_config_free(config);
+        return NULL;
+    }
+    // part of the function interface, m_config shouldn't care about this
+    config->optstruct = dummyopt_struct;
+    return config;
+}
+
 void *m_config_alloc_struct(void *talloc_parent,
                             const struct m_sub_options *subopts)
 {
