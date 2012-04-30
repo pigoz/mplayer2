@@ -52,6 +52,7 @@ extern const m_option_type_t m_option_type_print;
 extern const m_option_type_t m_option_type_print_indirect;
 extern const m_option_type_t m_option_type_print_func;
 extern const m_option_type_t m_option_type_subconfig;
+extern const m_option_type_t m_option_type_subconfig_struct;
 extern const m_option_type_t m_option_type_imgfmt;
 extern const m_option_type_t m_option_type_afmt;
 
@@ -305,6 +306,13 @@ struct m_option {
     int offset;
 };
 
+// m_option.p points to this if M_OPT_TYPE_USE_SUBSTRUCT is used
+struct m_sub_options {
+    const struct m_option *opts;
+    size_t size;
+    const void *defs;
+};
+
 
 // The option has a minimum set in \ref m_option::min.
 #define M_OPT_MIN               (1 << 0)
@@ -398,6 +406,10 @@ struct m_option {
  */
 #define M_OPT_TYPE_INDIRECT             (1 << 3)
 
+// modify M_OPT_TYPE_HAS_CHILD so that m_option::p points to
+// struct m_sub_options, instead of a direct m_option array.
+#define M_OPT_TYPE_USE_SUBSTRUCT        (1 << 4)
+
 ///////////////////////////// Parser flags /////////////////////////////////
 
 // On success parsers return the number of arguments consumed: 0 or 1.
@@ -449,6 +461,9 @@ char *m_option_strerror(int code);
  */
 const m_option_t *m_option_list_find(const m_option_t *list, const char *name);
 
+// xxx this becomes useless - we have to know the "path" to the option.
+//     but this expects either an absolute pointer (opt->p), or an offset
+//     into a single flat struct (MPOpts + opt->offset)
 static inline void *m_option_get_ptr(const struct m_option *opt,
                                      void *optstruct)
 {

@@ -1029,7 +1029,12 @@ static int parse_subconf(const m_option_t *opt, struct bstr name,
         return M_OPT_MISSING_PARAM;
 
     struct bstr p = param;
-    const struct m_option *subopts = opt->p;
+    const struct m_option *subopts;
+    if (opt->type->flags & M_OPT_TYPE_USE_SUBSTRUCT) {
+        const struct m_sub_options *sub = opt->p;
+        subopts = sub->opts;
+    } else
+        subopts = opt->p;
 
     while (p.len) {
         int optlen = bstrcspn(p, ":=");
@@ -1112,6 +1117,19 @@ const m_option_type_t m_option_type_subconfig = {
     "The syntax is -option opt1=foo:flag:opt2=blah",
     sizeof(int),
     M_OPT_TYPE_HAS_CHILD,
+    parse_subconf,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL
+};
+
+const m_option_type_t m_option_type_subconfig_struct = {
+    "Subconfig",
+    "The syntax is -option opt1=foo:flag:opt2=blah",
+    sizeof(int),
+    M_OPT_TYPE_HAS_CHILD | M_OPT_TYPE_USE_SUBSTRUCT,
     parse_subconf,
     NULL,
     NULL,

@@ -30,6 +30,7 @@
 typedef struct m_profile m_profile_t;
 struct m_option;
 struct m_option_type;
+struct m_sub_options;
 
 // Config option save slot
 struct m_config_save_slot {
@@ -221,5 +222,8 @@ int m_config_set_profile_option(struct m_config *config, struct m_profile *p,
  *  \param p The profile object.
  */
 void m_config_set_profile(struct m_config *config, struct m_profile *p);
+
+void *m_config_alloc_struct(void *talloc_parent,
+                            const struct m_sub_options *subopts);
 
 #endif /* MPLAYER_M_CONFIG_H */

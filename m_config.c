@@ -332,6 +332,18 @@ static void add_options(struct m_config *config,
     }
 }
 
+static void *substruct_read_ptr(struct m_config_option *co)
+{
+    void *res;
+    memcpy(&res, co->data, sizeof(void*));
+    return res;
+}
+
+static void substruct_write_ptr(struct m_config_option *co, void *ptr)
+{
+    memcpy(co->data, &ptr, sizeof(void*));
+}
+
 static void m_config_add_option(struct m_config *config,
                                 struct m_config_option *parent,
                                 const struct m_option *arg,
@@ -350,7 +362,11 @@ static void m_config_add_option(struct m_config *config,
     co->opt = arg;
     co->disabled_feature = disabled_feature;
 
-    char *optstruct = (char *) config->optstruct;
+    char *optstruct;
+    if (parent && (parent->opt->type->flags & M_OPT_TYPE_USE_SUBSTRUCT))
+        optstruct = substruct_read_ptr(parent);
+    else
+        optstruct = (char *) config->optstruct;
     co->data = arg->new ? optstruct + arg->offset : arg->p;
 
     if (parent) {
@@ -373,6 +389,12 @@ static void m_config_add_option(struct m_config *config,
     // Option with children -> add them
     if (arg->type->flags & M_OPT_TYPE_HAS_CHILD) {
         const struct m_option *sub = arg->p;
+        if (arg->type->flags & M_OPT_TYPE_USE_SUBSTRUCT) {
+            const struct m_sub_options *subopts = arg->p;
+            if (!substruct_read_ptr(co))
+                substruct_write_ptr(co, m_config_alloc_struct(config, subopts));
+            sub = subopts->opts;
+        }
         add_options(config, co, sub, disabled_feature);
     } else {
         struct m_config_option *i;
@@ -679,4 +701,13 @@ void m_config_set_profile(struct m_config *config, struct m_profile *p)
         m_config_set_option0(config, p->opts[2 * i], p->opts[2 * i + 1], false);
     config->profile_depth--;
     config->mode = prev_mode;
+}
+
+void *m_config_alloc_struct(void *talloc_parent,
+                            const struct m_sub_options *subopts)
+{
+    void *substruct = talloc_zero_size(talloc_parent, subopts->size);
+    if (subopts->defs)
+        memcpy(substruct, subopts->defs, subopts->size);
+    return substruct;
 }
