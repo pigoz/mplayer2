@@ -352,12 +352,22 @@ static void m_config_add_option(struct m_config *config,
 
     char *optstruct = (char *) config->optstruct;
     co->data = arg->new ? optstruct + arg->offset : arg->p;
-    co->parent = parent;
+
+    if (parent) {
+        // Merge case: pretend it has no parent (note that we still must follow
+        //             the "real" parent for accessing struct fields)
+        if (parent->opt->flags & M_OPT_MERGE)
+            co->parent = parent->parent;
+        else
+            co->parent = parent;
+    }
 
     // Fill in the full name
-    if (co->parent)
-        co->name = talloc_asprintf(co, "%s:%s", co->parent->name, arg->name);
-    else
+    if (co->parent) {
+        const char *sep = (co->parent->opt->flags & M_OPT_FLATTEN) ? "-" : ":";
+        co->name = talloc_asprintf(co, "%s%s%s", co->parent->name, sep,
+                                   arg->name);
+    } else
         co->name = (char *)arg->name;
 
     // Option with children -> add them
@@ -400,8 +410,12 @@ static void m_config_add_option(struct m_config *config,
             m_option_copy(co->opt, co->slots->data, sl->data);
         }
     }
-    co->next = config->opts;
-    config->opts = co;
+
+    // pretend that merge options don't exist (only their children matter)
+    if (!(arg->flags & M_OPT_MERGE)) {
+        co->next = config->opts;
+        config->opts = co;
+    }
 }
 
 int m_config_register_options(struct m_config *config,
