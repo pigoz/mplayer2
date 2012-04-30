@@ -55,6 +55,8 @@ struct m_config_option {
     struct m_config_save_slot *slots;
     // See \ref ConfigOptionFlags.
     unsigned int flags;
+    // If this is a suboption, the option that contains this option.
+    struct m_config_option *parent;
     // Points to the actual option data.
     void *data;
 };

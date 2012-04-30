@@ -164,8 +164,9 @@ static void m_option_set(const struct m_config *config,
 
 
 static void m_config_add_option(struct m_config *config,
+                                struct m_config_option *parent,
                                 const struct m_option *arg,
-                                const char *prefix, char *disabled_feature);
+                                char *disabled_feature);
 
 static int m_config_dtor(void *p);
 
@@ -203,7 +204,7 @@ struct m_config *m_config_new(void *optstruct,
             "include", includefunc, CONF_TYPE_FUNC_PARAM,
             CONF_NOSAVE, 0, 0, config
         };
-        m_config_add_option(config, p, NULL, NULL);
+        m_config_add_option(config, NULL, p, NULL);
     }
     config->optstruct = optstruct;
 
@@ -309,8 +310,9 @@ void m_config_pop(struct m_config *config)
 }
 
 static void add_options(struct m_config *config,
+                        struct m_config_option *parent,
                         const struct m_option *defs,
-                        const char *prefix, char *disabled_feature)
+                        char *disabled_feature)
 {
     char *dis = disabled_feature;
     const char marker[] = "conditional functionality: ";
@@ -326,12 +328,13 @@ static void add_options(struct m_config *config,
             }
             continue;
         }
-        m_config_add_option(config, defs + i, prefix, dis);
+        m_config_add_option(config, parent, defs + i, dis);
     }
 }
 
 static void m_config_add_option(struct m_config *config,
-                                const struct m_option *arg, const char *prefix,
+                                struct m_config_option *parent,
+                                const struct m_option *arg,
                                 char *disabled_feature)
 {
     struct m_config_option *co;
@@ -349,15 +352,18 @@ static void m_config_add_option(struct m_config *config,
 
     char *optstruct = (char *) config->optstruct;
     co->data = arg->new ? optstruct + arg->offset : arg->p;
+    co->parent = parent;
+
     // Fill in the full name
-    if (prefix && *prefix)
-        co->name = talloc_asprintf(co, "%s:%s", prefix, arg->name);
+    if (co->parent)
+        co->name = talloc_asprintf(co, "%s:%s", co->parent->name, arg->name);
     else
         co->name = (char *)arg->name;
 
     // Option with children -> add them
     if (arg->type->flags & M_OPT_TYPE_HAS_CHILD) {
-        add_options(config, arg->p, co->name, disabled_feature);
+        const struct m_option *sub = arg->p;
+        add_options(config, co, sub, disabled_feature);
     } else {
         struct m_config_option *i;
         // Check if there is already an option pointing to this address
@@ -405,7 +411,7 @@ int m_config_register_options(struct m_config *config,
     assert(config->lvl > 0);
     assert(args != NULL);
 
-    add_options(config, args, NULL, NULL);
+    add_options(config, NULL, args, NULL);
 
     return 1;
 }
