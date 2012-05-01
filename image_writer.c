@@ -45,6 +45,12 @@
 
 #include "m_option.h"
 
+const struct image_writer_opts image_writer_opts_defaults = {
+    .filetype = "png",
+    .png_compression = 7,
+    .jpeg_quality = 85,
+};
+
 // MPOpts -> image_writer_opts
 // xxx these macros should take the struct as parameter, but it would be too
 //     much to change right now
@@ -61,7 +67,7 @@ const struct m_sub_options image_writer_conf = {
         {0},
     },
     .size = sizeof(struct image_writer_opts),
-    .defs = &(struct image_writer_opts) IMAGE_WRITER_OPTS_DEFAULTS,
+    .defs = &image_writer_opts_defaults,
 };
 
 struct img_writer {
@@ -209,7 +215,7 @@ static const struct img_writer *get_writer(const struct image_writer_opts *opts)
 
 const char *image_writer_file_ext(const struct image_writer_opts *opts)
 {
-    struct image_writer_opts defs = IMAGE_WRITER_OPTS_DEFAULTS;
+    struct image_writer_opts defs = image_writer_opts_defaults;
 
     if (!opts)
         opts = &defs;
@@ -222,7 +228,7 @@ int write_image(struct mp_image *image, const struct mp_csp_details *csp,
 {
     struct mp_image *allocated_image = NULL;
     const int destfmt = IMGFMT_RGB24;
-    struct image_writer_opts defs = IMAGE_WRITER_OPTS_DEFAULTS;
+    struct image_writer_opts defs = image_writer_opts_defaults;
 
     if (!opts)
         opts = &defs;

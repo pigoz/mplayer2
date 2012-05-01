@@ -24,7 +24,7 @@ struct image_writer_opts {
     int jpeg_quality;
 };
 
-#define IMAGE_WRITER_OPTS_DEFAULTS {"png", 7, 85}
+extern const struct image_writer_opts image_writer_opts_defaults;
 
 extern const struct m_sub_options image_writer_conf;
 
