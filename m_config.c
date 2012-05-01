@@ -171,6 +171,8 @@ static void m_config_add_option(struct m_config *config,
                                 const struct m_option *arg,
                                 const char *prefix, char *disabled_feature);
 
+static int m_config_dtor(void *p);
+
 struct m_config *m_config_new(void *optstruct,
                               int includefunc(struct m_option *conf,
                                               char *filename))
@@ -209,11 +211,14 @@ struct m_config *m_config_new(void *optstruct,
     }
     config->optstruct = optstruct;
 
+    talloc_set_destructor(config, m_config_dtor);
+
     return config;
 }
 
-void m_config_free(struct m_config *config)
+static int m_config_dtor(void *p)
 {
+    struct m_config *config = p;
     struct m_config_option *copt;
     for (copt = config->opts; copt; copt = copt->next) {
         if (copt->flags & M_CFG_OPT_ALIAS)
@@ -227,6 +232,11 @@ void m_config_free(struct m_config *config)
         for (sl = copt->slots; sl; sl = sl->prev)
             m_option_free(copt->opt, sl->data);
     }
+    return 0;
+}
+
+void m_config_free(struct m_config *config)
+{
     talloc_free(config);
 }
 

@@ -110,6 +110,7 @@ m_config_new(void *optstruct,
              int includefunc(struct m_option *conf, char *filename));
 
 // Free a config object.
+// It is also allowed to free this with talloc_free(config);
 void m_config_free(struct m_config *config);
 
 /* Push a new context.
