@@ -72,11 +72,13 @@ const struct m_sub_options image_writer_conf = {
 
 struct image_writer_ctx {
     const struct image_writer_opts *opts;
+    const struct img_writer *writer;
 };
 
 struct img_writer {
     const char *file_ext;
     int (*write)(struct image_writer_ctx *ctx, mp_image_t *image, FILE *fp);
+    int *pixfmts;
 };
 
 static int write_png(struct image_writer_ctx *ctx, mp_image_t *image, FILE *fp)
@@ -225,7 +227,6 @@ int write_image(struct mp_image *image, const struct mp_csp_details *csp,
                 const struct image_writer_opts *opts, const char *filename)
 {
     struct mp_image *allocated_image = NULL;
-    const int destfmt = IMGFMT_RGB24;
     struct image_writer_opts defs = image_writer_opts_defaults;
     bool is_anamorphic = image->w != image->width || image->h != image->height;
 
@@ -233,7 +234,18 @@ int write_image(struct mp_image *image, const struct mp_csp_details *csp,
         opts = &defs;
 
     const struct img_writer *writer = get_writer(opts);
-    struct image_writer_ctx ctx = { opts };
+    struct image_writer_ctx ctx = { opts, writer };
+    int destfmt = IMGFMT_RGB24;
+
+    if (writer->pixfmts) {
+        destfmt = writer->pixfmts[0];   // default to first pixel format
+        for (int *fmt = writer->pixfmts; *fmt; fmt++) {
+            if (*fmt == image->imgfmt) {
+                destfmt = *fmt;
+                break;
+            }
+        }
+    }
 
     if (image->imgfmt != destfmt || is_anamorphic) {
         struct mp_image *dst = alloc_mpi(image->w, image->h, destfmt);
