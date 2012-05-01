@@ -70,16 +70,16 @@ const struct m_sub_options image_writer_conf = {
     .defs = &image_writer_opts_defaults,
 };
 
-struct img_writer {
-    const char *file_ext;
-    int (*write)(const struct image_writer_opts *opts,
-                 mp_image_t *image,
-                 FILE *fp);
+struct image_writer_ctx {
+    const struct image_writer_opts *opts;
 };
 
-static int write_png(const struct image_writer_opts *opts,
-                     struct mp_image *image,
-                     FILE *fp)
+struct img_writer {
+    const char *file_ext;
+    int (*write)(struct image_writer_ctx *ctx, mp_image_t *image, FILE *fp);
+};
+
+static int write_png(struct image_writer_ctx *ctx, mp_image_t *image, FILE *fp)
 {
     void *outbuffer = NULL;
     int success = 0;
@@ -97,7 +97,7 @@ static int write_png(const struct image_writer_opts *opts,
     avctx->width = image->width;
     avctx->height = image->height;
     avctx->pix_fmt = PIX_FMT_RGB24;
-    avctx->compression_level = opts->png_compression;
+    avctx->compression_level = ctx->opts->png_compression;
 
     if (avcodec_open2(avctx, png_codec, NULL) < 0) {
      print_open_fail:
@@ -146,9 +146,7 @@ static void write_jpeg_error_exit(j_common_ptr cinfo)
   longjmp(*(jmp_buf*)cinfo->client_data, 1);
 }
 
-static int write_jpeg(const struct image_writer_opts *opts,
-                      mp_image_t *image,
-                      FILE *fp)
+static int write_jpeg(struct image_writer_ctx *ctx, mp_image_t *image, FILE *fp)
 {
     struct jpeg_compress_struct cinfo;
     struct jpeg_error_mgr jerr;
@@ -172,7 +170,7 @@ static int write_jpeg(const struct image_writer_opts *opts,
     cinfo.in_color_space = JCS_RGB;
 
     jpeg_set_defaults(&cinfo);
-    jpeg_set_quality(&cinfo, opts->jpeg_quality, 1);
+    jpeg_set_quality(&cinfo, ctx->opts->jpeg_quality, 1);
 
     jpeg_start_compress(&cinfo, TRUE);
 
@@ -234,6 +232,7 @@ int write_image(struct mp_image *image, const struct mp_csp_details *csp,
         opts = &defs;
 
     const struct img_writer *writer = get_writer(opts);
+    struct image_writer_ctx ctx = { opts };
 
     if (image->imgfmt != destfmt) {
         struct mp_image *dst = alloc_mpi(image->w, image->h, destfmt);
@@ -268,7 +267,7 @@ int write_image(struct mp_image *image, const struct mp_csp_details *csp,
         mp_msg(MSGT_CPLAYER, MSGL_ERR,
                "Error opening '%s' for writing!\n", filename);
     } else {
-        success = writer->write(opts, image, fp);
+        success = writer->write(&ctx, image, fp);
         success = !fclose(fp) && success;
         if (!success)
             mp_msg(MSGT_CPLAYER, MSGL_ERR, "Error writing file '%s'!\n",
