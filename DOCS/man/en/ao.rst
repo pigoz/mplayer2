@@ -53,15 +53,6 @@ sdl (SDL only)
         Explicitly choose the SDL audio driver to use (default: let SDL
         choose).
 
-arts
-    audio output through the aRts daemon
-
-esd
-    audio output through the ESD daemon
-
-    <server>
-        Explicitly choose the ESD server to use (default: localhost).
-
 jack
     audio output through JACK (Jack Audio Connection Kit)
 
@@ -98,13 +89,6 @@ pulse
         Specify the host and optionally output sink to use. An empty <host>
         string uses a local connection, "localhost" uses network transfer
         (most likely not what you want).
-
-sgi (SGI only)
-    native SGI audio output driver
-
-    <output device name>
-        Explicitly choose the output device/interface to use (default:
-        system-wide default). For example, 'Analog Out' or 'Digital Out'.
 
 sun (Sun only)
     native Sun audio output driver
