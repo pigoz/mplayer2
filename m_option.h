@@ -256,6 +256,9 @@ struct m_option {
     int new;
 
     int offset;
+
+    // Initialize variable to given default before parsing options
+    void *defval;
 };
 
 
@@ -424,22 +427,28 @@ static inline void m_option_free(const m_option_t *opt, void *dst)
 #define OPT_START_CONDITIONAL(enable, featurename) OPT_START_CONDITIONAL_AFTERMACROEVAL(enable, featurename)
 #define OPT_START_CONDITIONAL_AFTERMACROEVAL(enable, featurename) {"conditional functionality: " #enable, .p = featurename}
 
-#define OPT_FLAG_ON(optname, varname, flags) {optname, NULL, &m_option_type_flag, flags, 0, 1, NULL, 1, offsetof(struct MPOpts, varname)}
-#define OPT_FLAG_OFF(optname, varname, flags) {optname, NULL, &m_option_type_flag, flags, 1, 0, NULL, 1, offsetof(struct MPOpts, varname)}
+#define OPTDEF_STR(s) .defval = (void *)&(char * const){s}
+#define OPTDEF_INT(i) .defval = (void *)&(const int){i}
+
+#define OPT_FLAG_ON(optname, varname, flags, ...) {optname, NULL, &m_option_type_flag, flags, 0, 1, NULL, 1, offsetof(OPT_BASE_STRUCT, varname), __VA_ARGS__}
+#define OPT_FLAG_OFF(optname, varname, flags) {optname, NULL, &m_option_type_flag, flags, 1, 0, NULL, 1, offsetof(OPT_BASE_STRUCT, varname)}
 #define OPT_MAKE_FLAGS(optname, varname, flags) OPT_FLAG_ON(optname, varname, flags), OPT_FLAG_OFF("no" optname, varname, flags)
-#define OPT_FLAG_CONSTANTS(optname, varname, flags, offvalue, value) {optname, NULL, &m_option_type_flag, flags, offvalue, value, NULL, 1, offsetof(struct MPOpts, varname)}
-#define OPT_STRINGLIST(optname, varname, flags) {optname, NULL, &m_option_type_string_list, flags, 0, 0, NULL, 1, offsetof(struct MPOpts, varname)}
-#define OPT_PATHLIST(optname, varname, flags) {optname, NULL, &m_option_type_string_list, flags, 0, 0, (void *)&(const char){OPTION_PATH_SEPARATOR}, 1, offsetof(struct MPOpts, varname)}
-#define OPT_INT(optname, varname, flags) {optname, NULL, &m_option_type_int, flags, 0, 0, NULL, 1, offsetof(struct MPOpts, varname)}
-#define OPT_INTRANGE(optname, varname, flags, min, max) {optname, NULL, &m_option_type_int, (flags) | CONF_RANGE, min, max, NULL, 1, offsetof(struct MPOpts, varname)}
-#define OPT_INTPAIR(optname, varname, flags) {optname, NULL, &m_option_type_intpair, (flags), 0, 0, NULL, 1, offsetof(struct MPOpts, varname)}
-#define OPT_FLOATRANGE(optname, varname, flags, min, max) {optname, NULL, &m_option_type_float, (flags) | CONF_RANGE, min, max, NULL, 1, offsetof(struct MPOpts, varname)}
-#define OPT_STRING(optname, varname, flags) {optname, NULL, &m_option_type_string, flags, 0, 0, NULL, 1, offsetof(struct MPOpts, varname)}
-#define OPT_SETTINGSLIST(optname, varname, flags, objlist) {optname, NULL, &m_option_type_obj_settings_list, flags, 0, 0, objlist, 1, offsetof(struct MPOpts, varname)}
-#define OPT_AUDIOFORMAT(optname, varname, flags) {optname, NULL, &m_option_type_afmt, flags, 0, 0, NULL, 1, offsetof(struct MPOpts, varname)}
+#define OPT_FLAG_CONSTANTS(optname, varname, flags, offvalue, value) {optname, NULL, &m_option_type_flag, flags, offvalue, value, NULL, 1, offsetof(OPT_BASE_STRUCT, varname)}
+#define OPT_STRINGLIST(optname, varname, flags) {optname, NULL, &m_option_type_string_list, flags, 0, 0, NULL, 1, offsetof(OPT_BASE_STRUCT, varname)}
+#define OPT_PATHLIST(optname, varname, flags) {optname, NULL, &m_option_type_string_list, flags, 0, 0, (void *)&(const char){OPTION_PATH_SEPARATOR}, 1, offsetof(OPT_BASE_STRUCT, varname)}
+#define OPT_INT(optname, varname, flags, ...) {optname, NULL, &m_option_type_int, flags, 0, 0, NULL, 1, offsetof(OPT_BASE_STRUCT, varname), __VA_ARGS__}
+#define OPT_INTRANGE(optname, varname, flags, min, max, ...) {optname, NULL, &m_option_type_int, (flags) | CONF_RANGE, min, max, NULL, 1, offsetof(OPT_BASE_STRUCT, varname), __VA_ARGS__}
+#define OPT_INTPAIR(optname, varname, flags) {optname, NULL, &m_option_type_intpair, (flags), 0, 0, NULL, 1, offsetof(OPT_BASE_STRUCT, varname)}
+#define OPT_FLOAT(optname, varname, flags) {optname, NULL, &m_option_type_float, flags, 0, 0, NULL, 1, offsetof(OPT_BASE_STRUCT, varname)}
+#define OPT_FLOATRANGE(optname, varname, flags, min, max) {optname, NULL, &m_option_type_float, (flags) | CONF_RANGE, min, max, NULL, 1, offsetof(OPT_BASE_STRUCT, varname)}
+#define OPT_STRING(optname, varname, flags, ...) {optname, NULL, &m_option_type_string, flags, 0, 0, NULL, 1, offsetof(OPT_BASE_STRUCT, varname), __VA_ARGS__}
+#define OPT_SETTINGSLIST(optname, varname, flags, objlist) {optname, NULL, &m_option_type_obj_settings_list, flags, 0, 0, objlist, 1, offsetof(OPT_BASE_STRUCT, varname)}
+#define OPT_AUDIOFORMAT(optname, varname, flags) {optname, NULL, &m_option_type_afmt, flags, 0, 0, NULL, 1, offsetof(OPT_BASE_STRUCT, varname)}
 #define OPT_HELPER_REMOVEPAREN(...) __VA_ARGS__
-#define OPT_CHOICE(optname, varname, flags, choices) {optname, NULL, &m_option_type_choice, flags, 0, 0, (void *)&(const struct m_opt_choice_alternatives[]){OPT_HELPER_REMOVEPAREN choices, {NULL}}, 1, offsetof(struct MPOpts, varname)}
-#define OPT_TIME(optname, varname, flags) {optname, NULL, &m_option_type_time, flags, 0, 0, NULL, 1, offsetof(struct MPOpts, varname)}
+#define OPT_CHOICE(optname, varname, flags, choices) {optname, NULL, &m_option_type_choice, flags, 0, 0, (void *)&(const struct m_opt_choice_alternatives[]){OPT_HELPER_REMOVEPAREN choices, {NULL}}, 1, offsetof(OPT_BASE_STRUCT, varname)}
+#define OPT_TIME(optname, varname, flags) {optname, NULL, &m_option_type_time, flags, 0, 0, NULL, 1, offsetof(OPT_BASE_STRUCT, varname)}
 #define OPT_ERRORMESSAGE(optname, message) {optname, message, CONF_TYPE_PRINT}
+
+#define OPT_BASE_STRUCT struct MPOpts
 
 #endif /* MPLAYER_M_OPTION_H */
