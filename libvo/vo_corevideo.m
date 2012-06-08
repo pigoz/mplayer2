@@ -76,7 +76,7 @@ static void resize(struct vo *vo, int width, int height)
     p->image_width = width;
     p->image_height = height;
 
-    mp_msg(MSGT_VO, MSGL_V, "[vo_corevideo] New OpenGL Viewport (0, 0, %d, "
+    mp_msg(MSGT_VO, MSGL_V, "[corevideo] New OpenGL Viewport (0, 0, %d, "
                             "%d)\n", p->image_width, p->image_height);
 
     gl->Viewport(0, 0, p->image_width, p->image_height);
@@ -116,7 +116,7 @@ static int init_gl(struct vo *vo, uint32_t d_width, uint32_t d_height)
     const char *version    = gl->GetString(GL_VERSION);
     const char *renderer   = gl->GetString(GL_RENDERER);
 
-    mp_msg(MSGT_VO, MSGL_V, "[vo_corevideo] Running on OpenGL '%s' by '%s',"
+    mp_msg(MSGT_VO, MSGL_V, "[corevideo] Running on OpenGL '%s' by '%s',"
            " version '%s'\n", renderer, vendor, version);
 
     gl->Disable(GL_BLEND);
@@ -268,7 +268,7 @@ static void prepare_texture(struct vo *vo)
     error = CVOpenGLTextureCacheCreateTextureFromImage(NULL,
                 p->textureCache, p->pixelBuffer, 0, &p->texture);
     if(error != kCVReturnSuccess)
-        mp_msg(MSGT_VO, MSGL_ERR,"[vo_corevideo] Failed to create OpenGL"
+        mp_msg(MSGT_VO, MSGL_ERR,"[corevideo] Failed to create OpenGL"
                                  " texture(%d)\n", error);
 
     CVOpenGLTextureGetCleanTexCoords(p->texture, q->lowerLeft, q->lowerRight,
@@ -325,14 +325,14 @@ static uint32_t draw_image(struct vo *vo, mp_image_t *mpi)
         error = CVOpenGLTextureCacheCreate(NULL, 0, vo_cocoa_cgl_context(),
                     vo_cocoa_cgl_pixel_format(), 0, &p->textureCache);
         if(error != kCVReturnSuccess)
-            mp_msg(MSGT_VO, MSGL_ERR,"[vo_corevideo] Failed to create OpenGL"
+            mp_msg(MSGT_VO, MSGL_ERR,"[corevideo] Failed to create OpenGL"
                                      " texture Cache(%d)\n", error);
 
         error = CVPixelBufferCreateWithBytes(NULL, mpi->width, mpi->height,
                     p->pixelFormat, mpi->planes[0], mpi->width * mpi->bpp / 8,
                     NULL, NULL, NULL, &p->pixelBuffer);
         if(error != kCVReturnSuccess)
-            mp_msg(MSGT_VO, MSGL_ERR,"[vo_corevideo] Failed to create Pixel"
+            mp_msg(MSGT_VO, MSGL_ERR,"[corevideo] Failed to create Pixel"
                                      "Buffer(%d)\n", error);
     }
 
