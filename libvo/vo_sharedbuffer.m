@@ -107,11 +107,11 @@ static void free_buffers(struct priv *p)
 
     if (p->image_data) {
         if (munmap(p->image_data, image_bytes(p)) == -1)
-            mp_msg(MSGT_VO, MSGL_FATAL, "[vo_sharedbuffer] uninit: munmap "
+            mp_msg(MSGT_VO, MSGL_FATAL, "[sharedbuffer] uninit: munmap "
                                         "failed. Error: %s\n", strerror(errno));
 
         if (shm_unlink(p->buffer_name) == -1)
-            mp_msg(MSGT_VO, MSGL_FATAL, "[vo_sharedbuffer] uninit: shm_unlink "
+            mp_msg(MSGT_VO, MSGL_FATAL, "[sharedbuffer] uninit: shm_unlink "
                                         "failed. Error: %s\n", strerror(errno));
     }
 }
@@ -127,21 +127,21 @@ static int config(struct vo *vo, uint32_t width, uint32_t height,
     p->image_width = width;
     p->image_height = height;
 
-    mp_msg(MSGT_VO, MSGL_INFO, "[vo_sharedbuffer] writing output to a shared "
+    mp_msg(MSGT_VO, MSGL_INFO, "[sharedbuffer] writing output to a shared "
         "buffer named \"%s\"\n", p->buffer_name);
 
     // create shared memory
     int shm_fd = shm_open(p->buffer_name, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
     if (shm_fd == -1) {
         mp_msg(MSGT_VO, MSGL_FATAL,
-            "[vo_sharedbuffer] failed to open shared memory. Error: %s\n",
+            "[sharedbuffer] failed to open shared memory. Error: %s\n",
             strerror(errno));
         goto err_out;
     }
 
     if (ftruncate(shm_fd, image_bytes(p)) == -1) {
         mp_msg(MSGT_VO, MSGL_FATAL,
-            "[vo_sharedbuffer] failed to size shared memory, possibly "
+            "[sharedbuffer] failed to size shared memory, possibly "
             "already in use. Error: %s\n", strerror(errno));
         close(shm_fd);
         shm_unlink(p->buffer_name);
@@ -154,7 +154,7 @@ static int config(struct vo *vo, uint32_t width, uint32_t height,
 
     if (p->image_data == MAP_FAILED) {
         mp_msg(MSGT_VO, MSGL_FATAL,
-            "[vo_sharedbuffer] failed to map shared memory. "
+            "[sharedbuffer] failed to map shared memory. "
             "Error: %s\n", strerror(errno));
         shm_unlink(p->buffer_name);
         goto err_out;
@@ -174,7 +174,7 @@ static int config(struct vo *vo, uint32_t width, uint32_t height,
                             withAspect:d_width*100/d_height];
     } else {
         mp_msg(MSGT_VO, MSGL_ERR,
-            "[vo_sharedbuffer] distributed object doesn't conform "
+            "[sharedbuffer] distributed object doesn't conform "
             "to the correct protocol.\n");
         [p->mposx_proxy release];
         p->mposx_proxy = nil;
