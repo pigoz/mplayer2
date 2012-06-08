@@ -18,7 +18,7 @@
  */
 
 /*
- * This video output was extracted from mplayer's corevideo. It's purpose it
+ * This video output was extracted from mplayer's corevideo. It's purpose is
  * to copy mp_image data to a shared buffer using mmap and to do simple
  * coordination with the GUIs using Distributed Objects.
  */
@@ -81,7 +81,7 @@ static int preinit(struct vo *vo, const char *arg)
     if (subopt_parse(arg, subopts) != 0) {
         mp_msg(MSGT_VO, MSGL_FATAL,
             "\n-vo sharedbuffer command line help:\n"
-            "Example: mplayer -vo shared_buffer:buffer_name=mybuff\n"
+            "Example: mplayer -vo sharedbuffer:buffer_name=mybuff\n"
             "\nOptions:\n"
             "  buffer_name=<name>\n"
             "    Name of the shared buffer created with shm_open() as well as\n"
