@@ -19,10 +19,12 @@
 
 // only to get keycode definitions from HIToolbox/Events.h
 #include <Carbon/Carbon.h>
+#include <CoreServices/CoreServices.h>
 #include "config.h"
 #include "osx_common.h"
 #include "input/keycodes.h"
 #include "input/input.h"
+#include "mp_msg.h"
 
 /*
  * Define keycodes only found in OSX >= 10.5 for older versions
@@ -139,4 +141,32 @@ void config_movie_aspect(float config_aspect)
     if (!our_aspect_change)
         old_movie_aspect = config_aspect;
     our_aspect_change = 0;
+}
+
+/**
+ * Checks at runtime that OSX version is the same or newer than the one
+ * provided as input.
+ */
+int is_osx_version_at_least(int majorv, int minorv, int bugfixv)
+{
+    OSErr err;
+    SInt32 major, minor, bugfix;
+    if ((err = Gestalt(gestaltSystemVersionMajor,  &major)) != noErr)
+        goto fail;
+    if ((err = Gestalt(gestaltSystemVersionMinor,  &minor)) != noErr)
+        goto fail;
+    if ((err = Gestalt(gestaltSystemVersionBugFix, &bugfix)) != noErr)
+        goto fail;
+
+    if(major > majorv ||
+        (major == majorv && (minor > minorv ||
+            (minor == minorv && bugfix >= bugfixv))))
+      return 1;
+    else
+      return 0;
+fail:
+    // There's no reason the Gestalt system call should fail on OSX.
+    mp_msg(MSGT_VO, MSGL_FATAL, "[osx] Failed to get system version number. "
+        "Please contact the developers. Error code: %ld\n", (long)err);
+    return 0;
 }

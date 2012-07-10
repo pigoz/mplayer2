@@ -24,5 +24,6 @@
 int convert_key(unsigned key, unsigned charcode);
 void change_movie_aspect(struct vo *vo, float new_aspect);
 void config_movie_aspect(float config_aspect);
+int is_osx_version_at_least(int majorv, int minorv, int bugfixv);
 
 #endif /* MPLAYER_OSX_COMMON_H */
