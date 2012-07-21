@@ -192,6 +192,16 @@ struct bstr bstr_getline(struct bstr str, struct bstr *rest)
         pos = str.len;
     if (rest)
         *rest = bstr_cut(str, pos + 1);
+    return bstr_splice(str, 0, pos + 1);
+}
+
+struct bstr bstr_getline_no_newline(struct bstr str, struct bstr *rest)
+{
+    int pos = bstrchr(str, '\n');
+    if (pos < 0)
+        pos = str.len;
+    if (rest)
+        *rest = bstr_cut(str, pos + 1);
     str.len = pos;
     if (str.len > 0 && str.start[str.len - 1] == '\r')
         str.len -= 1;

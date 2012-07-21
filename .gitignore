@@ -10,8 +10,6 @@
 /version.h
 /codecs.conf.h
 /codec-cfg
-/codec-cfg-test
-/codecs2html
 /cpuinfo
 /tags
 /TAGS
@@ -19,3 +17,6 @@
 /po
 
 libvo/vo_gl3_shaders.h
+/libmpdemux/ebml_defs.c
+/libmpdemux/ebml_types.h
+/libvo/vdpau_template.c

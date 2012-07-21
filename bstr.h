@@ -36,14 +36,18 @@ struct bstr {
 
 // demux_rtp.cpp (live555) C++ compilation workaround
 #ifndef __cplusplus
+// If str.start is NULL, return NULL.
 static inline char *bstrdup0(void *talloc_ctx, struct bstr str)
 {
     return talloc_strndup(talloc_ctx, (char *)str.start, str.len);
 }
 
+// Return start = NULL iff that is true for the original.
 static inline struct bstr bstrdup(void *talloc_ctx, struct bstr str)
 {
-    struct bstr r = { talloc_strndup(talloc_ctx, str.start, str.len), str.len };
+    struct bstr r = { NULL, str.len };
+    if (str.start)
+        r.start = talloc_memdup(talloc_ctx, str.start, str.len);
     return r;
 }
 
@@ -60,6 +64,8 @@ int bstrcspn(struct bstr str, const char *reject);
 
 int bstr_find(struct bstr haystack, struct bstr needle);
 struct bstr *bstr_splitlines(void *talloc_ctx, struct bstr str);
+struct bstr bstr_getline(struct bstr str, struct bstr *rest);
+struct bstr bstr_getline_no_newline(struct bstr str, struct bstr *rest);
 struct bstr bstr_lstrip(struct bstr str);
 struct bstr bstr_strip(struct bstr str);
 struct bstr bstr_split(struct bstr str, const char *sep, struct bstr *rest);
@@ -145,6 +151,11 @@ static inline int bstrcasecmp0(struct bstr str1, const char *str2)
 static inline int bstr_find0(struct bstr haystack, const char *needle)
 {
     return bstr_find(haystack, bstr(needle));
+}
+
+static inline int bstr_eatstart0(struct bstr *s, char *prefix)
+{
+    return bstr_eatstart(s, bstr(prefix));
 }
 
 #endif
