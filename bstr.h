@@ -65,7 +65,6 @@ int bstrcspn(struct bstr str, const char *reject);
 int bstr_find(struct bstr haystack, struct bstr needle);
 struct bstr *bstr_splitlines(void *talloc_ctx, struct bstr str);
 struct bstr bstr_getline(struct bstr str, struct bstr *rest);
-struct bstr bstr_getline_no_newline(struct bstr str, struct bstr *rest);
 struct bstr bstr_lstrip(struct bstr str);
 struct bstr bstr_strip(struct bstr str);
 struct bstr bstr_split(struct bstr str, const char *sep, struct bstr *rest);

@@ -481,14 +481,19 @@ static void update_all_uniforms(struct gl_priv *p)
 static char *get_section(void *talloc_ctx, struct bstr source,
                          const char *section)
 {
+    // append newline to section since bstr_getline returns lines with a
+    // trailing newline character
+    char *sectionn = talloc_strdup(talloc_ctx, section);
+    sectionn = talloc_asprintf_append_buffer(sectionn, "\n");
+
     char *res = talloc_strdup(talloc_ctx, "");
     bool copy = false;
     while (source.len) {
-        struct bstr line = bstr_getline_no_newline(source, &source);
+        struct bstr line = bstr_getline(source, &source);
         if (bstr_eatstart(&line, bstr(SECTION_HEADER))) {
-            copy = bstrcmp0(line, section) == 0;
+            copy = bstrcmp0(line, sectionn) == 0;
         } else if (copy) {
-            res = talloc_asprintf_append_buffer(res, "%.*s\n", BSTR_P(line));
+            res = talloc_asprintf_append_buffer(res, "%.*s", BSTR_P(line));
         }
     }
     return res;
