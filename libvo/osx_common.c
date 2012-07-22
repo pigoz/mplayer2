@@ -19,12 +19,12 @@
 
 // only to get keycode definitions from HIToolbox/Events.h
 #include <Carbon/Carbon.h>
+#include <CoreServices/CoreServices.h>
 #include "config.h"
 #include "osx_common.h"
-#include "old_vo_defines.h"
-#include "video_out.h"
 #include "input/keycodes.h"
 #include "input/input.h"
+#include "mp_msg.h"
 
 /*
  * Define keycodes only found in OSX >= 10.5 for older versions
@@ -122,14 +122,14 @@ static float old_movie_aspect;
  * Sends MPlayer a command to change aspect to the requested value.
  * @param new_aspect desired new aspect, < 0 means restore original.
  */
-void change_movie_aspect(float new_aspect)
+void change_movie_aspect(struct vo *vo, float new_aspect)
 {
     char cmd_str[64];
     if (new_aspect < 0)
         new_aspect = old_movie_aspect;
     our_aspect_change = 1;
     snprintf(cmd_str, sizeof(cmd_str), "switch_ratio %f", new_aspect);
-    mp_input_queue_cmd(global_vo->input_ctx, mp_input_parse_cmd(cmd_str));
+    mp_input_queue_cmd(vo->input_ctx, mp_input_parse_cmd(cmd_str));
 }
 
 /**
@@ -143,24 +143,30 @@ void config_movie_aspect(float config_aspect)
     our_aspect_change = 0;
 }
 
-/** This chunk of code is heavily based off SDL_macosx.m from SDL.
- *  The CPSEnableForegroundOperation that was here before is private
- *  and should not be used.
- *  Replaced by a call to the 10.3+ TransformProcessType.
+/**
+ * Checks at runtime that OSX version is the same or newer than the one
+ * provided as input.
  */
-void osx_foreground_hack(void)
+int is_osx_version_at_least(int majorv, int minorv, int bugfixv)
 {
-#if !defined (CONFIG_MACOSX_FINDER) || !defined (CONFIG_SDL)
-    ProcessSerialNumber myProc, frProc;
-    Boolean sameProc;
+    OSErr err;
+    SInt32 major, minor, bugfix;
+    if ((err = Gestalt(gestaltSystemVersionMajor,  &major)) != noErr)
+        goto fail;
+    if ((err = Gestalt(gestaltSystemVersionMinor,  &minor)) != noErr)
+        goto fail;
+    if ((err = Gestalt(gestaltSystemVersionBugFix, &bugfix)) != noErr)
+        goto fail;
 
-    if (GetFrontProcess(&frProc)   == noErr &&
-        GetCurrentProcess(&myProc) == noErr) {
-        if (SameProcess(&frProc, &myProc, &sameProc) == noErr && !sameProc) {
-            TransformProcessType(&myProc,
-                                 kProcessTransformToForegroundApplication);
-        }
-        SetFrontProcess(&myProc);
-    }
-#endif
+    if(major > majorv ||
+        (major == majorv && (minor > minorv ||
+            (minor == minorv && bugfix >= bugfixv))))
+      return 1;
+    else
+      return 0;
+fail:
+    // There's no reason the Gestalt system call should fail on OSX.
+    mp_msg(MSGT_VO, MSGL_FATAL, "[osx] Failed to get system version number. "
+        "Please contact the developers. Error code: %ld\n", (long)err);
+    return 0;
 }

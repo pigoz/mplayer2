@@ -25,6 +25,8 @@
 
 #include "cocoa_common.h"
 
+#include "config.h"
+
 #include "options.h"
 #include "video_out.h"
 #include "aspect.h"
@@ -51,6 +53,14 @@
 
 #define NSLeftAlternateKeyMask (0x000020 | NSAlternateKeyMask)
 #define NSRightAlternateKeyMask (0x000040 | NSAlternateKeyMask)
+
+// add methods not available on OSX versions prior to 10.7
+#ifndef MAC_OS_X_VERSION_10_7
+@interface NSView (IntroducedInLion)
+- (NSRect)convertRectToBacking:(NSRect)aRect;
+- (void)setWantsBestResolutionOpenGLSurface:(BOOL)aBool;
+@end
+#endif
 
 @interface GLMPlayerWindow : NSWindow <NSWindowDelegate>
 - (BOOL) canBecomeKeyWindow;
@@ -128,6 +138,13 @@ struct vo_cocoa_state *vo_cocoa_init_state(void)
     return s;
 }
 
+static bool supports_hidpi(NSView *view)
+{
+    SEL hdpi_selector = @selector(setWantsBestResolutionOpenGLSurface:);
+    return is_osx_version_at_least(10, 7, 0) && view &&
+           [view respondsToSelector:hdpi_selector];
+}
+
 bool vo_cocoa_gui_running(void)
 {
     return !!s;
@@ -174,6 +191,13 @@ void vo_cocoa_uninit(struct vo *vo)
     s = nil;
 }
 
+static int current_screen_has_dock_or_menubar(void)
+{
+    NSRect f  = s->screen_frame;
+    NSRect vf = [s->screen_handle visibleFrame];
+    return f.size.height > vf.size.height || f.size.width > vf.size.width;
+}
+
 void update_screen_info(void)
 {
     s->screen_array = [NSScreen screens];
@@ -205,8 +229,17 @@ int vo_cocoa_change_attributes(struct vo *vo)
 
 void resize_window(struct vo *vo)
 {
-    vo->dwidth = [[s->window contentView] frame].size.width;
-    vo->dheight = [[s->window contentView] frame].size.height;
+    NSView *view = [s->window contentView];
+    NSRect frame;
+
+    if (supports_hidpi(view)) {
+        frame = [view convertRectToBacking: [view frame]];
+    } else {
+        frame = [view frame];
+    }
+
+    vo->dwidth  = frame.size.width;
+    vo->dheight = frame.size.height;
     [s->glContext update];
 }
 
@@ -237,6 +270,7 @@ int vo_cocoa_create_window(struct vo *vo, uint32_t d_width,
     if (s->current_video_size.width > 0 || s->current_video_size.height > 0)
         s->previous_video_size = s->current_video_size;
     s->current_video_size = NSMakeSize(d_width, d_height);
+    config_movie_aspect((float)d_width/d_height);
 
     if (!(s->window || s->glContext)) { // keep using the same window
         s->window = [[GLMPlayerWindow alloc] initWithContentRect:NSMakeRect(0, 0, d_width, d_height)
@@ -245,9 +279,13 @@ int vo_cocoa_create_window(struct vo *vo, uint32_t d_width,
 
         GLMPlayerOpenGLView *glView = [[GLMPlayerOpenGLView alloc] initWithFrame:NSMakeRect(0, 0, 100, 100)];
 
+        // check for HiDPI support and enable it (available on 10.7 +)
+        if (supports_hidpi(glView))
+            [glView setWantsBestResolutionOpenGLSurface:YES];
+
         int i = 0;
         NSOpenGLPixelFormatAttribute attr[32];
-        if (is_lion_or_better()) {
+        if (is_osx_version_at_least(10, 7, 0)) {
           attr[i++] = NSOpenGLPFAOpenGLProfile;
           attr[i++] = (gl3profile ? NSOpenGLProfileVersion3_2Core : NSOpenGLProfileVersionLegacy);
         } else if(gl3profile) {
@@ -266,6 +304,7 @@ int vo_cocoa_create_window(struct vo *vo, uint32_t d_width,
                 "(GL3 not supported?)\n");
             return -1;
         }
+
         s->glContext = [[NSOpenGLContext alloc] initWithFormat:s->pixelFormat shareContext:nil];
 
         create_menu();
@@ -366,7 +405,6 @@ int vo_cocoa_check_events(struct vo *vo)
         return 0;
     l_vo = vo;
     [NSApp sendEvent:event];
-    l_vo = nil;
 
     if (s->did_resize) {
         s->did_resize = NO;
@@ -424,38 +462,68 @@ int vo_cocoa_cgl_color_size(void)
     return 8;
 }
 
-void create_menu()
+static NSMenuItem *new_menu_item(NSMenu *parent_menu, NSString *title,
+                                 SEL action, NSString *key_equivalent)
 {
-    NSMenu *menu;
-    NSMenuItem *menuItem;
-
-    menu = [[NSMenu new] autorelease];
-    menuItem = [[NSMenuItem new] autorelease];
-    [menu addItem: menuItem];
-    [NSApp setMainMenu: menu];
-
-    menu = [[NSMenu alloc] initWithTitle:@"Movie"];
-    menuItem = [[NSMenuItem alloc] initWithTitle:@"Half Size" action:@selector(halfSize) keyEquivalent:@"0"]; [menu addItem:menuItem];
-    menuItem = [[NSMenuItem alloc] initWithTitle:@"Normal Size" action:@selector(normalSize) keyEquivalent:@"1"]; [menu addItem:menuItem];
-    menuItem = [[NSMenuItem alloc] initWithTitle:@"Double Size" action:@selector(doubleSize) keyEquivalent:@"2"]; [menu addItem:menuItem];
-
-    menuItem = [[NSMenuItem alloc] initWithTitle:@"Movie" action:nil keyEquivalent:@""];
-    [menuItem setSubmenu:menu];
-    [[NSApp mainMenu] addItem:menuItem];
-
-    [menu release];
-    [menuItem release];
+    NSMenuItem *new_item = [[NSMenuItem alloc]
+                                initWithTitle:title
+                                       action:action
+                                keyEquivalent:key_equivalent];
+    [parent_menu addItem:new_item];
+    return [new_item autorelease];
 }
 
-bool is_lion_or_better(void)
+static NSMenuItem *new_main_menu_item(NSMenu *parent_menu, NSMenu *child_menu,
+                                      NSString *title)
 {
-    SInt32 major, minor;
-    Gestalt(gestaltSystemVersionMajor, &major);
-    Gestalt(gestaltSystemVersionMinor, &minor);
-    if(major >= 10 && minor >= 7)
-      return YES;
-    else
-      return NO;
+    NSMenuItem *new_item = [[NSMenuItem alloc]
+                                initWithTitle:title
+                                       action:nil
+                                keyEquivalent:@""];
+    [new_item setSubmenu:child_menu];
+    [parent_menu addItem:new_item];
+    return [new_item autorelease];
+}
+
+static NSMenuItem *new_separator(NSMenu *parent_menu)
+{
+    NSMenuItem *new_item = [NSMenuItem separatorItem];
+    [parent_menu addItem:new_item];
+    return new_item;
+}
+
+void create_menu()
+{
+    NSAutoreleasePool *pool = [NSAutoreleasePool new];
+    NSMenu *main_menu, *m_menu, *a_menu, *w_menu;
+    NSMenuItem *mi;
+
+    main_menu = [[NSMenu new] autorelease];
+    mi = [[NSMenuItem new] autorelease];
+    [main_menu addItem: mi];
+    [NSApp setMainMenu: main_menu];
+
+    m_menu = [[[NSMenu alloc] initWithTitle:@"Movie"] autorelease];
+    new_menu_item(m_menu, @"Half Size", @selector(halfSize), @"0");
+    new_menu_item(m_menu, @"Normal Size", @selector(normalSize), @"1");
+    new_menu_item(m_menu, @"Double Size", @selector(doubleSize), @"2");
+
+    a_menu = [[[NSMenu alloc] initWithTitle:@"Aspect Ratio"] autorelease];
+    new_menu_item(a_menu, @"Original", @selector(aspectOriginal), @"7");
+    new_menu_item(a_menu, @"4:3", @selector(aspectFull), @"8");
+    new_menu_item(a_menu, @"16:9", @selector(aspectWide), @"9");
+
+    new_separator(m_menu);
+    new_main_menu_item(m_menu, a_menu, @"Aspect Ratio");
+
+    new_main_menu_item(main_menu, m_menu, @"Movie");
+
+    w_menu = [[[NSMenu alloc] initWithTitle:@"Window"] autorelease];
+    new_menu_item(w_menu, @"Minimize", @selector(performMiniaturize:), @"m");
+    new_menu_item(w_menu, @"Zoom", @selector(performZoom:), @"z");
+
+    new_main_menu_item(main_menu, w_menu, @"Window");
+    [pool release];
 }
 
 @implementation GLMPlayerWindow
@@ -470,7 +538,8 @@ bool is_lion_or_better(void)
 {
     if (!vo_fs) {
         update_screen_info();
-        [NSApp setPresentationOptions:NSApplicationPresentationHideDock|NSApplicationPresentationHideMenuBar];
+        if (current_screen_has_dock_or_menubar())
+            [NSApp setPresentationOptions:NSApplicationPresentationHideDock|NSApplicationPresentationHideMenuBar];
         s->windowed_frame = [self frame];
         [self setHasShadow:NO];
         [self setStyleMask:s->fullscreen_mask];
@@ -671,6 +740,24 @@ bool is_lion_or_better(void)
         size.height = s->current_video_size.height * (multiplier);
         [self setContentSize:size keepCentered:YES];
     }
+}
+
+- (void) aspectOriginal {
+    change_movie_aspect(l_vo, -1);
+}
+
+- (void) aspectFull {
+    change_movie_aspect(l_vo, 4.0f/3.0f);
+}
+
+- (void) aspectWide {
+    change_movie_aspect(l_vo, 16.0f/9.0f);
+}
+
+- (void) performZoom:(id)sender
+{
+    [super performZoom:sender];
+    s->did_resize = YES;
 }
 
 - (void) setContentSize:(NSSize)ns keepCentered:(BOOL)keepCentered

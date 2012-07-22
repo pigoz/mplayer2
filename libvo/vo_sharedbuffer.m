@@ -18,7 +18,7 @@
  */
 
 /*
- * This video output was extracted from mplayer's corevideo. It's purpose it
+ * This video output was extracted from mplayer's corevideo. It's purpose is
  * to copy mp_image data to a shared buffer using mmap and to do simple
  * coordination with the GUIs using Distributed Objects.
  */
@@ -53,26 +53,25 @@ struct priv {
     id <MPlayerOSXVOProto> mposx_proto;
 };
 
-struct priv *p;
-
 // implementation
 static void draw_alpha(void *ctx, int x0, int y0, int w, int h,
                             unsigned char *src, unsigned char *srca,
                             int stride)
 {
+    struct priv *p = ((struct vo *) ctx)->priv;
     p->vo_draw_alpha_fnc(w, h, src, srca, stride,
         p->image_data + (x0 + y0 * p->image_width) * p->image_bytespp,
         p->image_width * p->image_bytespp);
 }
 
-static unsigned int image_bytes()
+static unsigned int image_bytes(struct priv *p)
 {
     return p->image_width * p->image_height * p->image_bytespp;
 }
 
 static int preinit(struct vo *vo, const char *arg)
 {
-    p = talloc_zero(NULL, struct priv);
+    struct priv *p = talloc_zero(vo, struct priv);
 
     const opt_t subopts[] = {
         {"buffer_name", OPT_ARG_MSTRZ, &p->buffer_name, NULL},
@@ -82,7 +81,7 @@ static int preinit(struct vo *vo, const char *arg)
     if (subopt_parse(arg, subopts) != 0) {
         mp_msg(MSGT_VO, MSGL_FATAL,
             "\n-vo sharedbuffer command line help:\n"
-            "Example: mplayer -vo shared_buffer:buffer_name=mybuff\n"
+            "Example: mplayer -vo sharedbuffer:buffer_name=mybuff\n"
             "\nOptions:\n"
             "  buffer_name=<name>\n"
             "    Name of the shared buffer created with shm_open() as well as\n"
@@ -94,11 +93,14 @@ static int preinit(struct vo *vo, const char *arg)
 
     if (!p->buffer_name) p->buffer_name = "mplayerosx";
 
+    vo->priv = p;
+
     return 0;
 }
 
 static void flip_page(struct vo *vo)
 {
+    struct priv *p = vo->priv;
     NSAutoreleasePool *pool = [NSAutoreleasePool new];
     [p->mposx_proto render];
     [pool release];
@@ -108,6 +110,7 @@ static void check_events(struct vo *vo) { }
 
 static uint32_t draw_image(struct vo *vo, mp_image_t *mpi)
 {
+    struct priv *p = vo->priv;
     memcpy_pic(p->image_data, mpi->planes[0],
                (p->image_width) * (p->image_bytespp), p->image_height,
                (p->image_width) * (p->image_bytespp), mpi->stride[0]);
@@ -115,10 +118,11 @@ static uint32_t draw_image(struct vo *vo, mp_image_t *mpi)
 }
 
 static void draw_osd(struct vo *vo, struct osd_state *osd) {
+    struct priv *p = vo->priv;
     osd_draw_text(osd, p->image_width, p->image_height, draw_alpha, vo);
 }
 
-static void free_buffers(void)
+static void free_buffers(struct priv *p)
 {
     [p->mposx_proto stop];
     p->mposx_proto = nil;
@@ -126,12 +130,12 @@ static void free_buffers(void)
     p->mposx_proxy = nil;
 
     if (p->image_data) {
-        if (munmap(p->image_data, image_bytes()) == -1)
-            mp_msg(MSGT_VO, MSGL_FATAL, "[vo_sharedbuffer] uninit: munmap "
+        if (munmap(p->image_data, image_bytes(p)) == -1)
+            mp_msg(MSGT_VO, MSGL_FATAL, "[sharedbuffer] uninit: munmap "
                                         "failed. Error: %s\n", strerror(errno));
 
         if (shm_unlink(p->buffer_name) == -1)
-            mp_msg(MSGT_VO, MSGL_FATAL, "[vo_sharedbuffer] uninit: shm_unlink "
+            mp_msg(MSGT_VO, MSGL_FATAL, "[sharedbuffer] uninit: shm_unlink "
                                         "failed. Error: %s\n", strerror(errno));
     }
 }
@@ -140,40 +144,41 @@ static int config(struct vo *vo, uint32_t width, uint32_t height,
                   uint32_t d_width, uint32_t d_height, uint32_t flags,
                   uint32_t format)
 {
+    struct priv *p = vo->priv;
     NSAutoreleasePool *pool = [NSAutoreleasePool new];
-    free_buffers();
+    free_buffers(p);
 
     p->image_width = width;
     p->image_height = height;
 
-    mp_msg(MSGT_VO, MSGL_INFO, "[vo_sharedbuffer] writing output to a shared "
+    mp_msg(MSGT_VO, MSGL_INFO, "[sharedbuffer] writing output to a shared "
         "buffer named \"%s\"\n", p->buffer_name);
 
     // create shared memory
     int shm_fd = shm_open(p->buffer_name, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
     if (shm_fd == -1) {
         mp_msg(MSGT_VO, MSGL_FATAL,
-            "[vo_sharedbuffer] failed to open shared memory. Error: %s\n",
+            "[sharedbuffer] failed to open shared memory. Error: %s\n",
             strerror(errno));
         goto err_out;
     }
 
-    if (ftruncate(shm_fd, image_bytes()) == -1) {
+    if (ftruncate(shm_fd, image_bytes(p)) == -1) {
         mp_msg(MSGT_VO, MSGL_FATAL,
-            "[vo_sharedbuffer] failed to size shared memory, possibly "
+            "[sharedbuffer] failed to size shared memory, possibly "
             "already in use. Error: %s\n", strerror(errno));
         close(shm_fd);
         shm_unlink(p->buffer_name);
         goto err_out;
     }
 
-    p->image_data = mmap(NULL, image_bytes(),
+    p->image_data = mmap(NULL, image_bytes(p),
         PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
     close(shm_fd);
 
     if (p->image_data == MAP_FAILED) {
         mp_msg(MSGT_VO, MSGL_FATAL,
-            "[vo_sharedbuffer] failed to map shared memory. "
+            "[sharedbuffer] failed to map shared memory. "
             "Error: %s\n", strerror(errno));
         shm_unlink(p->buffer_name);
         goto err_out;
@@ -193,7 +198,7 @@ static int config(struct vo *vo, uint32_t width, uint32_t height,
                             withAspect:d_width*100/d_height];
     } else {
         mp_msg(MSGT_VO, MSGL_ERR,
-            "[vo_sharedbuffer] distributed object doesn't conform "
+            "[sharedbuffer] distributed object doesn't conform "
             "to the correct protocol.\n");
         [p->mposx_proxy release];
         p->mposx_proxy = nil;
@@ -207,28 +212,29 @@ err_out:
     return 1;
 }
 
-static int query_format(uint32_t format)
+static int query_format(struct vo *vo, uint32_t format)
 {
-  unsigned int image_depth = 0;
-  switch (format) {
-      case IMGFMT_YUY2:
-          p->vo_draw_alpha_fnc = vo_draw_alpha_yuy2;
-          image_depth = 16;
-          goto supported;
-      case IMGFMT_RGB24:
-          p->vo_draw_alpha_fnc = vo_draw_alpha_rgb24;
-          image_depth = 24;
-          goto supported;
-      case IMGFMT_ARGB:
-          p->vo_draw_alpha_fnc = vo_draw_alpha_rgb32;
-          image_depth = 32;
-          goto supported;
-      case IMGFMT_BGRA:
-          p->vo_draw_alpha_fnc = vo_draw_alpha_rgb32;
-          image_depth = 32;
-          goto supported;
-  }
-  return 0;
+    struct priv *p = vo->priv;
+    unsigned int image_depth = 0;
+    switch (format) {
+        case IMGFMT_YUY2:
+            p->vo_draw_alpha_fnc = vo_draw_alpha_yuy2;
+            image_depth = 16;
+            goto supported;
+        case IMGFMT_RGB24:
+            p->vo_draw_alpha_fnc = vo_draw_alpha_rgb24;
+            image_depth = 24;
+            goto supported;
+        case IMGFMT_ARGB:
+            p->vo_draw_alpha_fnc = vo_draw_alpha_rgb32;
+            image_depth = 32;
+            goto supported;
+        case IMGFMT_BGRA:
+            p->vo_draw_alpha_fnc = vo_draw_alpha_rgb32;
+            image_depth = 32;
+            goto supported;
+    }
+    return 0;
 
 supported:
     p->image_bytespp = (image_depth + 7) / 8;
@@ -239,11 +245,13 @@ supported:
 
 static void uninit(struct vo *vo)
 {
-    free_buffers();
+    struct priv *p = vo->priv;
+    free_buffers(p);
 }
 
 static int control(struct vo *vo, uint32_t request, void *data)
 {
+    struct priv *p = vo->priv;
     switch (request) {
         case VOCTRL_DRAW_IMAGE:
             return draw_image(vo, data);
@@ -251,7 +259,7 @@ static int control(struct vo *vo, uint32_t request, void *data)
             [p->mposx_proto toggleFullscreen];
             return VO_TRUE;
         case VOCTRL_QUERY_FORMAT:
-            return query_format(*(uint32_t*)data);
+            return query_format(vo, *(uint32_t*)data);
         case VOCTRL_ONTOP:
             [p->mposx_proto ontop];
             return VO_TRUE;
