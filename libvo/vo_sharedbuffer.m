@@ -18,7 +18,7 @@
  */
 
 /*
- * This video output was extracted from mplayer's corevideo. Its purpose is
+ * This video output was extracted from mplayer's corevideo. It's purpose is
  * to copy mp_image data to a shared buffer using mmap and to do simple
  * coordination with the GUIs using Distributed Objects.
  */
